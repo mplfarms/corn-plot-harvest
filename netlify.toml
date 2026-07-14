@@ -3,12 +3,12 @@
   functions = "netlify/functions"
   command = ""
 
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
+
 [functions]
   node_bundler = "esbuild"
 
-# Never cache the service worker file itself at the CDN edge — it must
-# always be re-fetched so browsers see updates promptly (see public/sw.js
-# for the client-side cache-versioning story).
 [[headers]]
   for = "/sw.js"
   [headers.values]
