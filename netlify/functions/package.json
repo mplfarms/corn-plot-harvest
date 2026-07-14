@@ -1,5 +1,6 @@
 {
-  "name": "corn-plot-harvest-pwa",
-  "private": true,
-  "type": "module"
+  "type": "commonjs",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
 }
