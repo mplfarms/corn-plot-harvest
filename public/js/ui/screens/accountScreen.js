@@ -22,7 +22,7 @@ export function render(container, params) {
 
   // Already signed in (returning visit) — nothing to ask, go straight in.
   if (!force && authStore.getUser()) {
-    navigate("plot-chooser");
+    navigate("workspace");
     return;
   }
 
@@ -45,7 +45,7 @@ export function render(container, params) {
   const unsubscribe = authStore.subscribe(() => {
     if (authStore.getUser()) {
       unsubscribe();
-      navigate("plot-chooser");
+      navigate("workspace");
     }
   });
 

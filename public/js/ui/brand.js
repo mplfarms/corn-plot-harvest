@@ -30,13 +30,16 @@ export const BRANDS = {
     accentLight: "#E2555B",
     accentPale: "#EDA0A3",
     highlight: "#FFDC32",
-    chrome: "#4A1013",
-    // Background tokens use NC+'s official "Seed Corn+" identity blue
-    // (HEX 215AA8, per NC+ Brand Standards Annex I) — pale/dark tints of
-    // it, mirroring how Midwest's bgLight/bgDark are tints of its accent
+    // Chrome (the top bar / browser theme-color background) uses NC+'s
+    // official "Seed Corn+" identity blue directly (HEX 215AA8, per NC+
+    // Brand Standards Annex I) rather than the brand red — requested so
+    // the app's dominant background reads as NC+ blue, not red.
+    chrome: "#215AA8",
+    // bgLight/bgDark/cardDark are pale/dark tints of that same blue,
+    // mirroring how Midwest's bgLight/bgDark are tints of its accent
     // rather than the saturated brand color itself (keeps body text
-    // readable). Accent/highlight/chrome stay the brand's red/yellow —
-    // only the background was asked to change.
+    // readable). Accent/highlight stay the brand's red/yellow — those
+    // are used for buttons and small highlights, not backgrounds.
     cardLight: "#EAF1F8",
     danger: "#C94A4A",
     bgLight: "#EAF1F8",

@@ -6,7 +6,7 @@
 
 import { h, mount } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
-import { getBrand } from "../brand.js";
+import { BRANDS } from "../brand.js";
 import * as brandStore from "../stores/brandStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
 import * as themeStore from "../stores/themeStore.js";
@@ -58,27 +58,33 @@ export function render(container) {
   ]);
 
   // ---- Brand ----
-  const brand = getBrand(brandStore.getState().selectedBrand);
+  const selectedBrandId = brandStore.getState().selectedBrand;
+  const brandSegmented = h(
+    "div",
+    { className: "segmented-control" },
+    Object.values(BRANDS).map((b) =>
+      h(
+        "button",
+        {
+          type: "button",
+          className: "segmented-btn" + (b.id === selectedBrandId ? " segmented-btn-active" : ""),
+          "aria-pressed": b.id === selectedBrandId ? "true" : "false",
+          onclick: () => {
+            if (b.id === selectedBrandId) return;
+            libraryStore.flushDraftToLibrary();
+            brandStore.selectBrand(b.id);
+            render(container);
+          },
+        },
+        b.displayName
+      )
+    )
+  );
+
   const brandCard = h("section", { className: "card" }, [
     h("h3", { className: "section-header" }, "Brand"),
-    h(
-      "p",
-      { className: "field-note" },
-      brand ? `Currently using ${brand.displayName}.` : "No brand selected."
-    ),
-    h(
-      "button",
-      {
-        type: "button",
-        className: "btn btn-secondary",
-        onclick: () => {
-          libraryStore.flushDraftToLibrary();
-          brandStore.clearBrand();
-          navigate("brand-select");
-        },
-      },
-      "Switch Brand"
-    ),
+    h("p", { className: "field-note" }, "Select Brand"),
+    brandSegmented,
   ]);
 
   // ---- Account ----
