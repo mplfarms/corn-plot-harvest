@@ -1209,20 +1209,66 @@ h3.section-header:first-child {
   color: #ffffff;
 }
 
-.rank-badge-gold {
-  background: #d4af37;
+/* Badge color reflects dry-yield statistical significance vs. the trial
+   mean rather than rank position — see significanceBadgeClass() in
+   plotSummary.js. Text color is picked per-fill so the numeral always
+   clears contrast against its background (green is dark enough for white
+   numerals; the light-gray and yellow fills need dark ink instead — see
+   the dataviz skill's "label inside a colored fill" rule). */
+.rank-badge-sig-positive {
+  background: #0ca30c;
+  color: #ffffff;
 }
 
-.rank-badge-silver {
-  background: #a7a7ad;
+.rank-badge-sig-negative {
+  background: #fab219;
+  color: #1a1a19;
 }
 
-.rank-badge-bronze {
-  background: #b0703a;
+.rank-badge-sig-neutral {
+  background: #d8d7d1;
+  color: #1a1a19;
 }
 
-.rank-badge-default {
-  background: var(--accent);
+.significance-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: -4px 0 10px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.significance-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.significance-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.significance-swatch-positive {
+  background: #0ca30c;
+}
+
+.significance-swatch-negative {
+  background: #fab219;
+}
+
+.significance-swatch-neutral {
+  background: #d8d7d1;
+  border: 1px solid var(--border);
+}
+
+.significance-footnote {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: -4px 0 10px;
 }
 
 .ranked-row-body {

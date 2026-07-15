@@ -19,6 +19,8 @@ import {
   valueForMetric,
   moisture,
   dryYieldSummary,
+  dryYieldSignificance,
+  dryYieldLsd,
   orderBrandFirst,
 } from "../../core/yieldCalculator.js";
 import { buildPdf, pdfFilename } from "../../core/pdfBuilder.js";
@@ -41,11 +43,15 @@ function computeRanked(entries, metric, header) {
   return [...withValue, ...withoutValue];
 }
 
-function rankBadgeClass(rank) {
-  if (rank === 1) return "rank-badge rank-badge-gold";
-  if (rank === 2) return "rank-badge rank-badge-silver";
-  if (rank === 3) return "rank-badge rank-badge-bronze";
-  return "rank-badge rank-badge-default";
+// Badge color reflects the entry's dry-yield significance vs. the trial
+// mean (green = statistically higher, yellow = statistically lower, light
+// gray = not a significant difference) rather than its rank position —
+// this holds steady across all 3 metric tabs (Dry Yield/Gross/Moisture)
+// since it's describing the entry's yield standing, not the current sort.
+function significanceBadgeClass(significance) {
+  if (significance === "positive") return "rank-badge rank-badge-sig-positive";
+  if (significance === "negative") return "rank-badge rank-badge-sig-negative";
+  return "rank-badge rank-badge-sig-neutral";
 }
 
 export function render(container, params) {
@@ -287,6 +293,30 @@ export function render(container, params) {
   const ranked = computeRanked(entries, metric, header);
   const showsMoistureLine = metric !== RankingMetric.MOISTURE;
 
+  const lsd = dryYieldLsd(summary);
+  const significanceLegend = h("div", { className: "significance-legend" }, [
+    h("span", { className: "significance-legend-item" }, [
+      h("span", { className: "significance-swatch significance-swatch-positive" }),
+      "Statistically higher yield",
+    ]),
+    h("span", { className: "significance-legend-item" }, [
+      h("span", { className: "significance-swatch significance-swatch-negative" }),
+      "Statistically lower yield",
+    ]),
+    h("span", { className: "significance-legend-item" }, [
+      h("span", { className: "significance-swatch significance-swatch-neutral" }),
+      "Not significantly different",
+    ]),
+  ]);
+  const significanceFootnote =
+    lsd === null
+      ? null
+      : h(
+          "p",
+          { className: "significance-footnote" },
+          `Trial CV ${summary.coefficientOfVariation.toFixed(1)}% — a badge is colored when an entry's dry yield is more than ${lsd.toFixed(1)} bu/ac from the trial mean (simplified single-entry LSD-style threshold; see comments in yieldCalculator.js).`
+        );
+
   const rankedList = h("div", { className: "ranked-list" });
   if (ranked.length === 0) {
     rankedList.appendChild(h("p", { className: "empty-state" }, "No entries yet — add plot entries to see ranked results."));
@@ -301,10 +331,11 @@ export function render(container, params) {
 
     const moistureVal = moisture(result.entry);
     const moistureText = moistureVal === null ? "—" : `${moistureVal.toFixed(1)}%`;
+    const significance = dryYieldSignificance(result.entry, summary);
 
     rankedList.appendChild(
       h("div", { className: "ranked-row card" }, [
-        h("span", { className: rankBadgeClass(rank) }, String(rank)),
+        h("span", { className: significanceBadgeClass(significance) }, String(rank)),
         h("div", { className: "ranked-row-body" }, [
           h("p", { className: "ranked-row-title" }, subtitleParts.length ? subtitleParts.join(" • ") : "Untitled Entry"),
           showsMoistureLine ? h("p", { className: "ranked-row-moisture" }, `Moisture: ${moistureText}`) : null,
@@ -333,6 +364,8 @@ export function render(container, params) {
       segmented,
       summaryCard,
       h("h3", { className: "section-header" }, "Ranked Results"),
+      significanceLegend,
+      significanceFootnote,
       rankedList,
       editPlotBtn,
       menuWrapper,

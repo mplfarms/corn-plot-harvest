@@ -225,6 +225,50 @@ export function dryYieldSummary(entries) {
 }
 
 /**
+ * Simplified single-entry "LSD-style" significance threshold, expressed in
+ * bu/ac. Each plot entry is recorded once (no replicated reps), so there's
+ * no true error term to run a textbook LSD test against. This estimates
+ * spread from the trial's own coefficient of variation (CV% x mean = 1
+ * sample SD in original units) and flags an entry only when it clears
+ * ~2 SD from the trial mean — a documented simplification, not a
+ * textbook-accurate LSD, chosen deliberately conservative since there's
+ * no replication to estimate a real error term from.
+ * @readonly
+ */
+export const SIGNIFICANCE_T_VALUE = 2.0;
+
+/**
+ * @param {DryYieldSummary} summary
+ * @returns {number|null} threshold in bu/ac, or null if there aren't
+ *   enough entries (2+) to estimate a CV from.
+ */
+export function dryYieldLsd(summary) {
+  if (summary.mean === null || summary.coefficientOfVariation === null) return null;
+  return SIGNIFICANCE_T_VALUE * (summary.coefficientOfVariation / 100) * summary.mean;
+}
+
+/**
+ * Classifies one entry's dry yield against the trial mean.
+ * @param {import('./models.js').PlotEntry} entry
+ * @param {DryYieldSummary} summary
+ * @returns {"positive"|"negative"|"neutral"} positive = statistically
+ *   higher yield than the trial mean, negative = statistically lower,
+ *   neutral = not a statistically significant difference (or not enough
+ *   data to tell — same visual treatment either way).
+ */
+export function dryYieldSignificance(entry, summary) {
+  if (summary.mean === null) return "neutral";
+  const y = dryYield(entry);
+  if (y === null) return "neutral";
+  const lsd = dryYieldLsd(summary);
+  if (lsd === null) return "neutral";
+  const delta = y - summary.mean;
+  if (delta > lsd) return "positive";
+  if (delta < -lsd) return "negative";
+  return "neutral";
+}
+
+/**
  * Reorders a DryYieldSummary's byBrand array so the given brand's own
  * average leads the list, regardless of where it'd otherwise land by
  * yield value — everything else keeps its existing highest-to-lowest
