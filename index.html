@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#09452C" />
+  <title>Corn Plot Harvest</title>
+
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Corn Plot" />
+
+  <link rel="stylesheet" href="/css/styles.css" />
+
+  <!-- jsPDF is only used lazily inside pdfBuilder.js's buildPdf(), never at
+       module-eval time, so loading it with `defer` is safe even though it
+       resolves after our own module scripts run. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+
+  <!-- Netlify Identity: the classic widget (not the @netlify/identity npm
+       package) since this app has no build step for its frontend — see
+       src/ui/authStore.js. Deferred classic scripts execute in document
+       order before deferred/module scripts, so window.netlifyIdentity is
+       guaranteed to exist before main.js's authStore.init() runs below. -->
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
