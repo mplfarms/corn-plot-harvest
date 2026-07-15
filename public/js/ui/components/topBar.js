@@ -9,16 +9,19 @@
 // own contextual Back button (left, after Home) and/or extra right-side
 // content (e.g. Plot Summary's share menu), which sits to the left of
 // the Settings gear so the gear always stays the rightmost element.
+//
+// "Home" means the Plot Workspace screen — the brand is chosen once up
+// front and from then on stays fixed for the session; switching brands
+// is a deliberate action tucked into Settings (see settings.js), not
+// something the Home button does as a side effect anymore.
 
 import { h } from "../dom.js";
 import { navigate } from "../router.js";
-import * as brandStore from "../stores/brandStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
 
 function goHome() {
   libraryStore.flushDraftToLibrary();
-  brandStore.clearBrand();
-  navigate("brand-select");
+  navigate("workspace");
 }
 
 /**

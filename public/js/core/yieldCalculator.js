@@ -132,10 +132,20 @@ export function valueForMetric(entry, metric, header) {
 }
 
 /**
+ * @typedef {Object} MaturityAverage
+ * @property {string} maturity display label, e.g. "RM 82" or "RM Not Listed"
+ * @property {number} average
+ * @property {number} count
+ */
+
+/**
  * @typedef {Object} BrandAverage
  * @property {string} brand
  * @property {number} average
  * @property {number} count
+ * @property {MaturityAverage[]} byMaturity same brand's entries, further
+ *   broken out by Relative Maturity, sorted youngest (lowest RM) first;
+ *   entries with no RM listed sort last.
  */
 
 /**
@@ -146,12 +156,36 @@ export function valueForMetric(entry, metric, header) {
  * @property {number} sampleCount
  */
 
+function averageMaturityGroups(entries) {
+  /** @type {Map<string, number[]>} */
+  const groups = new Map();
+  for (const { y, entry } of entries) {
+    const rm = entry.relativeMaturity.trim();
+    const label = rm ? `RM ${rm}` : "RM Not Listed";
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(y);
+  }
+  const byMaturity = Array.from(groups.entries()).map(([maturity, values]) => {
+    const sum = values.reduce((a, b) => a + b, 0);
+    return { maturity, average: sum / values.length, count: values.length };
+  });
+  byMaturity.sort((a, b) => {
+    const an = parseNumber(a.maturity.replace("RM ", ""));
+    const bn = parseNumber(b.maturity.replace("RM ", ""));
+    if (an === null && bn === null) return a.maturity.localeCompare(b.maturity);
+    if (an === null) return 1;
+    if (bn === null) return -1;
+    return an - bn;
+  });
+  return byMaturity;
+}
+
 /**
  * @param {import('./models.js').PlotEntry[]} entries
  * @returns {DryYieldSummary}
  */
 export function dryYieldSummary(entries) {
-  /** @type {Map<string, number[]>} */
+  /** @type {Map<string, {y: number, entry: import('./models.js').PlotEntry}[]>} */
   const groups = new Map();
   /** @type {number[]} */
   const allValues = [];
@@ -162,12 +196,18 @@ export function dryYieldSummary(entries) {
     allValues.push(y);
     const brand = entry.brand.trim() || "Unlisted Brand";
     if (!groups.has(brand)) groups.set(brand, []);
-    groups.get(brand).push(y);
+    groups.get(brand).push({ y, entry });
   }
 
-  const byBrand = Array.from(groups.entries()).map(([brand, values]) => {
+  const byBrand = Array.from(groups.entries()).map(([brand, rows]) => {
+    const values = rows.map((r) => r.y);
     const sum = values.reduce((a, b) => a + b, 0);
-    return { brand, average: sum / values.length, count: values.length };
+    return {
+      brand,
+      average: sum / values.length,
+      count: values.length,
+      byMaturity: averageMaturityGroups(rows),
+    };
   });
   byBrand.sort((a, b) => b.average - a.average);
 
@@ -182,4 +222,24 @@ export function dryYieldSummary(entries) {
   }
 
   return { byBrand, mean, coefficientOfVariation, sampleCount };
+}
+
+/**
+ * Reorders a DryYieldSummary's byBrand array so the given brand's own
+ * average leads the list, regardless of where it'd otherwise land by
+ * yield value — everything else keeps its existing highest-to-lowest
+ * order behind it. Used by both the Plot Summary screen and the PDF
+ * export so the two stay consistent.
+ * @param {BrandAverage[]} byBrand
+ * @param {string|null|undefined} leadBrandName e.g. "Midwest Seed Genetics" or "NC+"
+ * @returns {BrandAverage[]}
+ */
+export function orderBrandFirst(byBrand, leadBrandName) {
+  if (!leadBrandName) return byBrand;
+  const idx = byBrand.findIndex((b) => b.brand.trim().toLowerCase() === leadBrandName.toLowerCase());
+  if (idx <= 0) return byBrand;
+  const copy = byBrand.slice();
+  const [lead] = copy.splice(idx, 1);
+  copy.unshift(lead);
+  return copy;
 }

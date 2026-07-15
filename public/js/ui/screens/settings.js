@@ -6,6 +6,9 @@
 
 import { h, mount } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
+import { getBrand } from "../brand.js";
+import * as brandStore from "../stores/brandStore.js";
+import * as libraryStore from "../stores/libraryStore.js";
 import * as themeStore from "../stores/themeStore.js";
 import * as authStore from "../authStore.js";
 import { navigate } from "../router.js";
@@ -54,6 +57,30 @@ export function render(container) {
     segmented,
   ]);
 
+  // ---- Brand ----
+  const brand = getBrand(brandStore.getState().selectedBrand);
+  const brandCard = h("section", { className: "card" }, [
+    h("h3", { className: "section-header" }, "Brand"),
+    h(
+      "p",
+      { className: "field-note" },
+      brand ? `Currently using ${brand.displayName}.` : "No brand selected."
+    ),
+    h(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-secondary",
+        onclick: () => {
+          libraryStore.flushDraftToLibrary();
+          brandStore.clearBrand();
+          navigate("brand-select");
+        },
+      },
+      "Switch Brand"
+    ),
+  ]);
+
   // ---- Account ----
   const user = authStore.getUser();
   const accountCard = h(
@@ -96,6 +123,7 @@ export function render(container) {
     h("div", { className: "screen-body" }, [
       h("h2", { className: "screen-heading" }, "Settings"),
       appearanceCard,
+      brandCard,
       accountCard,
     ]),
   ]);

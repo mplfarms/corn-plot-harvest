@@ -1137,17 +1137,22 @@ h3.section-header:first-child {
   gap: 6px;
 }
 
+.brand-average-block {
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand-average-block:last-child {
+  border-bottom: none;
+  padding-bottom: 4px;
+}
+
 .brand-average-row {
   display: flex;
   justify-content: space-between;
   gap: 10px;
   font-size: 0.88rem;
   padding: 4px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.brand-average-row:last-child {
-  border-bottom: none;
 }
 
 .brand-average-name {
@@ -1155,6 +1160,27 @@ h3.section-header:first-child {
 }
 
 .brand-average-value {
+  color: var(--text-muted);
+}
+
+.brand-average-maturity-list {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-average-maturity-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.brand-average-maturity-name {
   color: var(--text-muted);
 }
 
@@ -1235,14 +1261,11 @@ h3.section-header:first-child {
   position: relative;
 }
 
-.share-menu-toggle {
-  font-size: 1.3rem;
-}
-
 .share-menu-panel {
   position: absolute;
+  left: 0;
   right: 0;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   background: var(--card-bg);
   color: var(--text);
   border-radius: 12px;
@@ -1250,7 +1273,6 @@ h3.section-header:first-child {
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  min-width: 240px;
   overflow: hidden;
   z-index: 30;
 }

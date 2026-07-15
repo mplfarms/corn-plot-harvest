@@ -19,6 +19,7 @@ import {
   valueForMetric,
   moisture,
   dryYieldSummary,
+  orderBrandFirst,
 } from "../../core/yieldCalculator.js";
 import { buildPdf, pdfFilename } from "../../core/pdfBuilder.js";
 import { buildXlsx, createEffectiveLists } from "../../core/xlsxBuilder.js";
@@ -184,7 +185,7 @@ export function render(container, params) {
   menuPanel.appendChild(menuAction(`Email XLSX to ${brand ? brand.displayName : "Operations"} Operations`, handleEmailXlsx));
 
   const menuWrapper = h("div", { className: "share-menu-wrapper" }, [
-    h("button", { type: "button", className: "top-bar-btn share-menu-toggle", onclick: toggleMenu, "aria-label": "Share and export options" }, "⋯"),
+    h("button", { type: "button", className: "btn btn-secondary btn-block", onclick: toggleMenu }, "Share This Plot"),
     menuPanel,
   ]);
 
@@ -192,7 +193,6 @@ export function render(container, params) {
     title: "Plot Summary",
     onBack: () => navigate("workspace"),
     backLabel: "Menu",
-    right: menuWrapper,
   });
 
   // ---- Header card ----
@@ -228,18 +228,8 @@ export function render(container, params) {
   // The selected brand (Midwest Seed Genetics or NC+) always leads the
   // "Average By Brand" list, regardless of where it'd otherwise land by
   // average value — everything else keeps its existing highest-to-lowest
-  // order behind it.
-  const byBrandOrdered = (() => {
-    if (!brand) return summary.byBrand;
-    const idx = summary.byBrand.findIndex(
-      (b) => b.brand.trim().toLowerCase() === brand.displayName.toLowerCase()
-    );
-    if (idx <= 0) return summary.byBrand;
-    const copy = summary.byBrand.slice();
-    const [selected] = copy.splice(idx, 1);
-    copy.unshift(selected);
-    return copy;
-  })();
+  // order behind it. Shared with the PDF export so both stay consistent.
+  const byBrandOrdered = orderBrandFirst(summary.byBrand, brand ? brand.displayName : null);
 
   const summaryCard = h("section", { className: "card" }, [
     h("h3", { className: "section-header" }, "Dry Yield Summary"),
@@ -271,9 +261,21 @@ export function render(container, params) {
           "ul",
           { className: "brand-average-list" },
           byBrandOrdered.map((b) =>
-            h("li", { className: "brand-average-row" }, [
-              h("span", { className: "brand-average-name" }, b.brand),
-              h("span", { className: "brand-average-value" }, `${b.average.toFixed(1)} bu/ac (n=${b.count})`),
+            h("li", { className: "brand-average-block" }, [
+              h("div", { className: "brand-average-row" }, [
+                h("span", { className: "brand-average-name" }, b.brand),
+                h("span", { className: "brand-average-value" }, `${b.average.toFixed(1)} bu/ac (n=${b.count})`),
+              ]),
+              h(
+                "ul",
+                { className: "brand-average-maturity-list" },
+                b.byMaturity.map((m) =>
+                  h("li", { className: "brand-average-maturity-row" }, [
+                    h("span", { className: "brand-average-maturity-name" }, m.maturity),
+                    h("span", {}, `${m.average.toFixed(1)} bu/ac (n=${m.count})`),
+                  ])
+                )
+              ),
             ])
           )
         )
@@ -333,6 +335,7 @@ export function render(container, params) {
       h("h3", { className: "section-header" }, "Ranked Results"),
       rankedList,
       editPlotBtn,
+      menuWrapper,
     ]),
   ]);
 

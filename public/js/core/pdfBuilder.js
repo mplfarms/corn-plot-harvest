@@ -6,7 +6,7 @@
 // (inside buildPdf) rather than importing it, since there is no bundler
 // and no npm install in this sandbox.
 
-import { rankingMetricMeta, moisture, dryYieldSummary } from "./yieldCalculator.js";
+import { rankingMetricMeta, moisture, dryYieldSummary, orderBrandFirst } from "./yieldCalculator.js";
 import { filenameYear } from "./models.js";
 import { exportFilename } from "./xlsxBuilder.js";
 
@@ -159,22 +159,31 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
-      doc.text("Average Dry Yield by Brand:", MARGIN, y + 9 * 0.8);
+      doc.text("Average Dry Yield by Brand (by Relative Maturity):", MARGIN, y + 9 * 0.8);
       y += 9 * 1.15 + 4;
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      const colWidth = tableWidth / 2;
-      const lineHeight = 9 * 1.3;
-      for (let i = 0; i < summary.byBrand.length; i++) {
-        const b = summary.byBrand[i];
-        const col = i % 2;
-        const row = Math.floor(i / 2);
-        const text = `${b.brand}: ${b.average.toFixed(1)} bu/ac (n=${b.count})`;
-        doc.text(text, MARGIN + col * colWidth, y + row * lineHeight + 9 * 0.8);
+      // The selected brand (Midwest Seed Genetics or NC+) always leads,
+      // same rule as the Plot Summary screen, so the two stay consistent.
+      const orderedByBrand = orderBrandFirst(summary.byBrand, brand ? brand.displayName : null);
+      const brandLineHeight = 9 * 1.3;
+      const maturityLineHeight = 8 * 1.25;
+      for (const b of orderedByBrand) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text(`${b.brand}: ${b.average.toFixed(1)} bu/ac (n=${b.count})`, MARGIN, y + 9 * 0.8);
+        y += brandLineHeight;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(110, 110, 110);
+        for (const m of b.byMaturity) {
+          doc.text(`${m.maturity}: ${m.average.toFixed(1)} bu/ac (n=${m.count})`, MARGIN + 14, y + 8 * 0.8);
+          y += maturityLineHeight;
+        }
+        doc.setTextColor(0, 0, 0);
+        y += 3;
       }
-      const rowCount = Math.ceil(summary.byBrand.length / 2);
-      y += rowCount * lineHeight + 6;
+      y += 3;
     }
 
     doc.setDrawColor(200, 200, 200);
