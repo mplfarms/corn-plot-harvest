@@ -114,9 +114,22 @@ function createWheelSelectBase(opts) {
     if (onChange) onChange(val);
   }
 
+  // Row height mirrors .wheel-option's min-height (44px) in styles.css.
+  // The top/bottom spacers only exist so scroll-snap can center the
+  // first/last real option in the 176px-tall viewport — when a list is
+  // short enough that every option already fits without scrolling, that
+  // spacer has nowhere to scroll to and just sits there as a permanent
+  // blank row above the options. Skip it in that case.
+  const WHEEL_OPTION_ROW_HEIGHT = 44;
+  const WHEEL_SCROLL_VIEWPORT_HEIGHT = 176;
+
   function buildPanel() {
+    const rowCount = currentOptions.length + (extendable ? 1 : 0);
+    const needsScroll = rowCount * WHEEL_OPTION_ROW_HEIGHT > WHEEL_SCROLL_VIEWPORT_HEIGHT;
+
     const scrollEl = h("div", { className: "wheel-scroll", role: "listbox", tabindex: "0" });
-    scrollEl.appendChild(h("div", { className: "wheel-spacer", "aria-hidden": "true" }));
+    if (!needsScroll) scrollEl.classList.add("wheel-scroll-fit");
+    if (needsScroll) scrollEl.appendChild(h("div", { className: "wheel-spacer", "aria-hidden": "true" }));
 
     for (const opt of currentOptions) {
       const isSelected = opt.value === currentValue;
@@ -162,15 +175,17 @@ function createWheelSelectBase(opts) {
       );
     }
 
-    scrollEl.appendChild(h("div", { className: "wheel-spacer", "aria-hidden": "true" }));
+    if (needsScroll) scrollEl.appendChild(h("div", { className: "wheel-spacer", "aria-hidden": "true" }));
 
     const panel = h("div", { className: "wheel-panel" }, scrollEl);
 
-    requestAnimationFrame(() => {
-      const selectedEl = scrollEl.querySelector(".wheel-option-selected");
-      const target = selectedEl || scrollEl.querySelector(".wheel-option");
-      if (target && target.scrollIntoView) target.scrollIntoView({ block: "center", behavior: "auto" });
-    });
+    if (needsScroll) {
+      requestAnimationFrame(() => {
+        const selectedEl = scrollEl.querySelector(".wheel-option-selected");
+        const target = selectedEl || scrollEl.querySelector(".wheel-option");
+        if (target && target.scrollIntoView) target.scrollIntoView({ block: "center", behavior: "auto" });
+      });
+    }
 
     return panel;
   }

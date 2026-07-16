@@ -72,9 +72,18 @@ export function addEntry(entry) {
 // most recently added entry instead of starting blank.
 const CARRIED_MEASUREMENT_FIELDS = ["stripLengthFeet", "numberOfRows", "widthInches"];
 
+// Hybrid / RM / Trait are carried forward too — not because they're
+// usually identical, but so each of those selection lists opens already
+// scrolled to the previous entry's pick (wheelSelect.js auto-scrolls to
+// whatever the current value is) instead of the top of a long list. The
+// user still has to actively confirm or change it for the new entry.
+const CARRIED_IDENTITY_FIELDS = ["hybrid", "relativeMaturity", "trait"];
+
 /**
  * Adds a new blank entry, prepopulating Strip Length, Number of Rows,
- * and Width from the most recently added entry (if any).
+ * Width, Hybrid, Relative Maturity, and Trait from the most recently
+ * added entry (if any) — the first entry in a new plot has nothing to
+ * carry forward from; see entryEditor.js for how it defaults instead.
  * @returns {import('../../core/models.js').PlotEntry}
  */
 export function addEntryCarryingMeasurements() {
@@ -82,6 +91,7 @@ export function addEntryCarryingMeasurements() {
   const entry = createPlotEntry();
   if (prev) {
     for (const key of CARRIED_MEASUREMENT_FIELDS) entry[key] = prev[key];
+    for (const key of CARRIED_IDENTITY_FIELDS) entry[key] = prev[key];
   }
   return addEntry(entry);
 }

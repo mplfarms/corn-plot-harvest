@@ -132,20 +132,10 @@ export function valueForMetric(entry, metric, header) {
 }
 
 /**
- * @typedef {Object} MaturityAverage
- * @property {string} maturity display label, e.g. "RM 82" or "RM Not Listed"
- * @property {number} average
- * @property {number} count
- */
-
-/**
  * @typedef {Object} BrandAverage
  * @property {string} brand
  * @property {number} average
  * @property {number} count
- * @property {MaturityAverage[]} byMaturity same brand's entries, further
- *   broken out by Relative Maturity, sorted youngest (lowest RM) first;
- *   entries with no RM listed sort last.
  */
 
 /**
@@ -156,36 +146,12 @@ export function valueForMetric(entry, metric, header) {
  * @property {number} sampleCount
  */
 
-function averageMaturityGroups(entries) {
-  /** @type {Map<string, number[]>} */
-  const groups = new Map();
-  for (const { y, entry } of entries) {
-    const rm = entry.relativeMaturity.trim();
-    const label = rm ? `RM ${rm}` : "RM Not Listed";
-    if (!groups.has(label)) groups.set(label, []);
-    groups.get(label).push(y);
-  }
-  const byMaturity = Array.from(groups.entries()).map(([maturity, values]) => {
-    const sum = values.reduce((a, b) => a + b, 0);
-    return { maturity, average: sum / values.length, count: values.length };
-  });
-  byMaturity.sort((a, b) => {
-    const an = parseNumber(a.maturity.replace("RM ", ""));
-    const bn = parseNumber(b.maturity.replace("RM ", ""));
-    if (an === null && bn === null) return a.maturity.localeCompare(b.maturity);
-    if (an === null) return 1;
-    if (bn === null) return -1;
-    return an - bn;
-  });
-  return byMaturity;
-}
-
 /**
  * @param {import('./models.js').PlotEntry[]} entries
  * @returns {DryYieldSummary}
  */
 export function dryYieldSummary(entries) {
-  /** @type {Map<string, {y: number, entry: import('./models.js').PlotEntry}[]>} */
+  /** @type {Map<string, number[]>} */
   const groups = new Map();
   /** @type {number[]} */
   const allValues = [];
@@ -196,18 +162,12 @@ export function dryYieldSummary(entries) {
     allValues.push(y);
     const brand = entry.brand.trim() || "Unlisted Brand";
     if (!groups.has(brand)) groups.set(brand, []);
-    groups.get(brand).push({ y, entry });
+    groups.get(brand).push(y);
   }
 
-  const byBrand = Array.from(groups.entries()).map(([brand, rows]) => {
-    const values = rows.map((r) => r.y);
+  const byBrand = Array.from(groups.entries()).map(([brand, values]) => {
     const sum = values.reduce((a, b) => a + b, 0);
-    return {
-      brand,
-      average: sum / values.length,
-      count: values.length,
-      byMaturity: averageMaturityGroups(rows),
-    };
+    return { brand, average: sum / values.length, count: values.length };
   });
   byBrand.sort((a, b) => b.average - a.average);
 
@@ -225,46 +185,29 @@ export function dryYieldSummary(entries) {
 }
 
 /**
- * Simplified single-entry "LSD-style" significance threshold, expressed in
- * bu/ac. Each plot entry is recorded once (no replicated reps), so there's
- * no true error term to run a textbook LSD test against. This estimates
- * spread from the trial's own coefficient of variation (CV% x mean = 1
- * sample SD in original units) and flags an entry only when it clears
- * ~2 SD from the trial mean — a documented simplification, not a
- * textbook-accurate LSD, chosen deliberately conservative since there's
- * no replication to estimate a real error term from.
+ * Fixed conditional-formatting threshold (bu/ac) an entry's dry yield must
+ * clear above/below the plot mean to be flagged green/yellow — a plain
+ * cutoff set directly by the user, not a statistical test.
  * @readonly
  */
-export const SIGNIFICANCE_T_VALUE = 2.0;
+export const SIGNIFICANCE_THRESHOLD_BU_AC = 10;
 
 /**
- * @param {DryYieldSummary} summary
- * @returns {number|null} threshold in bu/ac, or null if there aren't
- *   enough entries (2+) to estimate a CV from.
- */
-export function dryYieldLsd(summary) {
-  if (summary.mean === null || summary.coefficientOfVariation === null) return null;
-  return SIGNIFICANCE_T_VALUE * (summary.coefficientOfVariation / 100) * summary.mean;
-}
-
-/**
- * Classifies one entry's dry yield against the trial mean.
+ * Classifies one entry's dry yield against the plot mean using the fixed
+ * +/-10 bu/ac threshold: green ("positive") at 10+ bu/ac over the mean,
+ * yellow ("negative") at 10+ bu/ac under the mean, light gray ("neutral")
+ * for everything in between.
  * @param {import('./models.js').PlotEntry} entry
  * @param {DryYieldSummary} summary
- * @returns {"positive"|"negative"|"neutral"} positive = statistically
- *   higher yield than the trial mean, negative = statistically lower,
- *   neutral = not a statistically significant difference (or not enough
- *   data to tell — same visual treatment either way).
+ * @returns {"positive"|"negative"|"neutral"}
  */
 export function dryYieldSignificance(entry, summary) {
   if (summary.mean === null) return "neutral";
   const y = dryYield(entry);
   if (y === null) return "neutral";
-  const lsd = dryYieldLsd(summary);
-  if (lsd === null) return "neutral";
   const delta = y - summary.mean;
-  if (delta > lsd) return "positive";
-  if (delta < -lsd) return "negative";
+  if (delta >= SIGNIFICANCE_THRESHOLD_BU_AC) return "positive";
+  if (delta <= -SIGNIFICANCE_THRESHOLD_BU_AC) return "negative";
   return "neutral";
 }
 
@@ -272,8 +215,7 @@ export function dryYieldSignificance(entry, summary) {
  * Reorders a DryYieldSummary's byBrand array so the given brand's own
  * average leads the list, regardless of where it'd otherwise land by
  * yield value — everything else keeps its existing highest-to-lowest
- * order behind it. Used by both the Plot Summary screen and the PDF
- * export so the two stay consistent.
+ * order behind it.
  * @param {BrandAverage[]} byBrand
  * @param {string|null|undefined} leadBrandName e.g. "Midwest Seed Genetics" or "NC+"
  * @returns {BrandAverage[]}
@@ -286,4 +228,21 @@ export function orderBrandFirst(byBrand, leadBrandName) {
   const [lead] = copy.splice(idx, 1);
   copy.unshift(lead);
   return copy;
+}
+
+/**
+ * Filters a DryYieldSummary's byBrand array down to brands with 2 or more
+ * hybrids in the plot (a "brand average" of a single hybrid isn't a
+ * meaningful average) and puts the given lead brand first among what's
+ * left. Shared by the Plot Summary screen and PDF export so both stay
+ * consistent.
+ * @param {BrandAverage[]} byBrand
+ * @param {string|null|undefined} leadBrandName e.g. "Midwest Seed Genetics" or "NC+"
+ * @returns {BrandAverage[]}
+ */
+export function brandAveragesForDisplay(byBrand, leadBrandName) {
+  return orderBrandFirst(
+    byBrand.filter((b) => b.count >= 2),
+    leadBrandName
+  );
 }

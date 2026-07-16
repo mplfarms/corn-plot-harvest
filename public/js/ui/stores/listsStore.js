@@ -15,12 +15,19 @@ export const CATEGORY = {
   HYBRID: "hybrid",
   TRAIT: "trait",
   SEED_TREATMENT: "seedTreatment",
+  COLLECTED_BY: "collectedBy",
 };
+
+// The shared hybrid catalog (DefaultLists.json's "hybrids") mixes a few
+// different in-house numbering schemes; only these two brands' lists get
+// the noisy non-RM-coded entries filtered out (see hybridItems() below) —
+// other hybridDefaultBrands (e.g. Crow's) are left as-is.
+const HYBRID_HYPHEN_ONLY_BRANDS = ["Midwest Seed Genetics", "NC+ Hybrids"];
 
 const pubsub = createPubSub();
 
 function blankCustom() {
-  return { companies: [], hybridsByBrand: {}, traits: [], seedTreatments: [] };
+  return { companies: [], hybridsByBrand: {}, traits: [], seedTreatments: [], collectionMethods: [] };
 }
 
 function loadCustom() {
@@ -31,6 +38,7 @@ function loadCustom() {
     hybridsByBrand: c.hybridsByBrand && typeof c.hybridsByBrand === "object" ? c.hybridsByBrand : {},
     traits: Array.isArray(c.traits) ? c.traits : [],
     seedTreatments: Array.isArray(c.seedTreatments) ? c.seedTreatments : [],
+    collectionMethods: Array.isArray(c.collectionMethods) ? c.collectionMethods : [],
   };
 }
 
@@ -46,6 +54,7 @@ let state = {
     tillageOptions: [],
     soilTypeOptions: [],
     previousCropOptions: [],
+    collectionMethods: [],
   },
   custom: loadCustom(),
 };
@@ -107,6 +116,8 @@ export function items(category) {
       return [...d.traits, ...c.traits];
     case CATEGORY.SEED_TREATMENT:
       return [...d.seedTreatments, ...c.seedTreatments];
+    case CATEGORY.COLLECTED_BY:
+      return [...d.collectionMethods, ...c.collectionMethods];
     default:
       return [];
   }
@@ -124,9 +135,47 @@ export function hybridItems(forBrand) {
   const isDefaultBrand = (d.hybridDefaultBrands || []).some(
     (b) => b.toLowerCase() === brand.toLowerCase()
   );
-  const base = isDefaultBrand ? d.hybrids : [];
+  let base = isDefaultBrand ? d.hybrids : [];
+  // Midwest Seed Genetics / NC+ Hybrids' shared catalog mixes a few
+  // different in-house numbering schemes; only the "<RM>-<sequence>"
+  // coded entries are kept for these two brands (see
+  // HYBRID_HYPHEN_ONLY_BRANDS and parseHybridRelativeMaturity below) so
+  // the list — and RM defaulting — only surfaces hybrids whose RM is
+  // actually known.
+  const hyphenOnly = HYBRID_HYPHEN_ONLY_BRANDS.some((b) => b.toLowerCase() === brand.toLowerCase());
+  if (hyphenOnly) base = base.filter((h) => h.includes("-"));
   const custom = c.hybridsByBrand[brand] || c.hybridsByBrand[forBrand] || [];
   return [...base, ...custom];
+}
+
+/**
+ * Parses a hybrid's Relative Maturity from its catalog name, following
+ * this catalog's numbering convention: a 2-digit prefix before the first
+ * hyphen is the RM directly for 75-99 ("82-22 VT2PRIB" -> 82), and for
+ * RM 100-120 the catalog drops the leading "1" ("00-31 SSRIB" -> 100,
+ * "18-88 TRERIB" -> 118). Returns null for names that don't follow this
+ * pattern.
+ * @param {string} hybridLabel
+ * @returns {number|null}
+ */
+export function parseHybridRelativeMaturity(hybridLabel) {
+  const m = /^(\d{2,3})-/.exec(String(hybridLabel || "").trim());
+  if (!m) return null;
+  const prefix = parseInt(m[1], 10);
+  if (prefix >= 75 && prefix <= 99) return prefix;
+  if (prefix >= 0 && prefix <= 20) return 100 + prefix;
+  return null;
+}
+
+/**
+ * @param {string} forBrand
+ * @param {number} rm
+ * @returns {string|null} the first hybrid (in catalog order) with this
+ *   parsed RM, or null if none match (e.g. a competitor brand with no
+ *   default catalog at all).
+ */
+export function firstHybridWithRm(forBrand, rm) {
+  return hybridItems(forBrand).find((h) => parseHybridRelativeMaturity(h) === rm) || null;
 }
 
 /**
@@ -151,6 +200,9 @@ export function addCustomItem(raw, category) {
         break;
       case CATEGORY.SEED_TREATMENT:
         next = { ...c, seedTreatments: [...c.seedTreatments, trimmed] };
+        break;
+      case CATEGORY.COLLECTED_BY:
+        next = { ...c, collectionMethods: [...c.collectionMethods, trimmed] };
         break;
       default:
         next = c;
@@ -199,6 +251,9 @@ export function removeCustomItem(value, category) {
       break;
     case CATEGORY.SEED_TREATMENT:
       next = { ...c, seedTreatments: c.seedTreatments.filter((v) => v !== value) };
+      break;
+    case CATEGORY.COLLECTED_BY:
+      next = { ...c, collectionMethods: c.collectionMethods.filter((v) => v !== value) };
       break;
     default:
       next = c;

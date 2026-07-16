@@ -20,8 +20,8 @@ import {
   moisture,
   dryYieldSummary,
   dryYieldSignificance,
-  dryYieldLsd,
-  orderBrandFirst,
+  SIGNIFICANCE_THRESHOLD_BU_AC,
+  brandAveragesForDisplay,
 } from "../../core/yieldCalculator.js";
 import { buildPdf, pdfFilename } from "../../core/pdfBuilder.js";
 import { buildXlsx, createEffectiveLists } from "../../core/xlsxBuilder.js";
@@ -43,11 +43,11 @@ function computeRanked(entries, metric, header) {
   return [...withValue, ...withoutValue];
 }
 
-// Badge color reflects the entry's dry-yield significance vs. the trial
-// mean (green = statistically higher, yellow = statistically lower, light
-// gray = not a significant difference) rather than its rank position —
-// this holds steady across all 3 metric tabs (Dry Yield/Gross/Moisture)
-// since it's describing the entry's yield standing, not the current sort.
+// Badge color reflects the entry's dry yield vs. the plot mean (green =
+// 10+ bu/ac over, yellow = 10+ bu/ac under, light gray = within 10 bu/ac
+// either way) rather than its rank position — this holds steady across
+// all 3 metric tabs (Dry Yield/Gross/Moisture) since it's describing the
+// entry's yield standing, not the current sort.
 function significanceBadgeClass(significance) {
   if (significance === "positive") return "rank-badge rank-badge-sig-positive";
   if (significance === "negative") return "rank-badge rank-badge-sig-negative";
@@ -231,11 +231,12 @@ export function render(container, params) {
   // ---- Dry Yield Summary card ----
   const summary = dryYieldSummary(entries);
 
-  // The selected brand (Midwest Seed Genetics or NC+) always leads the
-  // "Average By Brand" list, regardless of where it'd otherwise land by
-  // average value — everything else keeps its existing highest-to-lowest
-  // order behind it. Shared with the PDF export so both stay consistent.
-  const byBrandOrdered = orderBrandFirst(summary.byBrand, brand ? brand.displayName : null);
+  // Only brands with 2+ hybrids in this plot get an average (a "brand
+  // average" of one hybrid isn't meaningful); the selected brand (Midwest
+  // Seed Genetics or NC+) always leads what's left, regardless of where
+  // it'd otherwise land by average value. Shared with the PDF export so
+  // both stay consistent.
+  const byBrandOrdered = brandAveragesForDisplay(summary.byBrand, brand ? brand.displayName : null);
 
   const summaryCard = h("section", { className: "card" }, [
     h("h3", { className: "section-header" }, "Dry Yield Summary"),
@@ -272,16 +273,6 @@ export function render(container, params) {
                 h("span", { className: "brand-average-name" }, b.brand),
                 h("span", { className: "brand-average-value" }, `${b.average.toFixed(1)} bu/ac (n=${b.count})`),
               ]),
-              h(
-                "ul",
-                { className: "brand-average-maturity-list" },
-                b.byMaturity.map((m) =>
-                  h("li", { className: "brand-average-maturity-row" }, [
-                    h("span", { className: "brand-average-maturity-name" }, m.maturity),
-                    h("span", {}, `${m.average.toFixed(1)} bu/ac (n=${m.count})`),
-                  ])
-                )
-              ),
             ])
           )
         )
@@ -293,29 +284,20 @@ export function render(container, params) {
   const ranked = computeRanked(entries, metric, header);
   const showsMoistureLine = metric !== RankingMetric.MOISTURE;
 
-  const lsd = dryYieldLsd(summary);
   const significanceLegend = h("div", { className: "significance-legend" }, [
     h("span", { className: "significance-legend-item" }, [
       h("span", { className: "significance-swatch significance-swatch-positive" }),
-      "Statistically higher yield",
+      `${SIGNIFICANCE_THRESHOLD_BU_AC}+ bu/ac over plot mean`,
     ]),
     h("span", { className: "significance-legend-item" }, [
       h("span", { className: "significance-swatch significance-swatch-negative" }),
-      "Statistically lower yield",
+      `${SIGNIFICANCE_THRESHOLD_BU_AC}+ bu/ac under plot mean`,
     ]),
     h("span", { className: "significance-legend-item" }, [
       h("span", { className: "significance-swatch significance-swatch-neutral" }),
-      "Not significantly different",
+      `Within ${SIGNIFICANCE_THRESHOLD_BU_AC} bu/ac of plot mean`,
     ]),
   ]);
-  const significanceFootnote =
-    lsd === null
-      ? null
-      : h(
-          "p",
-          { className: "significance-footnote" },
-          `Trial CV ${summary.coefficientOfVariation.toFixed(1)}% — a badge is colored when an entry's dry yield is more than ${lsd.toFixed(1)} bu/ac from the trial mean (simplified single-entry LSD-style threshold; see comments in yieldCalculator.js).`
-        );
 
   const rankedList = h("div", { className: "ranked-list" });
   if (ranked.length === 0) {
@@ -365,7 +347,6 @@ export function render(container, params) {
       summaryCard,
       h("h3", { className: "section-header" }, "Ranked Results"),
       significanceLegend,
-      significanceFootnote,
       rankedList,
       editPlotBtn,
       menuWrapper,

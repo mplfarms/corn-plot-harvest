@@ -6,9 +6,25 @@
 // (inside buildPdf) rather than importing it, since there is no bundler
 // and no npm install in this sandbox.
 
-import { rankingMetricMeta, moisture, dryYieldSummary, orderBrandFirst } from "./yieldCalculator.js";
+import {
+  rankingMetricMeta,
+  moisture,
+  dryYieldSummary,
+  dryYieldSignificance,
+  brandAveragesForDisplay,
+} from "./yieldCalculator.js";
 import { filenameYear } from "./models.js";
 import { exportFilename } from "./xlsxBuilder.js";
+
+// Same 3-color rule as the Plot Summary screen's rank badges (see
+// significanceBadgeClass() in plotSummary.js / dryYieldSignificance() in
+// yieldCalculator.js) — kept in sync by construction since both read the
+// same "positive"/"negative"/"neutral" classification.
+const SIGNIFICANCE_COLORS = {
+  positive: { fill: [12, 163, 12], text: [255, 255, 255] }, // green, white numeral
+  negative: { fill: [250, 178, 25], text: [26, 26, 25] }, // yellow, dark numeral
+  neutral: { fill: [216, 215, 209], text: [26, 26, 25] }, // light gray, dark numeral
+};
 
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
@@ -157,33 +173,26 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
       doc.text(line, MARGIN, y + 9 * 0.8);
       y += 9 * 1.15 + 6;
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.text("Average Dry Yield by Brand (by Relative Maturity):", MARGIN, y + 9 * 0.8);
-      y += 9 * 1.15 + 4;
-
-      // The selected brand (Midwest Seed Genetics or NC+) always leads,
+      // Only brands with 2+ hybrids in this plot get an average (a
+      // "brand average" of one hybrid isn't meaningful); the selected
+      // brand (Midwest Seed Genetics or NC+) always leads what's left —
       // same rule as the Plot Summary screen, so the two stay consistent.
-      const orderedByBrand = orderBrandFirst(summary.byBrand, brand ? brand.displayName : null);
-      const brandLineHeight = 9 * 1.3;
-      const maturityLineHeight = 8 * 1.25;
-      for (const b of orderedByBrand) {
+      const brandsToShow = brandAveragesForDisplay(summary.byBrand, brand ? brand.displayName : null);
+      if (brandsToShow.length > 0) {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
-        doc.text(`${b.brand}: ${b.average.toFixed(1)} bu/ac (n=${b.count})`, MARGIN, y + 9 * 0.8);
-        y += brandLineHeight;
+        doc.text("Average Dry Yield by Brand:", MARGIN, y + 9 * 0.8);
+        y += 9 * 1.15 + 4;
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(110, 110, 110);
-        for (const m of b.byMaturity) {
-          doc.text(`${m.maturity}: ${m.average.toFixed(1)} bu/ac (n=${m.count})`, MARGIN + 14, y + 8 * 0.8);
-          y += maturityLineHeight;
+        const brandLineHeight = 9 * 1.3;
+        for (const b of brandsToShow) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.text(`${b.brand}: ${b.average.toFixed(1)} bu/ac (n=${b.count})`, MARGIN, y + 9 * 0.8);
+          y += brandLineHeight;
         }
-        doc.setTextColor(0, 0, 0);
         y += 3;
       }
-      y += 3;
     }
 
     doc.setDrawColor(200, 200, 200);
@@ -234,7 +243,6 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
       moistureValue === null || moistureValue === undefined ? "—" : `${moistureValue.toFixed(1)}%`;
 
     const cellValues = [
-      String(idx + 1),
       String(result.originalNumber),
       result.entry.brand || "",
       result.entry.hybrid || "",
@@ -243,8 +251,26 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     if (showsMoistureColumn) cellValues.push(moistureText);
     cellValues.push(meta.formatValue(result.value));
 
+    // Rank badge: a colored circle (same green/yellow/light-gray rule as
+    // the Plot Summary screen's rank badges) with the rank number on top,
+    // instead of plain text, in the Rank column.
+    const significance = dryYieldSignificance(result.entry, summary);
+    const colors = SIGNIFICANCE_COLORS[significance] || SIGNIFICANCE_COLORS.neutral;
+    const badgeRadius = 8;
+    const badgeCenterX = columnX(0) + badgeRadius + 2;
+    const badgeCenterY = y + 10 * 0.8 - 3;
+    doc.setFillColor(colors.fill[0], colors.fill[1], colors.fill[2]);
+    doc.circle(badgeCenterX, badgeCenterY, badgeRadius, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
+    doc.text(String(idx + 1), badgeCenterX, badgeCenterY + 3, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
     for (let i = 0; i < cellValues.length; i++) {
-      doc.text(cellValues[i], columnX(i), y + 10 * 0.8);
+      doc.text(cellValues[i], columnX(i + 1), y + 10 * 0.8);
     }
     y += ROW_HEIGHT;
 

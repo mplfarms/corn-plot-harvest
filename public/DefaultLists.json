@@ -314,5 +314,10 @@
     "Soybeans",
     "Wheat",
     "Other"
+  ],
+  "collectionMethods": [
+    "Weigh Wagon",
+    "Yield Monitor",
+    "Grain Cart"
   ]
 }
