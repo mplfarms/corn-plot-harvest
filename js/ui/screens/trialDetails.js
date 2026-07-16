@@ -63,6 +63,61 @@ function textAreaInput({ value, placeholder, oninput }) {
   }, value || "");
 }
 
+function isoToMmDdYyyy(iso) {
+  if (!iso || String(iso).length < 10) return "";
+  const [y, m, d] = String(iso).split("-");
+  return `${m}/${d}/${y}`;
+}
+
+function isValidCalendarDate(year, month, day) {
+  // Rejects e.g. Feb 30 or month 13 by round-tripping through Date's own
+  // component getters instead of trusting the raw digits typed in.
+  const dt = new Date(year, month - 1, day);
+  return dt.getFullYear() === year && dt.getMonth() === month - 1 && dt.getDate() === day;
+}
+
+// A plain masked text field standing in for <input type="date">. Native
+// date inputs render wildly inconsistently across browsers — most
+// notably iOS Safari, which swaps in its own compact pill-shaped date
+// control that ignores most of our CSS and looks out of place next to
+// every other field on this screen. This auto-inserts the "/" separators
+// as digits are typed and only commits a value once a real MM/DD/YYYY
+// date is complete, so it looks and behaves identically everywhere.
+function dateMaskInput({ value, oninput }) {
+  const input = h("input", {
+    type: "text",
+    inputmode: "numeric",
+    autocomplete: "off",
+    className: "text-input",
+    placeholder: "MM/DD/YYYY",
+    value: isoToMmDdYyyy(value),
+    oninput: (e) => {
+      const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
+      let formatted = digits;
+      if (digits.length > 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+      else if (digits.length > 2) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+      e.target.value = formatted;
+
+      if (digits.length === 0) {
+        oninput(null);
+        return;
+      }
+      if (digits.length === 8) {
+        const month = Number(digits.slice(0, 2));
+        const day = Number(digits.slice(2, 4));
+        const year = Number(digits.slice(4, 8));
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && isValidCalendarDate(year, month, day)) {
+          oninput(`${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+          return;
+        }
+      }
+      // Incomplete or not-yet-valid — leave the stored value alone until
+      // typing produces a real date (or the field is cleared, above).
+    },
+  });
+  return input;
+}
+
 export function render(container) {
   const header = trialStore.getState().header;
   const fixed = listsStore.fixedLists();
@@ -369,10 +424,9 @@ export function render(container) {
     sectionHeader("Planting"),
     field(
       "Date Planted",
-      textInput({
-        type: "date",
+      dateMaskInput({
         value: header.datePlanted || "",
-        oninput: (v) => trialStore.updateHeader({ datePlanted: v || null }),
+        oninput: (v) => trialStore.updateHeader({ datePlanted: v }),
       })
     ),
     field("Tillage", tillageWheel.el),
@@ -397,10 +451,9 @@ export function render(container) {
     sectionHeader("Harvest"),
     field(
       "Date Harvested",
-      textInput({
-        type: "date",
+      dateMaskInput({
         value: header.dateHarvested || "",
-        oninput: (v) => trialStore.updateHeader({ dateHarvested: v || null }),
+        oninput: (v) => trialStore.updateHeader({ dateHarvested: v }),
       })
     ),
     field("Collected By", collectedByWheel.el),
