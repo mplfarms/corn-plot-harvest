@@ -1,8 +1,8 @@
 // src/ui/screens/workspaceMenu.js
 //
-// Mirrors ContentView.swift's workspace menu: Plot Details / Plot
-// Entries / Plot Summary & Results, plus a Saved Plots row and a
-// destructive "Start a New Trial" action.
+// Mirrors ContentView.swift's workspace menu: Enter Plot Details / Enter
+// Plot Hybrids / Plot Summary & Results, plus a Saved Plots row and a
+// destructive "Enter a New Plot" action.
 
 import { h, mount } from "../dom.js";
 import { getBrand } from "../brand.js";
@@ -10,8 +10,10 @@ import * as brandStore from "../stores/brandStore.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
 import * as authStore from "../authStore.js";
+import * as cloudSyncStore from "../stores/cloudSyncStore.js";
 import { createTopBar } from "../components/topBar.js";
 import { showConfirm } from "../components/modal.js";
+import { showToast } from "../components/toast.js";
 import { navigate } from "../router.js";
 
 function menuRow(title, subtitle, onClick) {
@@ -28,6 +30,49 @@ function menuRow(title, subtitle, onClick) {
   );
 }
 
+// Double-arrow sync-status icon shown in the top bar next to the Settings
+// gear (replaces the old "Synced as {email}" card). Green = signed in and
+// the most recent push/pull succeeded; red = anything else (signed out,
+// mid-sync, or the last attempt failed). Reflects status as of render
+// time — since this screen is rebuilt fresh every time it's navigated to
+// (see dom.js's mount()/clear() — no persistent store subscription here),
+// coming back to Home after a sync completes elsewhere always shows the
+// current state. Tapping it triggers a manual sync (or sends a signed-out
+// user to Settings to sign in) and re-renders to reflect the outcome.
+function syncStatusIcon(container) {
+  const status = cloudSyncStore.getSyncStatus();
+  const isSynced = status === cloudSyncStore.SyncStatus.SYNCED;
+  const label = {
+    [cloudSyncStore.SyncStatus.SYNCED]: "Synced",
+    [cloudSyncStore.SyncStatus.SYNCING]: "Syncing…",
+    [cloudSyncStore.SyncStatus.ERROR]: "Sync failed — tap to retry",
+    [cloudSyncStore.SyncStatus.SIGNED_OUT]: "Not signed in — tap to sign in",
+  }[status];
+
+  return h(
+    "button",
+    {
+      type: "button",
+      className: "top-bar-btn sync-icon-btn " + (isSynced ? "sync-icon-synced" : "sync-icon-not-synced"),
+      "aria-label": label,
+      title: label,
+      onclick: async () => {
+        if (!authStore.getUser()) {
+          navigate("account", { force: true });
+          return;
+        }
+        await cloudSyncStore.pullAndMerge();
+        await cloudSyncStore.pushNow();
+        if (cloudSyncStore.getSyncStatus() === cloudSyncStore.SyncStatus.ERROR) {
+          showToast("Couldn't sync right now — check your connection and try again.", { type: "error" });
+        }
+        render(container);
+      },
+    },
+    "⇄"
+  );
+}
+
 export function render(container) {
   const brand = getBrand(brandStore.getState().selectedBrand);
   const draft = trialStore.getState();
@@ -37,12 +82,13 @@ export function render(container) {
   const topBar = createTopBar({
     title: brand ? brand.displayName : "Workspace",
     onBack: () => navigate("plot-chooser"),
+    right: syncStatusIcon(container),
   });
 
   const rows = h("div", { className: "chooser-list" }, [
-    menuRow("Plot Details", cooperator || "No cooperator set yet", () => navigate("trial-details")),
+    menuRow("Enter Plot Details", cooperator || "No cooperator set yet", () => navigate("trial-details")),
     menuRow(
-      "Plot Entries",
+      "Enter Plot Hybrids",
       `${entryCount} ${entryCount === 1 ? "entry" : "entries"}`,
       () => navigate("entries")
     ),
@@ -53,30 +99,6 @@ export function render(container) {
     authStore.isAdmin() ? menuRow("All Plots (Admin)", "See every user's saved plots", () => navigate("admin-plots")) : null,
   ]);
 
-  // ---- Account / cloud sync status ----
-  const user = authStore.getUser();
-  const accountCard = h(
-    "section",
-    { className: "card account-status-card" },
-    user
-      ? [
-          h("p", { className: "account-status-text" }, `Synced as ${user.email}`),
-          h("p", { className: "field-note" }, "Manage your account in Settings."),
-        ]
-      : [
-          h("p", { className: "account-status-text" }, "Not signed in — plots are only saved on this device."),
-          h(
-            "button",
-            {
-              type: "button",
-              className: "btn btn-secondary",
-              onclick: () => navigate("account", { force: true }),
-            },
-            "Sign In to Sync"
-          ),
-        ]
-  );
-
   const startNewBtn = h(
     "button",
     {
@@ -84,10 +106,10 @@ export function render(container) {
       className: "btn btn-danger btn-block",
       onclick: async () => {
         const ok = await showConfirm({
-          title: "Start a New Trial?",
+          title: "Enter a New Plot?",
           message:
             "This clears the current plot details and entries from the workspace. If a cooperator name is set, this plot has already been saved to your library.",
-          confirmLabel: "Start New Trial",
+          confirmLabel: "Enter a New Plot",
           destructive: true,
         });
         if (!ok) return;
@@ -96,14 +118,13 @@ export function render(container) {
         navigate("trial-details");
       },
     },
-    "Start a New Trial"
+    "Enter a New Plot"
   );
 
   const screen = h("div", { className: "screen workspace-menu-screen" }, [
     topBar,
     h("div", { className: "screen-body" }, [
       h("h2", { className: "screen-heading" }, "Plot Workspace"),
-      accountCard,
       rows,
       h("div", { className: "section-spacer" }),
       startNewBtn,

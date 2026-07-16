@@ -21,6 +21,7 @@
 
 import * as libraryStore from "./libraryStore.js";
 import * as authStore from "../authStore.js";
+import { createPubSub } from "./pubsub.js";
 
 const ENDPOINT = "/.netlify/functions/plots";
 const PUSH_DEBOUNCE_MS = 1500;
@@ -30,6 +31,38 @@ let pushTimer = null;
 // mutation doesn't itself schedule a redundant push of the same data
 // right back up.
 let applyingRemote = false;
+
+// ---- Sync status (drives the header sync icon — see topBar.js) ----
+//
+// "synced"     — signed in, and the most recent push/pull succeeded.
+// "syncing"    — signed in, a push or pull is in flight right now.
+// "error"      — signed in, but the most recent push/pull failed.
+// "signed-out" — not signed in at all; nothing to sync.
+export const SyncStatus = {
+  SYNCED: "synced",
+  SYNCING: "syncing",
+  ERROR: "error",
+  SIGNED_OUT: "signed-out",
+};
+
+const statusPubsub = createPubSub();
+let status = authStore.getUser() ? SyncStatus.SYNCED : SyncStatus.SIGNED_OUT;
+
+function setStatus(next) {
+  if (status === next) return;
+  status = next;
+  statusPubsub.notify();
+}
+
+/** @returns {string} one of SyncStatus */
+export function getSyncStatus() {
+  return status;
+}
+
+/** @param {Function} fn @returns {Function} unsubscribe */
+export function subscribeStatus(fn) {
+  return statusPubsub.subscribe(fn);
+}
 
 function mergeByLastModified(localTrials, cloudTrials) {
   const byId = new Map();
@@ -60,9 +93,13 @@ async function authedFetch(options) {
  */
 export async function pullAndMerge() {
   if (!authStore.getUser()) return;
+  setStatus(SyncStatus.SYNCING);
   try {
     const res = await authedFetch({ method: "GET" });
-    if (!res || !res.ok) return;
+    if (!res || !res.ok) {
+      setStatus(SyncStatus.ERROR);
+      return;
+    }
     const payload = await res.json();
     const cloudTrials = Array.isArray(payload.trials) ? payload.trials : [];
     const merged = mergeByLastModified(libraryStore.getState().trials, cloudTrials);
@@ -72,8 +109,10 @@ export async function pullAndMerge() {
     } finally {
       applyingRemote = false;
     }
+    setStatus(SyncStatus.SYNCED);
   } catch (e) {
     console.error("[cloudSync] pull failed (offline or server error) — local data is unaffected", e);
+    setStatus(SyncStatus.ERROR);
   }
 }
 
@@ -84,14 +123,21 @@ export async function pushNow() {
     pushTimer = null;
   }
   if (!authStore.getUser()) return;
+  setStatus(SyncStatus.SYNCING);
   try {
-    await authedFetch({
+    const res = await authedFetch({
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ trials: libraryStore.getState().trials }),
     });
+    if (!res || !res.ok) {
+      setStatus(SyncStatus.ERROR);
+      return;
+    }
+    setStatus(SyncStatus.SYNCED);
   } catch (e) {
     console.error("[cloudSync] push failed (offline or server error) — will retry on next change", e);
+    setStatus(SyncStatus.ERROR);
   }
 }
 
@@ -106,5 +152,9 @@ function schedulePush() {
 libraryStore.subscribe(() => schedulePush());
 
 authStore.subscribe(() => {
-  if (authStore.getUser()) pullAndMerge();
+  if (authStore.getUser()) {
+    pullAndMerge();
+  } else {
+    setStatus(SyncStatus.SIGNED_OUT);
+  }
 });

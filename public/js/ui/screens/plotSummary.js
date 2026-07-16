@@ -11,6 +11,7 @@ import * as trialStore from "../stores/trialStore.js";
 import * as listsStore from "../stores/listsStore.js";
 import { createTopBar } from "../components/topBar.js";
 import { showToast } from "../components/toast.js";
+import { showCustomModal } from "../components/modal.js";
 import { navigate } from "../router.js";
 import { filenameYear } from "../../core/models.js";
 import {
@@ -65,28 +66,13 @@ export function render(container, params) {
     render(container, { ...params, metric: nextMetric });
   }
 
-  // ---- Toolbar share menu ----
-  const menuPanel = h("div", { className: "share-menu-panel hidden" });
-  let menuOpen = false;
+  // ---- Toolbar share menu (centered modal popup, not a below-button
+  // dropdown, so the user never has to scroll down to reach it) ----
+  let activeShareModal = null;
 
-  function outsideClickHandler(e) {
-    if (!menuWrapper.contains(e.target)) closeMenu();
-  }
-
-  function toggleMenu() {
-    if (menuOpen) {
-      closeMenu();
-    } else {
-      menuOpen = true;
-      menuPanel.classList.remove("hidden");
-      // Deferred so the click that opened the menu doesn't immediately close it.
-      setTimeout(() => document.addEventListener("click", outsideClickHandler, true), 0);
-    }
-  }
-  function closeMenu() {
-    menuOpen = false;
-    menuPanel.classList.add("hidden");
-    document.removeEventListener("click", outsideClickHandler, true);
+  function closeShareModal() {
+    if (activeShareModal) activeShareModal.close();
+    activeShareModal = null;
   }
 
   function menuAction(label, fn) {
@@ -96,12 +82,28 @@ export function render(container, params) {
         type: "button",
         className: "share-menu-item",
         onclick: async () => {
-          closeMenu();
+          closeShareModal();
           await fn();
         },
       },
       label
     );
+  }
+
+  function openShareModal() {
+    const body = h("div", { className: "share-menu-panel share-menu-panel-modal" }, [
+      menuAction("Export / Share PDF (Ranked Results)", handleExportPdf),
+      menuAction("Export / Share XLSX (Full Form)", handleExportXlsx),
+      menuAction("Print Ranked Results", handlePrint),
+      menuAction(`Email XLSX to ${brand ? brand.displayName : "Operations"} Operations`, handleEmailXlsx),
+    ]);
+    activeShareModal = showCustomModal({
+      title: "Share This Plot",
+      bodyNode: body,
+      onClose: () => {
+        activeShareModal = null;
+      },
+    });
   }
 
   async function buildRankedPdfBlob() {
@@ -185,15 +187,11 @@ export function render(container, params) {
     }
   }
 
-  menuPanel.appendChild(menuAction("Export / Share PDF (Ranked Results)", handleExportPdf));
-  menuPanel.appendChild(menuAction("Export / Share XLSX (Full Form)", handleExportXlsx));
-  menuPanel.appendChild(menuAction("Print Ranked Results", handlePrint));
-  menuPanel.appendChild(menuAction(`Email XLSX to ${brand ? brand.displayName : "Operations"} Operations`, handleEmailXlsx));
-
-  const menuWrapper = h("div", { className: "share-menu-wrapper" }, [
-    h("button", { type: "button", className: "btn btn-secondary btn-block", onclick: toggleMenu }, "Share This Plot"),
-    menuPanel,
-  ]);
+  const shareBtn = h(
+    "button",
+    { type: "button", className: "btn btn-secondary btn-block", onclick: openShareModal },
+    "Share This Plot"
+  );
 
   const topBar = createTopBar({
     title: "Plot Summary",
@@ -349,7 +347,7 @@ export function render(container, params) {
       significanceLegend,
       rankedList,
       editPlotBtn,
-      menuWrapper,
+      shareBtn,
     ]),
   ]);
 

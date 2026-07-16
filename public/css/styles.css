@@ -221,6 +221,20 @@ a {
   background: rgba(255, 255, 255, 0.15);
 }
 
+.sync-icon-btn {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sync-icon-synced {
+  color: #4ade80;
+}
+
+.sync-icon-not-synced {
+  color: #f87171;
+}
+
 /* ---------- cards / sections ---------- */
 
 .card {
@@ -1326,4 +1340,15 @@ h3.section-header:first-child {
 
 .share-menu-item:hover {
   background: rgba(0, 0, 0, 0.04);
+}
+
+/* Share This Plot now opens as a centered modal (see plotSummary.js's
+   openShareModal()) instead of a below-button dropdown — this override
+   resets the panel's positioning so it lays out normally inside the
+   modal card rather than as an absolutely-positioned popover. */
+.share-menu-panel-modal {
+  position: static;
+  box-shadow: none;
+  border: 1px solid var(--border);
+  margin-top: 4px;
 }

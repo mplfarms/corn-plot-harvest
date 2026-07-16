@@ -11,6 +11,7 @@ import {
   moisture,
   dryYieldSummary,
   dryYieldSignificance,
+  SIGNIFICANCE_THRESHOLD_BU_AC,
   brandAveragesForDisplay,
 } from "./yieldCalculator.js";
 import { filenameYear } from "./models.js";
@@ -25,6 +26,15 @@ const SIGNIFICANCE_COLORS = {
   negative: { fill: [250, 178, 25], text: [26, 26, 25] }, // yellow, dark numeral
   neutral: { fill: [216, 215, 209], text: [26, 26, 25] }, // light gray, dark numeral
 };
+
+// Same 3 labels as the Plot Summary screen's on-screen legend (see
+// significanceLegend in plotSummary.js) — kept in sync by construction
+// since both reference SIGNIFICANCE_THRESHOLD_BU_AC.
+const LEGEND_ITEMS = [
+  { significance: "positive", label: `${SIGNIFICANCE_THRESHOLD_BU_AC}+ bu/ac over plot mean` },
+  { significance: "negative", label: `${SIGNIFICANCE_THRESHOLD_BU_AC}+ bu/ac under plot mean` },
+  { significance: "neutral", label: `Within ${SIGNIFICANCE_THRESHOLD_BU_AC} bu/ac of plot mean` },
+];
 
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
@@ -151,6 +161,42 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     y = Math.max(y, MARGIN + LOGO_MAX_HEIGHT + 6);
   }
 
+  // Ranking-bubble color legend — same 3-color rule and label text as the
+  // Plot Summary screen (see significanceLegend in plotSummary.js).
+  // Drawn just above the "Trial Mean: ... CV: ..." stats line so it reads
+  // right before the ranked table's colored Rank bubbles below it.
+  function drawSignificanceLegend() {
+    const swatchRadius = 4;
+    const itemGap = 14;
+    const rowHeight = 9 * 1.5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+
+    let x = MARGIN;
+    let rowStartY = y;
+    for (const item of LEGEND_ITEMS) {
+      const colors = SIGNIFICANCE_COLORS[item.significance];
+      const textWidth = doc.getTextWidth(item.label);
+      const itemWidth = swatchRadius * 2 + 4 + textWidth;
+
+      if (x + itemWidth > MARGIN + tableWidth && x > MARGIN) {
+        x = MARGIN;
+        rowStartY += rowHeight;
+      }
+
+      const swatchCenterY = rowStartY + 8 * 0.8 - 2.5;
+      doc.setFillColor(colors.fill[0], colors.fill[1], colors.fill[2]);
+      doc.circle(x + swatchRadius, swatchCenterY, swatchRadius, "F");
+      doc.setTextColor(90, 90, 90);
+      doc.text(item.label, x + swatchRadius * 2 + 4, rowStartY + 8 * 0.8);
+      doc.setTextColor(0, 0, 0);
+
+      x += itemWidth + itemGap;
+    }
+
+    y = rowStartY + rowHeight;
+  }
+
   function drawSummaryBlock() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
@@ -165,11 +211,15 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
       doc.setTextColor(0, 0, 0);
       y += 9 * 1.15 + 6;
     } else {
+      drawSignificanceLegend();
+
       const cvText =
         summary.coefficientOfVariation === null
           ? "CV requires at least 2 entries"
           : `Coefficient of Variation (CV): ${summary.coefficientOfVariation.toFixed(1)}%`;
       const line = `Trial Mean: ${summary.mean.toFixed(1)} bu/ac   •   n = ${summary.sampleCount} entries   •   ${cvText}`;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
       doc.text(line, MARGIN, y + 9 * 0.8);
       y += 9 * 1.15 + 6;
 
