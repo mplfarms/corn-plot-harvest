@@ -216,7 +216,7 @@ export function render(container, params) {
 
   function refreshDryYieldPlaceholder() {
     const calc = calculatedDryYield(currentEntry());
-    dryYieldInput.placeholder = calc === null ? "Calculated automatically" : `${calc.toFixed(1)} bu/ac (calculated)`;
+    dryYieldInput.placeholder = calc === null ? "Calculated Automatically or Enter Manually" : `${calc.toFixed(1)} bu/ac (calculated)`;
   }
   refreshDryYieldPlaceholder();
 

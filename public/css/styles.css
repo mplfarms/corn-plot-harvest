@@ -315,6 +315,25 @@ h3.section-header:first-child {
   resize: vertical;
 }
 
+.field-locked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-muted);
+  background: var(--card-bg);
+}
+
+.field-locked-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
 .field-wrapper {
   display: contents;
 }
@@ -613,39 +632,19 @@ h3.section-header:first-child {
   border-top: 1px solid var(--border);
 }
 
+/* A plain top-anchored option list: it takes its natural height for
+   short lists (no scrolling, nothing reserved above the first option)
+   and caps out at roughly 4 rows for long lists, scrolling normally from
+   there. There is deliberately no scroll-snap and no spacer element —
+   both were part of an earlier "always-centered wheel picker" design
+   that required blank filler space above/below the options to let the
+   first/last item reach the center of the viewport, and that filler is
+   what showed up as a persistent blank line at the top of the list. */
 .wheel-scroll {
-  height: 176px; /* roughly 3 rows + spacers */
+  max-height: 176px;
   overflow-y: auto;
-  scroll-snap-type: y mandatory;
   position: relative;
   background: var(--card-bg);
-}
-
-/* Short lists (fewer options than fit in the 176px viewport) render
-   without the centering spacers or scroll — see buildPanel()'s
-   needsScroll check in wheelSelect.js. Without this, a short list would
-   still reserve the fixed 176px height and its unreachable top spacer
-   would sit there as a permanent blank row above the first option. */
-.wheel-scroll-fit {
-  height: auto;
-  overflow-y: visible;
-  scroll-snap-type: none;
-}
-
-.wheel-scroll::before,
-.wheel-scroll::after {
-  content: "";
-  position: sticky;
-  display: block;
-  left: 0;
-  right: 0;
-  height: 0;
-  pointer-events: none;
-}
-
-.wheel-spacer {
-  height: 66px;
-  scroll-snap-align: none;
 }
 
 .wheel-option {
@@ -655,7 +654,6 @@ h3.section-header:first-child {
   justify-content: center;
   padding: 10px 14px;
   text-align: center;
-  scroll-snap-align: center;
   cursor: pointer;
   border-top: 1px solid transparent;
   border-bottom: 1px solid transparent;
@@ -750,6 +748,116 @@ h3.section-header:first-child {
   color: var(--text-muted);
   min-width: 44px;
   min-height: 44px;
+}
+
+/* ---------- date picker ---------- */
+
+.date-picker-btn {
+  text-align: left;
+  cursor: pointer;
+  background: var(--bg);
+}
+
+.date-picker-btn-placeholder {
+  color: var(--text-muted);
+}
+
+.date-picker-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.date-picker-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.date-picker-nav-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.4rem;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.date-picker-nav-btn:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.date-picker-month-label {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.date-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.date-picker-weekday {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 4px 0 6px;
+}
+
+.date-picker-day {
+  min-height: 38px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.date-picker-day:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.date-picker-day-empty {
+  cursor: default;
+}
+
+.date-picker-day-today {
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.date-picker-day-selected {
+  background: var(--accent-strong);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.date-picker-footer-row {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 2px;
+}
+
+.date-picker-footer-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent-strong);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 8px 6px;
+  min-height: 36px;
+  cursor: pointer;
+}
+
+.date-picker-clear-btn {
+  color: var(--danger);
 }
 
 /* ---------- searchable list picker ---------- */

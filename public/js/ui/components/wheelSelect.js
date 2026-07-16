@@ -114,22 +114,17 @@ function createWheelSelectBase(opts) {
     if (onChange) onChange(val);
   }
 
-  // Row height mirrors .wheel-option's min-height (44px) in styles.css.
-  // The top/bottom spacers only exist so scroll-snap can center the
-  // first/last real option in the 176px-tall viewport — when a list is
-  // short enough that every option already fits without scrolling, that
-  // spacer has nowhere to scroll to and just sits there as a permanent
-  // blank row above the options. Skip it in that case.
-  const WHEEL_OPTION_ROW_HEIGHT = 44;
-  const WHEEL_SCROLL_VIEWPORT_HEIGHT = 176;
-
+  // Previously this reserved a fixed-height, always-centered "wheel" with
+  // blank spacer rows above/below the options so scroll-snap could center
+  // the first/last item. That spacer is what showed up as a persistent
+  // blank line at the top of the list — most visibly whenever the
+  // currently selected value was the first (or an early) option, since
+  // centering it still requires scrolling space above. Instead, this is
+  // now a plain top-anchored list: it never reserves blank space, and
+  // just caps its height and scrolls (see .wheel-scroll's max-height) once
+  // there are more options than fit.
   function buildPanel() {
-    const rowCount = currentOptions.length + (extendable ? 1 : 0);
-    const needsScroll = rowCount * WHEEL_OPTION_ROW_HEIGHT > WHEEL_SCROLL_VIEWPORT_HEIGHT;
-
     const scrollEl = h("div", { className: "wheel-scroll", role: "listbox", tabindex: "0" });
-    if (!needsScroll) scrollEl.classList.add("wheel-scroll-fit");
-    if (needsScroll) scrollEl.appendChild(h("div", { className: "wheel-spacer", "aria-hidden": "true" }));
 
     for (const opt of currentOptions) {
       const isSelected = opt.value === currentValue;
@@ -175,17 +170,16 @@ function createWheelSelectBase(opts) {
       );
     }
 
-    if (needsScroll) scrollEl.appendChild(h("div", { className: "wheel-spacer", "aria-hidden": "true" }));
-
     const panel = h("div", { className: "wheel-panel" }, scrollEl);
 
-    if (needsScroll) {
-      requestAnimationFrame(() => {
-        const selectedEl = scrollEl.querySelector(".wheel-option-selected");
-        const target = selectedEl || scrollEl.querySelector(".wheel-option");
-        if (target && target.scrollIntoView) target.scrollIntoView({ block: "center", behavior: "auto" });
-      });
-    }
+    // Bring the current selection into view without ever introducing
+    // blank space above it — "nearest" scrolls only the minimum amount
+    // needed (none at all if it's already visible, e.g. the first item),
+    // unlike "center" which is what originally required the spacer hack.
+    requestAnimationFrame(() => {
+      const selectedEl = scrollEl.querySelector(".wheel-option-selected");
+      if (selectedEl && selectedEl.scrollIntoView) selectedEl.scrollIntoView({ block: "nearest", behavior: "auto" });
+    });
 
     return panel;
   }

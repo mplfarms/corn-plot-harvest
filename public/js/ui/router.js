@@ -46,6 +46,17 @@ function renderCurrent() {
   const path = currentPath() || "brand-select";
   const screen = routes[path] || routes["brand-select"];
   screen.render(appContainer, currentParams);
+
+  // Screens replace #app's content in place (see dom.js's mount()) rather
+  // than the browser loading a fresh page, so the window's scroll
+  // position otherwise carries over unchanged from whatever screen was
+  // showing before. Most visibly: tapping "+ Add Another Entry" (or the
+  // Entries list's "+" button) from partway down a long form used to
+  // land on the new entry's editor already scrolled to that same
+  // mid-page offset instead of its top. Every navigation should start
+  // scrolled to the top of the new screen, so this resets it here once,
+  // for all routes, rather than special-casing just the entry-add flows.
+  window.scrollTo(0, 0);
 }
 
 /**

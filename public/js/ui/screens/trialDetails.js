@@ -13,6 +13,7 @@ import * as listsStore from "../stores/listsStore.js";
 import * as geoData from "../geoData.js";
 import { createTopBar } from "../components/topBar.js";
 import { createWheelSelect, createExtendableWheelSelect } from "../components/wheelSelect.js";
+import { createDatePicker } from "../components/datePicker.js";
 import { openSearchListPicker } from "../components/searchListPicker.js";
 import { navigate } from "../router.js";
 
@@ -21,6 +22,11 @@ import { navigate } from "../router.js";
 // PO-box/business-only codes) — fall back to the searchable list picker
 // used elsewhere in the app for long option lists.
 const ZIP_CHIP_LIMIT = 8;
+
+// Base Moisture % is locked at 15.5 (standard corn moisture basis) rather
+// than an editable field — Drying Shrink Rate and Price per Bushel still
+// vary per plot, but this one no longer does.
+const BASE_MOISTURE_LOCKED = 15.5;
 
 const US_STATES = [
   ["AL", "Alabama"], ["AK", "Alaska"], ["AZ", "Arizona"], ["AR", "Arkansas"], ["CA", "California"],
@@ -55,6 +61,33 @@ function textInput({ value, placeholder, oninput, type = "text", inputmode }) {
   });
 }
 
+// Formats a run of digits as a US phone number: "(555) 555-5555", growing
+// the mask as digits are typed rather than waiting for all 10 at once.
+function formatPhoneDisplay(digits) {
+  const d = digits.slice(0, 10);
+  if (d.length === 0) return "";
+  if (d.length < 4) return `(${d}`;
+  if (d.length < 7) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+}
+
+function phoneInput({ value, oninput }) {
+  return h("input", {
+    type: "tel",
+    inputmode: "tel",
+    autocomplete: "tel",
+    className: "text-input",
+    placeholder: "(555) 555-5555",
+    value: formatPhoneDisplay(String(value || "").replace(/\D/g, "")),
+    oninput: (e) => {
+      const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+      const formatted = formatPhoneDisplay(digits);
+      e.target.value = formatted;
+      oninput(formatted);
+    },
+  });
+}
+
 function textAreaInput({ value, placeholder, oninput }) {
   return h("textarea", {
     className: "text-input text-area",
@@ -63,64 +96,17 @@ function textAreaInput({ value, placeholder, oninput }) {
   }, value || "");
 }
 
-function isoToMmDdYyyy(iso) {
-  if (!iso || String(iso).length < 10) return "";
-  const [y, m, d] = String(iso).split("-");
-  return `${m}/${d}/${y}`;
-}
-
-function isValidCalendarDate(year, month, day) {
-  // Rejects e.g. Feb 30 or month 13 by round-tripping through Date's own
-  // component getters instead of trusting the raw digits typed in.
-  const dt = new Date(year, month - 1, day);
-  return dt.getFullYear() === year && dt.getMonth() === month - 1 && dt.getDate() === day;
-}
-
-// A plain masked text field standing in for <input type="date">. Native
-// date inputs render wildly inconsistently across browsers — most
-// notably iOS Safari, which swaps in its own compact pill-shaped date
-// control that ignores most of our CSS and looks out of place next to
-// every other field on this screen. This auto-inserts the "/" separators
-// as digits are typed and only commits a value once a real MM/DD/YYYY
-// date is complete, so it looks and behaves identically everywhere.
-function dateMaskInput({ value, oninput }) {
-  const input = h("input", {
-    type: "text",
-    inputmode: "numeric",
-    autocomplete: "off",
-    className: "text-input",
-    placeholder: "MM/DD/YYYY",
-    value: isoToMmDdYyyy(value),
-    oninput: (e) => {
-      const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
-      let formatted = digits;
-      if (digits.length > 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-      else if (digits.length > 2) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-      e.target.value = formatted;
-
-      if (digits.length === 0) {
-        oninput(null);
-        return;
-      }
-      if (digits.length === 8) {
-        const month = Number(digits.slice(0, 2));
-        const day = Number(digits.slice(2, 4));
-        const year = Number(digits.slice(4, 8));
-        if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && isValidCalendarDate(year, month, day)) {
-          oninput(`${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
-          return;
-        }
-      }
-      // Incomplete or not-yet-valid — leave the stored value alone until
-      // typing produces a real date (or the field is cleared, above).
-    },
-  });
-  return input;
-}
 
 export function render(container) {
   const header = trialStore.getState().header;
   const fixed = listsStore.fixedLists();
+
+  // Correct any older/imported plot whose base moisture isn't the locked
+  // 15.5 value — this field is no longer user-editable (see yieldSection
+  // below), so nothing should be able to leave it at a stale value.
+  if (header.baseMoisturePercent !== BASE_MOISTURE_LOCKED) {
+    trialStore.updateHeader({ baseMoisturePercent: BASE_MOISTURE_LOCKED });
+  }
 
   const topBar = createTopBar({
     title: "Plot Details",
@@ -424,10 +410,10 @@ export function render(container) {
     sectionHeader("Planting"),
     field(
       "Date Planted",
-      dateMaskInput({
-        value: header.datePlanted || "",
-        oninput: (v) => trialStore.updateHeader({ datePlanted: v }),
-      })
+      createDatePicker({
+        value: header.datePlanted || null,
+        onChange: (v) => trialStore.updateHeader({ datePlanted: v }),
+      }).el
     ),
     field("Tillage", tillageWheel.el),
     field("Irrigation", irrigationWheel.el),
@@ -451,13 +437,13 @@ export function render(container) {
     sectionHeader("Harvest"),
     field(
       "Date Harvested",
-      dateMaskInput({
-        value: header.dateHarvested || "",
-        oninput: (v) => trialStore.updateHeader({ dateHarvested: v }),
-      })
+      createDatePicker({
+        value: header.dateHarvested || null,
+        onChange: (v) => trialStore.updateHeader({ dateHarvested: v }),
+      }).el
     ),
     field("Collected By", collectedByWheel.el),
-    field("Phone", textInput({ value: header.phone, oninput: (v) => trialStore.updateHeader({ phone: v }), type: "tel" })),
+    field("Phone", phoneInput({ value: header.phone, oninput: (v) => trialStore.updateHeader({ phone: v }) })),
     field("Email", textInput({ value: header.email, oninput: (v) => trialStore.updateHeader({ email: v }), type: "email" })),
   ]);
 
@@ -466,14 +452,10 @@ export function render(container) {
     sectionHeader("Yield Calculation"),
     field(
       "Base Moisture %",
-      textInput({
-        value: String(header.baseMoisturePercent),
-        inputmode: "decimal",
-        oninput: (v) => {
-          const n = Number(v);
-          if (Number.isFinite(n)) trialStore.updateHeader({ baseMoisturePercent: n });
-        },
-      })
+      h("div", { className: "text-input field-locked" }, [
+        h("span", {}, `${BASE_MOISTURE_LOCKED}%`),
+        h("span", { className: "field-locked-tag" }, "Locked"),
+      ])
     ),
     field(
       "Drying Shrink Rate",
@@ -501,7 +483,7 @@ export function render(container) {
     h(
       "p",
       { className: "field-note" },
-      "Base moisture, drying shrink rate, and price per bushel are used to calculate Gross $/ac across all entries."
+      "Base moisture (fixed at 15.5%), drying shrink rate, and price per bushel are used to calculate Gross $/ac across all entries."
     ),
   ]);
 

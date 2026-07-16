@@ -68,7 +68,11 @@ export function createTrialHeader() {
     cooperatorName: "",
     address: "",
     city: "",
-    state: "",
+    // Defaults to Iowa (this farm operation's home state) so a brand new
+    // plot's State wheel opens already set instead of blank — the user
+    // can still change it for out-of-state plots. Only affects new/blank
+    // trials; an existing saved trial keeps whatever state it already has.
+    state: "IA",
     zip: "",
     county: "",
     gpsLatitude: null,
