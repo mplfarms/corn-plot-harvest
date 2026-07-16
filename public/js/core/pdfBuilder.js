@@ -244,11 +244,22 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     doc.line(xMin, chartCenterY - capHalfHeight, xMin, chartCenterY + capHalfHeight);
     doc.line(xMax, chartCenterY - capHalfHeight, xMax, chartCenterY + capHalfHeight);
 
+    // The IQR box is filled at reduced opacity — a fully solid fill hid the
+    // median line (drawn in the same brand color) inside it, making the box
+    // look like one undivided block instead of the two quartiles (Q1–median,
+    // median–Q3) it actually represents. Fill translucent, then stroke the
+    // outline and median at full opacity so all four quadrants (lower
+    // whisker, Q1–median, median–Q3, upper whisker) read clearly.
+    const boxW = Math.max(xQ3 - xQ1, 1);
+    doc.saveGraphicsState();
+    doc.setGState(doc.GState({ opacity: 0.35 }));
     doc.setFillColor(r, g, b);
+    doc.rect(xQ1, chartCenterY - boxHalfHeight, boxW, boxHalfHeight * 2, "F");
+    doc.restoreGraphicsState();
+
     doc.setDrawColor(r, g, b);
     doc.setLineWidth(1.2);
-    const boxW = Math.max(xQ3 - xQ1, 1);
-    doc.rect(xQ1, chartCenterY - boxHalfHeight, boxW, boxHalfHeight * 2, "FD");
+    doc.rect(xQ1, chartCenterY - boxHalfHeight, boxW, boxHalfHeight * 2, "D");
 
     doc.setLineWidth(1.8);
     doc.line(xMedian, chartCenterY - boxHalfHeight, xMedian, chartCenterY + boxHalfHeight);
