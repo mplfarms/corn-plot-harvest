@@ -139,12 +139,39 @@ export function valueForMetric(entry, metric, header) {
  */
 
 /**
+ * @typedef {Object} BoxPlotStats
+ * @property {number} min
+ * @property {number} q1
+ * @property {number} median
+ * @property {number} q3
+ * @property {number} max
+ * @property {number} mean
+ * @property {number} count
+ */
+
+/**
  * @typedef {Object} DryYieldSummary
  * @property {BrandAverage[]} byBrand
  * @property {number|null} mean
  * @property {number|null} coefficientOfVariation
  * @property {number} sampleCount
+ * @property {BoxPlotStats|null} boxPlot
  */
+
+/**
+ * Linear-interpolation quantile (the common "R type 7" / Excel PERCENTILE
+ * method) over an already-sorted array.
+ * @param {number[]} sorted
+ * @param {number} q 0..1
+ * @returns {number}
+ */
+function quantileOfSorted(sorted, q) {
+  if (sorted.length === 1) return sorted[0];
+  const pos = (sorted.length - 1) * q;
+  const base = Math.floor(pos);
+  const rest = pos - base;
+  return sorted[base + 1] !== undefined ? sorted[base] + rest * (sorted[base + 1] - sorted[base]) : sorted[base];
+}
 
 /**
  * @param {import('./models.js').PlotEntry[]} entries
@@ -181,7 +208,21 @@ export function dryYieldSummary(entries) {
     coefficientOfVariation = (Math.sqrt(variance) / mean) * 100;
   }
 
-  return { byBrand, mean, coefficientOfVariation, sampleCount };
+  let boxPlot = null;
+  if (sampleCount > 0) {
+    const sorted = allValues.slice().sort((a, b) => a - b);
+    boxPlot = {
+      min: sorted[0],
+      q1: quantileOfSorted(sorted, 0.25),
+      median: quantileOfSorted(sorted, 0.5),
+      q3: quantileOfSorted(sorted, 0.75),
+      max: sorted[sorted.length - 1],
+      mean,
+      count: sampleCount,
+    };
+  }
+
+  return { byBrand, mean, coefficientOfVariation, sampleCount, boxPlot };
 }
 
 /**
@@ -190,13 +231,14 @@ export function dryYieldSummary(entries) {
  * cutoff set directly by the user, not a statistical test.
  * @readonly
  */
-export const SIGNIFICANCE_THRESHOLD_BU_AC = 10;
+export const SIGNIFICANCE_THRESHOLD_BU_AC = 8;
 
 /**
  * Classifies one entry's dry yield against the plot mean using the fixed
- * +/-10 bu/ac threshold: green ("positive") at 10+ bu/ac over the mean,
- * yellow ("negative") at 10+ bu/ac under the mean, light gray ("neutral")
- * for everything in between.
+ * +/- threshold (SIGNIFICANCE_THRESHOLD_BU_AC): green ("positive") at or
+ * above that many bu/ac over the mean, yellow ("negative") at or below
+ * that many bu/ac under the mean, light gray ("neutral") for everything
+ * in between.
  * @param {import('./models.js').PlotEntry} entry
  * @param {DryYieldSummary} summary
  * @returns {"positive"|"negative"|"neutral"}

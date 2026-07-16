@@ -112,10 +112,28 @@ export function render(container, params) {
   // The very first entry in a brand new plot has nothing to carry a
   // Hybrid/RM/Trait forward from (every later entry does — see
   // CARRIED_IDENTITY_FIELDS in trialStore.js). Instead, once its Brand is
-  // picked, it defaults Hybrid and RM to the catalog's first RM-100
-  // hybrid so there's a sensible starting point instead of a blank field.
+  // set, it defaults Hybrid and RM to the catalog's first RM-100 hybrid
+  // so there's a sensible starting point instead of a blank field. Brand
+  // itself is now pre-filled at entry-creation time (see
+  // addEntryCarryingMeasurements() in trialStore.js), so this has to run
+  // both right away below (the user may never touch the Brand wheel at
+  // all) and again from the wheel's onChange (if they pick a different
+  // Brand while Hybrid/RM are still untouched).
   const isFirstEntryOfPlot = draft.entries.length > 0 && draft.entries[0].id === entryId;
   const DEFAULT_RM_FOR_NEW_PLOT = 100;
+
+  function applyFirstEntryHybridRmDefault(brandValue) {
+    if (!isFirstEntryOfPlot || !brandValue) return;
+    const current = currentEntry();
+    // Only default while both are still untouched, so this never
+    // clobbers a hybrid/RM the user already picked.
+    if (current.hybrid.trim() || current.relativeMaturity.trim()) return;
+    const defaultHybrid = listsStore.firstHybridWithRm(brandValue, DEFAULT_RM_FOR_NEW_PLOT);
+    const patch = { relativeMaturity: String(DEFAULT_RM_FOR_NEW_PLOT) };
+    if (defaultHybrid) patch.hybrid = defaultHybrid;
+    trialStore.updateEntry(entryId, patch);
+    rmWheel.setValue(String(DEFAULT_RM_FOR_NEW_PLOT));
+  }
 
   // ---- Brand / Company ----
   const brandWheel = createExtendableWheelSelect({
@@ -124,19 +142,7 @@ export function render(container, params) {
     options: listsStore.items(listsStore.CATEGORY.BRAND_COMPANY),
     onChange: (v) => {
       trialStore.updateEntry(entryId, { brand: v });
-      if (isFirstEntryOfPlot) {
-        const current = currentEntry();
-        // Only default while both are still untouched, so this never
-        // clobbers a hybrid/RM the user already picked before changing
-        // their mind about the Brand.
-        if (!current.hybrid.trim() && !current.relativeMaturity.trim()) {
-          const defaultHybrid = listsStore.firstHybridWithRm(v, DEFAULT_RM_FOR_NEW_PLOT);
-          const patch = { relativeMaturity: String(DEFAULT_RM_FOR_NEW_PLOT) };
-          if (defaultHybrid) patch.hybrid = defaultHybrid;
-          trialStore.updateEntry(entryId, patch);
-          rmWheel.setValue(String(DEFAULT_RM_FOR_NEW_PLOT));
-        }
-      }
+      applyFirstEntryHybridRmDefault(v);
       rebuildHybridWheel();
     },
     onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.BRAND_COMPANY),
@@ -164,7 +170,6 @@ export function render(container, params) {
     clear(hybridWheelHolder);
     hybridWheelHolder.appendChild(wheel.el);
   }
-  rebuildHybridWheel();
 
   // ---- Trait / Seed Treatment ----
   const traitRow = listPickerRow({
@@ -196,6 +201,14 @@ export function render(container, params) {
     options: rmOptions,
     onChange: (v) => trialStore.updateEntry(entryId, { relativeMaturity: v }),
   });
+
+  // Brand is pre-filled by trialStore for a freshly created entry (see
+  // addEntryCarryingMeasurements()), so this has to run once up front —
+  // not just from brandWheel's onChange — or the very first entry in a
+  // new plot would never get its Hybrid/RM default applied unless the
+  // user happened to touch the Brand wheel themselves.
+  applyFirstEntryHybridRmDefault(currentEntry().brand);
+  rebuildHybridWheel();
 
   const identitySection = h("section", { className: "card" }, [
     sectionHeader("Identity"),

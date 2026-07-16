@@ -31,6 +31,112 @@ import { downloadBlob, shareOrDownload, openMailto } from "../fileSave.js";
 
 const METRIC_ORDER = [RankingMetric.DRY_YIELD, RankingMetric.GROSS, RankingMetric.MOISTURE];
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+const BOX_PLOT_VIEW_W = 320;
+const BOX_PLOT_VIEW_H = 56;
+const BOX_PLOT_PAD_X = 16;
+const BOX_PLOT_HEIGHT = 22;
+const BOX_PLOT_CAP_HEIGHT = 12;
+
+/**
+ * Builds a horizontal box-and-whisker SVG for the plot's Dry Yield
+ * distribution (min / Q1 / median / Q3 / max, plus a small diamond
+ * marker for the mean when it's visually distinguishable from the
+ * median). One series, so one hue (the app's own accent color) does the
+ * whole job — no categorical palette needed; the whisker/caps use a
+ * muted neutral so the box (the actual IQR) reads as the focal shape.
+ * @param {import('../../core/yieldCalculator.js').BoxPlotStats} boxPlot
+ * @returns {SVGSVGElement}
+ */
+function buildBoxPlotSvg(boxPlot) {
+  const { min, q1, median, q3, max, mean } = boxPlot;
+  const trackW = BOX_PLOT_VIEW_W - BOX_PLOT_PAD_X * 2;
+  const range = max - min;
+  // A zero-width range (every entry has the identical dry yield) would
+  // divide by zero — fall back to centering everything instead.
+  const scale = (v) => (range === 0 ? BOX_PLOT_PAD_X + trackW / 2 : BOX_PLOT_PAD_X + ((v - min) / range) * trackW);
+  const midY = BOX_PLOT_VIEW_H / 2;
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${BOX_PLOT_VIEW_W} ${BOX_PLOT_VIEW_H}`);
+  svg.setAttribute("class", "box-plot-svg");
+  svg.setAttribute("role", "img");
+  svg.setAttribute(
+    "aria-label",
+    `Dry yield distribution: minimum ${min.toFixed(1)}, first quartile ${q1.toFixed(1)}, median ${median.toFixed(
+      1
+    )}, third quartile ${q3.toFixed(1)}, maximum ${max.toFixed(1)} bushels per acre`
+  );
+
+  function line(x1, y1, x2, y2, extraClass) {
+    const el = document.createElementNS(SVG_NS, "line");
+    el.setAttribute("x1", x1);
+    el.setAttribute("y1", y1);
+    el.setAttribute("x2", x2);
+    el.setAttribute("y2", y2);
+    el.setAttribute("class", "box-plot-line" + (extraClass ? " " + extraClass : ""));
+    svg.appendChild(el);
+  }
+  function rect(x, y, w, h, extraClass) {
+    const el = document.createElementNS(SVG_NS, "rect");
+    el.setAttribute("x", x);
+    el.setAttribute("y", y);
+    el.setAttribute("width", Math.max(w, 1));
+    el.setAttribute("height", h);
+    el.setAttribute("class", "box-plot-box" + (extraClass ? " " + extraClass : ""));
+    svg.appendChild(el);
+  }
+
+  const xMin = scale(min);
+  const xQ1 = scale(q1);
+  const xMedian = scale(median);
+  const xQ3 = scale(q3);
+  const xMax = scale(max);
+
+  // Whisker (min -> max) drawn first so the box sits visually on top of it.
+  line(xMin, midY, xMax, midY, "box-plot-whisker");
+  line(xMin, midY - BOX_PLOT_CAP_HEIGHT / 2, xMin, midY + BOX_PLOT_CAP_HEIGHT / 2, "box-plot-cap");
+  line(xMax, midY - BOX_PLOT_CAP_HEIGHT / 2, xMax, midY + BOX_PLOT_CAP_HEIGHT / 2, "box-plot-cap");
+  // Box (Q1 -> Q3).
+  rect(xQ1, midY - BOX_PLOT_HEIGHT / 2, xQ3 - xQ1, BOX_PLOT_HEIGHT, "box-plot-iqr");
+  // Median line.
+  line(xMedian, midY - BOX_PLOT_HEIGHT / 2, xMedian, midY + BOX_PLOT_HEIGHT / 2, "box-plot-median");
+  // Mean marker — a diamond, not just a color, so it's distinguishable
+  // even without color (only drawn when it wouldn't just sit on top of
+  // the median line).
+  if (Math.abs(mean - median) > Math.max(0.05, range * 0.01)) {
+    const xMean = scale(mean);
+    const d = 5;
+    const diamond = document.createElementNS(SVG_NS, "polygon");
+    diamond.setAttribute(
+      "points",
+      `${xMean},${midY - d} ${xMean + d},${midY} ${xMean},${midY + d} ${xMean - d},${midY}`
+    );
+    diamond.setAttribute("class", "box-plot-mean");
+    svg.appendChild(diamond);
+  }
+
+  return svg;
+}
+
+/**
+ * @param {import('../../core/yieldCalculator.js').BoxPlotStats} boxPlot
+ * @returns {HTMLElement}
+ */
+function buildBoxPlotSection(boxPlot) {
+  return h("div", { className: "box-plot-section" }, [
+    h("h4", { className: "brand-average-header" }, "Dry Yield Distribution"),
+    buildBoxPlotSvg(boxPlot),
+    h(
+      "p",
+      { className: "box-plot-caption" },
+      `Min ${boxPlot.min.toFixed(1)} • Q1 ${boxPlot.q1.toFixed(1)} • Median ${boxPlot.median.toFixed(
+        1
+      )} • Q3 ${boxPlot.q3.toFixed(1)} • Max ${boxPlot.max.toFixed(1)} bu/ac`
+    ),
+  ]);
+}
+
 function computeRanked(entries, metric, header) {
   const meta = rankingMetricMeta[metric];
   const all = entries.map((entry, idx) => ({
@@ -234,7 +340,12 @@ export function render(container, params) {
   // Seed Genetics or NC+) always leads what's left, regardless of where
   // it'd otherwise land by average value. Shared with the PDF export so
   // both stay consistent.
-  const byBrandOrdered = brandAveragesForDisplay(summary.byBrand, brand ? brand.displayName : null);
+  // catalogBrandName, not displayName — summary.byBrand groups entries by
+  // their actual PlotEntry.brand string (e.g. "NC+ Hybrids"), which for
+  // NC+ never equals the shorter cosmetic "NC+" displayName used
+  // elsewhere. Matching against the wrong string silently fails to
+  // reorder anything, so this has to be the catalog name.
+  const byBrandOrdered = brandAveragesForDisplay(summary.byBrand, brand ? brand.catalogBrandName : null);
 
   const summaryCard = h("section", { className: "card" }, [
     h("h3", { className: "section-header" }, "Dry Yield Summary"),
@@ -258,6 +369,7 @@ export function render(container, params) {
             h("span", { className: "summary-stat-label" }, "Entries"),
           ]),
         ]),
+    summary.boxPlot ? buildBoxPlotSection(summary.boxPlot) : null,
     byBrandOrdered.length > 0
       ? h("h4", { className: "brand-average-header" }, "Average By Brand")
       : null,

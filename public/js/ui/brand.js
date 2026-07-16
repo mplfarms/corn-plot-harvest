@@ -21,6 +21,16 @@ export const BRANDS = {
     bgDark: "#04140C",
     cardDark: "#0C4A2C",
     displayName: "Midwest Seed Genetics",
+    // The exact string this brand is stored as in the Brand / Company
+    // catalog (DefaultLists.json's "companies" list) and therefore on
+    // every PlotEntry.brand value for it — used anywhere brand data needs
+    // to be matched or defaulted against real entries (see
+    // trialStore.js's defaultBrandForNewEntry() and
+    // yieldCalculator.js's orderBrandFirst()). displayName above is for
+    // cosmetic UI text only (logo alt text, email subject lines) and
+    // isn't guaranteed to match the catalog string — for Midwest the two
+    // happen to be identical, but they are NOT for NC+ (see below).
+    catalogBrandName: "Midwest Seed Genetics",
     logo: "/logos/midwest.png",
     operationsEmail: "operations@midwestseed.com",
   },
@@ -46,6 +56,11 @@ export const BRANDS = {
     bgDark: "#071633",
     cardDark: "#163E73",
     displayName: "NC+",
+    // The catalog (DefaultLists.json) lists this brand's company entry as
+    // "NC+ Hybrids", not "NC+" — see the comment on Midwest's
+    // catalogBrandName above for why this field exists separately from
+    // displayName.
+    catalogBrandName: "NC+ Hybrids",
     logo: "/logos/ncplus.png",
     operationsEmail: "operations@nc-pluse.com",
   },

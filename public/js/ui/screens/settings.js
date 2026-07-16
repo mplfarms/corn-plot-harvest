@@ -57,18 +57,20 @@ export function render(container) {
     segmented,
   ]);
 
-  // ---- Brand ----
+  // ---- Brand View ----
   const selectedBrandId = brandStore.getState().selectedBrand;
   const brandSegmented = h(
     "div",
-    { className: "segmented-control" },
+    { className: "segmented-control brand-view-segmented" },
     Object.values(BRANDS).map((b) =>
       h(
         "button",
         {
           type: "button",
-          className: "segmented-btn" + (b.id === selectedBrandId ? " segmented-btn-active" : ""),
+          className: "segmented-btn brand-view-btn" + (b.id === selectedBrandId ? " segmented-btn-active" : ""),
           "aria-pressed": b.id === selectedBrandId ? "true" : "false",
+          "aria-label": b.displayName,
+          title: b.displayName,
           onclick: () => {
             if (b.id === selectedBrandId) return;
             libraryStore.flushDraftToLibrary();
@@ -76,14 +78,14 @@ export function render(container) {
             render(container);
           },
         },
-        b.displayName
+        h("img", { className: "brand-view-logo", src: b.logo, alt: b.displayName })
       )
     )
   );
 
   const brandCard = h("section", { className: "card" }, [
-    h("h3", { className: "section-header" }, "Brand"),
-    h("p", { className: "field-note" }, "Select Brand"),
+    h("h3", { className: "section-header" }, "Brand View"),
+    h("p", { className: "field-note" }, "Select Brand View"),
     brandSegmented,
   ]);
 

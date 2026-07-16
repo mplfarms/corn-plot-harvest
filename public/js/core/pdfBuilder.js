@@ -36,6 +36,20 @@ const LEGEND_ITEMS = [
   { significance: "neutral", label: `Within ${SIGNIFICANCE_THRESHOLD_BU_AC} bu/ac of plot mean` },
 ];
 
+// Fallback box-plot accent color when no brand is selected (matches the
+// Midwest green, this app's original default accent, before NC+ existed).
+const DEFAULT_BOX_PLOT_RGB = [9, 69, 44];
+
+/**
+ * @param {string} hex e.g. "#09452C"
+ * @returns {[number, number, number]}
+ */
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex || "").trim());
+  if (!m) return DEFAULT_BOX_PLOT_RGB;
+  return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+}
+
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const MARGIN = 36;
@@ -197,6 +211,71 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     y = rowStartY + rowHeight;
   }
 
+  // Horizontal box-and-whisker for the plot's Dry Yield distribution —
+  // same shape/rule as the Plot Summary screen's box plot (see
+  // buildBoxPlotSvg() in plotSummary.js): one hue (the selected brand's
+  // accent color, falling back to the app's original green when no brand
+  // is set) for the whole thing, since it's a single series. Placed just
+  // above "Average Dry Yield by Brand:" in both places.
+  function drawBoxPlot(boxPlot) {
+    const { min, q1, median, q3, max, mean } = boxPlot;
+    const range = max - min;
+    const scale = (v) => (range === 0 ? MARGIN + tableWidth / 2 : MARGIN + ((v - min) / range) * tableWidth);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("Dry Yield Distribution:", MARGIN, y + 9 * 0.8);
+    y += 9 * 1.15 + 8;
+
+    const chartCenterY = y + 9;
+    const boxHalfHeight = 7;
+    const capHalfHeight = 5;
+    const [r, g, b] = hexToRgb(brand ? brand.accent : null);
+
+    const xMin = scale(min);
+    const xQ1 = scale(q1);
+    const xMedian = scale(median);
+    const xQ3 = scale(q3);
+    const xMax = scale(max);
+
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(1);
+    doc.line(xMin, chartCenterY, xMax, chartCenterY);
+    doc.line(xMin, chartCenterY - capHalfHeight, xMin, chartCenterY + capHalfHeight);
+    doc.line(xMax, chartCenterY - capHalfHeight, xMax, chartCenterY + capHalfHeight);
+
+    doc.setFillColor(r, g, b);
+    doc.setDrawColor(r, g, b);
+    doc.setLineWidth(1.2);
+    const boxW = Math.max(xQ3 - xQ1, 1);
+    doc.rect(xQ1, chartCenterY - boxHalfHeight, boxW, boxHalfHeight * 2, "FD");
+
+    doc.setLineWidth(1.8);
+    doc.line(xMedian, chartCenterY - boxHalfHeight, xMedian, chartCenterY + boxHalfHeight);
+
+    // Mean marker — a small hollow circle, a different shape (not just a
+    // color) so it reads distinctly from the median line — only drawn
+    // when it wouldn't just sit on top of the median.
+    if (Math.abs(mean - median) > Math.max(0.05, range * 0.01)) {
+      const xMean = scale(mean);
+      doc.setFillColor(255, 255, 255);
+      doc.circle(xMean, chartCenterY, 3, "FD");
+    }
+
+    doc.setDrawColor(0, 0, 0);
+    y = chartCenterY + boxHalfHeight + 10;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+    const caption = `Min ${min.toFixed(1)}  •  Q1 ${q1.toFixed(1)}  •  Median ${median.toFixed(1)}  •  Q3 ${q3.toFixed(
+      1
+    )}  •  Max ${max.toFixed(1)} bu/ac`;
+    doc.text(caption, MARGIN, y);
+    doc.setTextColor(0, 0, 0);
+    y += 8 * 1.3 + 6;
+  }
+
   function drawSummaryBlock() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
@@ -223,11 +302,16 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
       doc.text(line, MARGIN, y + 9 * 0.8);
       y += 9 * 1.15 + 6;
 
+      if (summary.boxPlot) drawBoxPlot(summary.boxPlot);
+
       // Only brands with 2+ hybrids in this plot get an average (a
       // "brand average" of one hybrid isn't meaningful); the selected
       // brand (Midwest Seed Genetics or NC+) always leads what's left —
       // same rule as the Plot Summary screen, so the two stay consistent.
-      const brandsToShow = brandAveragesForDisplay(summary.byBrand, brand ? brand.displayName : null);
+      // catalogBrandName, not displayName — see the matching comment in
+      // plotSummary.js's byBrandOrdered for why (NC+'s catalog entry is
+      // "NC+ Hybrids", not the shorter cosmetic "NC+").
+      const brandsToShow = brandAveragesForDisplay(summary.byBrand, brand ? brand.catalogBrandName : null);
       if (brandsToShow.length > 0) {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);

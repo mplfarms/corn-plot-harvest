@@ -7,6 +7,8 @@
 
 import { uuid, createTrialHeader, createPlotEntry } from "../../core/models.js";
 import { createPubSub, debounce, readJson, writeJson } from "./pubsub.js";
+import * as brandStore from "./brandStore.js";
+import { getBrand } from "../brand.js";
 
 const KEY = "cph.draftTrial";
 const AUTOSAVE_DEBOUNCE_MS = 400;
@@ -79,16 +81,36 @@ const CARRIED_MEASUREMENT_FIELDS = ["stripLengthFeet", "numberOfRows", "widthInc
 // user still has to actively confirm or change it for the new entry.
 const CARRIED_IDENTITY_FIELDS = ["hybrid", "relativeMaturity", "trait"];
 
+// Brand / Company defaults to whichever app-level brand is currently
+// selected (Midwest Seed Genetics or NC+ Hybrids — see brandStore.js),
+// for every new entry, not just carried forward from the previous one —
+// a plot commonly mixes in competitor hybrids for comparison, so
+// "whatever the last entry's brand happened to be" isn't the right
+// default the way Hybrid/RM/Trait carrying-forward is. The user can
+// still change it per entry; this just saves the common case of most
+// entries being the home brand.
+function defaultBrandForNewEntry() {
+  const brand = getBrand(brandStore.getState().selectedBrand);
+  // catalogBrandName (not displayName) — this has to match an actual
+  // entry in the Brand / Company catalog (e.g. "NC+ Hybrids", not the
+  // shorter "NC+" shown elsewhere as cosmetic branding) or the Brand
+  // wheel would show a value that isn't really one of its own options.
+  return brand ? brand.catalogBrandName : "";
+}
+
 /**
- * Adds a new blank entry, prepopulating Strip Length, Number of Rows,
- * Width, Hybrid, Relative Maturity, and Trait from the most recently
- * added entry (if any) — the first entry in a new plot has nothing to
- * carry forward from; see entryEditor.js for how it defaults instead.
+ * Adds a new blank entry, defaulting Brand / Company to the app's
+ * currently selected brand and prepopulating Strip Length, Number of
+ * Rows, Width, Hybrid, Relative Maturity, and Trait from the most
+ * recently added entry (if any) — see entryEditor.js for how the very
+ * first entry in a plot additionally defaults Hybrid/RM once Brand is
+ * set, since it has no previous entry to carry those from.
  * @returns {import('../../core/models.js').PlotEntry}
  */
 export function addEntryCarryingMeasurements() {
   const prev = state.entries[state.entries.length - 1];
   const entry = createPlotEntry();
+  entry.brand = defaultBrandForNewEntry();
   if (prev) {
     for (const key of CARRIED_MEASUREMENT_FIELDS) entry[key] = prev[key];
     for (const key of CARRIED_IDENTITY_FIELDS) entry[key] = prev[key];
