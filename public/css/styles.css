@@ -227,6 +227,11 @@ a {
   line-height: 1;
 }
 
+.top-bar-btn-settings {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
 .sync-icon-synced {
   color: #4ade80;
 }
