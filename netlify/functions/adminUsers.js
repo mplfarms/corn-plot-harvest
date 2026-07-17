@@ -3,21 +3,21 @@
 // Admin-only user management: list every registered account, promote or
 // demote admin status, and delete an account (which also deletes that
 // account's saved cloud plots). Every request must supply the caller's
-// own email + the shared passcode, and the caller's stored record must
-// have isAdmin === true (see _shared.js's requireAdmin()) — there is no
-// separate admin-only credential beyond that; see _shared.js's top
-// comment for the security tradeoff this implies.
+// own email, and the caller's stored record must have isAdmin === true
+// (see _shared.js's requireAdmin()) — there is no other credential
+// involved; see _shared.js's top comment for the security tradeoff this
+// implies.
 //
 // Endpoints (all under /.netlify/functions/adminUsers):
-//   GET  ?email=&passcode=                          -> { users: [{name,email,isAdmin,createdAt}] }
-//   POST body {email,passcode,action:"setAdmin",targetEmail,isAdmin}  -> { user }
-//   POST body {email,passcode,action:"delete",targetEmail}            -> { ok: true }
+//   GET  ?email=                                          -> { users: [{name,email,isAdmin,createdAt}] }
+//   POST body {email,action:"setAdmin",targetEmail,isAdmin}  -> { user }
+//   POST body {email,action:"delete",targetEmail}            -> { ok: true }
 
 const { getStore, connectLambda } = require("@netlify/blobs");
 const { json, normalizeEmail, userKey, requireAdmin } = require("./_shared");
 
-async function handleList(usersStore, email, passcode) {
-  const adminCheck = await requireAdmin(usersStore, email, passcode);
+async function handleList(usersStore, email) {
+  const adminCheck = await requireAdmin(usersStore, email);
   if (!adminCheck.ok) return json(adminCheck.statusCode, { error: adminCheck.error });
 
   const { blobs } = await usersStore.list();
@@ -26,8 +26,8 @@ async function handleList(usersStore, email, passcode) {
   return json(200, { users });
 }
 
-async function handleSetAdmin(usersStore, callerEmail, passcode, targetEmail, isAdmin) {
-  const adminCheck = await requireAdmin(usersStore, callerEmail, passcode);
+async function handleSetAdmin(usersStore, callerEmail, targetEmail, isAdmin) {
+  const adminCheck = await requireAdmin(usersStore, callerEmail);
   if (!adminCheck.ok) return json(adminCheck.statusCode, { error: adminCheck.error });
 
   const key = userKey(targetEmail);
@@ -38,8 +38,8 @@ async function handleSetAdmin(usersStore, callerEmail, passcode, targetEmail, is
   return json(200, { user: record });
 }
 
-async function handleDelete(usersStore, plotsStore, callerEmail, passcode, targetEmail) {
-  const adminCheck = await requireAdmin(usersStore, callerEmail, passcode);
+async function handleDelete(usersStore, plotsStore, callerEmail, targetEmail) {
+  const adminCheck = await requireAdmin(usersStore, callerEmail);
   if (!adminCheck.ok) return json(adminCheck.statusCode, { error: adminCheck.error });
 
   const normalizedTarget = normalizeEmail(targetEmail);
@@ -65,7 +65,7 @@ exports.handler = async (event) => {
 
   if (event.httpMethod === "GET") {
     const q = event.queryStringParameters || {};
-    return handleList(usersStore, q.email, q.passcode);
+    return handleList(usersStore, q.email);
   }
 
   if (event.httpMethod === "POST") {
@@ -77,10 +77,10 @@ exports.handler = async (event) => {
     }
 
     if (payload.action === "setAdmin") {
-      return handleSetAdmin(usersStore, payload.email, payload.passcode, payload.targetEmail, payload.isAdmin);
+      return handleSetAdmin(usersStore, payload.email, payload.targetEmail, payload.isAdmin);
     }
     if (payload.action === "delete") {
-      return handleDelete(usersStore, plotsStore, payload.email, payload.passcode, payload.targetEmail);
+      return handleDelete(usersStore, plotsStore, payload.email, payload.targetEmail);
     }
     return json(400, { error: "Unknown action." });
   }

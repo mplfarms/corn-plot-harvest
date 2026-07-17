@@ -83,18 +83,29 @@ online at least once (to cache the PDF library), after which it also works offli
 - Selection wheels are a tap-to-expand scrolling list rather than iOS's native spinning
   wheel control — same idea, adapted for the web.
 
-## Cloud sync setup (optional — sign in to access plots on any device)
+## Cloud sync setup (sign-in is required — lets plots follow you across devices)
 
-This is a newer, separate piece: signing in (Netlify Identity) lets a saved plot
-follow you across phones/tablets/computers instead of staying stuck on one device.
-It's entirely optional — skip it and the app works exactly as it always has,
-local-only. Turning it on requires a few one-time steps that only the site owner
-needs to do, once:
+Signing in is mandatory: every screen except the launch screen itself requires a
+session (enforced in `router.js`, not just by hiding a button), and there's no
+"use it without an account" option anymore. Once signed in, a saved plot follows
+that email across phones/tablets/computers instead of staying stuck on one
+device, and the session is kept in `localStorage` indefinitely (no expiry, no
+TTL) so a device stays signed in across restarts until someone explicitly taps
+Sign Out.
+
+**This app no longer uses Netlify Identity.** Signing in used to require a
+password and email verification, which caused sign-in trouble for the team — it's
+been replaced with something much lighter: **just an email address**, on the
+app's launch screen (the Republic shield + brand-logo screen). There's no name
+field, no password, no verification email, no per-user Netlify Identity account
+to manage, and (per the team's explicit choice) no shared passcode either — this
+is deliberately as simple as possible, since none of this data is sensitive.
+Turning it on requires one one-time step that only the site owner needs to do:
 
 **1. Switch from drag-and-drop to Git-based deploys.** The parts that make cloud
-sync work (`netlify/functions/plots.js`) need Netlify to run a small build step to
-package them, and manual drag-and-drop deploys skip that step entirely — they only
-work for plain static files. So:
+sync work (the functions in `netlify/functions/`) need Netlify to run a small
+build step to package them, and manual drag-and-drop deploys skip that step
+entirely — they only work for plain static files. So:
    - Put this whole project (not just `public/`) in a GitHub repository.
    - In the Netlify dashboard, go to your site → **Site configuration → Build & deploy →
      Continuous deployment**, and connect it to that GitHub repo instead of using
@@ -104,32 +115,58 @@ work for plain static files. So:
    - From then on, every push to the repo redeploys automatically — no more manual
      dragging.
 
-**2. Enable Identity.** In the Netlify dashboard: your site → **Site configuration →
-   Identity → Enable Identity**. Leave the default settings (email/password signup) —
-   no extra configuration is required for this app to work.
+**2. That's it for admin setup.** The account signed in as **mplfarms@aol.com** is
+   automatically the admin the first time it signs in inside the deployed app — no
+   dashboard step needed. From Settings → **Manage Users** (only visible to an
+   admin), that account can promote or demote any other signed-in user to admin,
+   or delete an account entirely (which also deletes that account's cloud-saved
+   plots). An admin can't accidentally delete their own account.
 
-**3. Promote yourself to admin (optional).** Once you've signed up for an account
-   *inside the deployed app itself* (tap "Create Account" on the Account screen), go
-   to your site → **Identity** tab in the Netlify dashboard, find your user in the
-   list, open it, and add the role `admin`. Only users with this role can see the
-   "All Plots (Admin)" screen (everyone's saved plots, not just their own) — regular
-   users only ever see their own.
+**3. Default Brand View by email domain.** When someone signs in, the app tries to
+   guess which brand they work with from their email address and sets that as
+   their Brand View automatically: `@midwestseedgenetics.com`, `@midwestseed.com`,
+   or `@republicseed.com` → Midwest Seed Genetics, `@nc-plus.com` → NC+. Anyone
+   signing in from any other email domain is sent to a manual Brand View picker
+   screen instead (they can always change it later in Settings, too). To add or
+   change these domain rules, edit `BRAND_ID_BY_EMAIL_DOMAIN` near the top of
+   `public/js/ui/brand.js`.
 
-**4. Test it.** Sign up on one device, save a plot (give it a Cooperator Name — that's
-   what triggers auto-save), then sign in with the same account on a second
-   device/browser and confirm the plot shows up under Saved Plots there too.
+**4. Test it.** Sign in on one device with just an email, save a plot (give it a
+   Cooperator Name — that's what triggers auto-save), then sign in with the same
+   email on a second device/browser and confirm the plot shows up under Saved
+   Plots there too. Each person's plots are private to their own email — a
+   different email sees only what it saved itself, except the admin account, which
+   can see everyone's via **Workspace → All Plots (Admin)**.
 
-If any of this errors out, the most likely causes are: Identity isn't enabled yet
-(step 2), or the site is still on a drag-and-drop deploy instead of a Git-connected
-one (step 1) — Functions silently won't exist without it, and `/.netlify/functions/plots`
-will 404. A **502** instead (the function exists and is being called, but errors out)
-most likely means `netlify/functions/plots.js` threw `MissingBlobsEnvironmentError` —
-this endpoint uses the classic Lambda-compatible `(event, context)` handler signature
-(needed to read `context.clientContext.user` from Identity), and in that mode Netlify
-Blobs requires an explicit `connectLambda(event)` call before `getStore()` or its
-environment isn't configured. This is already handled in the current version of
-`plots.js` — if you're still seeing a 502 after deploying it, check **Site →
-Functions → plots → real-time logs** in the Netlify dashboard for the actual error.
+**A security tradeoff worth knowing clearly.** This is intentionally lightweight,
+not enterprise-grade, and dropping the shared passcode makes it meaningfully more
+open: there's no password, no email verification, and now nothing at all standing
+between typing an email into the sign-in form and being treated as that person.
+Concretely — anyone who knows (or guesses) a teammate's email can sign in as them
+and see their saved plots, and anyone who knows the admin's email
+(`mplfarms@aol.com`, documented right here in this file) can sign in as the admin
+and get full access: view every user's plots, promote or demote any account, or
+delete accounts outright. For a small internal farm-operation tool where the only
+people who'd ever open this sign-in screen are trusted teammates, that's an
+acceptable, deliberate tradeoff in exchange for the simplest possible sign-in flow
+— but it's worth being clear-eyed that this is closer to "an honor system with a
+name tag" than real authentication. If that stops feeling like enough (e.g. the
+app ever needs to be reachable by people outside the immediate team), the shared
+passcode that used to sit on top of this is the natural first thing to bring
+back.
+
+If any of this errors out, the most likely cause is the site still being on a
+drag-and-drop deploy instead of a Git-connected one (step 1) — Functions silently
+won't exist without it, and `/.netlify/functions/auth` (or `plots`, or
+`adminUsers`) will 404. A **502** instead (the function exists and is being
+called, but errors out) most likely means the function threw
+`MissingBlobsEnvironmentError` — all three functions (`auth.js`, `plots.js`,
+`adminUsers.js`) use the classic Lambda-compatible `(event, context)` handler
+signature, and in that mode Netlify Blobs requires an explicit
+`connectLambda(event)` call before `getStore()` or its environment isn't
+configured. This is already handled at the top of all three functions — if you're
+still seeing a 502 after deploying, check **Site → Functions → (auth / plots /
+adminUsers) → real-time logs** in the Netlify dashboard for the actual error.
 
 ## Local testing (optional, for whoever's deploying this)
 

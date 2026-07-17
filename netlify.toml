@@ -3,12 +3,19 @@
   functions = "netlify/functions"
   command = ""
 
+# Without this, Netlify never runs "npm install" for
+# netlify/functions/package.json, so the function's "@netlify/blobs"
+# import can't be resolved at build time and the whole build fails.
+# This plugin runs that install automatically before bundling.
 [[plugins]]
   package = "@netlify/plugin-functions-install-core"
 
 [functions]
   node_bundler = "esbuild"
 
+# Never cache the service worker file itself at the CDN edge — it must
+# always be re-fetched so browsers see updates promptly (see public/sw.js
+# for the client-side cache-versioning story).
 [[headers]]
   for = "/sw.js"
   [headers.values]

@@ -181,9 +181,16 @@ a {
 .top-bar-left {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
-  flex: 1;
+  /* Content-sized, not an even three-way split with the title: Home and
+     Back need to stay fully readable ("⌂ Home", "‹ Back"), so they claim
+     only the width their own label needs and never shrink. All the
+     give when space is tight comes from the title instead (flex:1 1 auto
+     below) — a truncated brand name reads fine ("Midwest Seed Gen…"),
+     but a truncated button label ("⌂ …") does not, so the title is the
+     one that should give way, never Home/Back. */
+  flex: 0 0 auto;
 }
 
 .top-bar-title {
@@ -191,17 +198,24 @@ a {
   font-weight: 700;
   font-size: 1.05rem;
   text-align: center;
-  flex: 2;
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* Guarantees a visible gap from Home/Back regardless of exactly how
+     wide those buttons render (their own width varies with the Back
+     label's text and can't always be predicted precisely) — without
+     this, a long brand name's ellipsis-truncated text starts flush
+     against "Back" with no breathing room. */
+  padding: 0 6px;
 }
 
 .top-bar-right {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex: 1;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
@@ -215,6 +229,17 @@ a {
   min-height: 44px;
   border-radius: 8px;
   cursor: pointer;
+  /* Belt-and-suspenders against the center title: a flex item's default
+     min-width is its content size, which stops it from ever actually
+     shrinking below that no matter how little room .top-bar-left has —
+     min-width:0 here lets it actually shrink, and the truncation rules
+     make a too-tight fit end in an ellipsis instead of visibly running
+     into the title text next to it. */
+  min-width: 0;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .top-bar-btn:active {
@@ -232,10 +257,17 @@ a {
   line-height: 1;
 }
 
-/* Home and Back — sized to match the Settings gear rather than the
-   smaller default .top-bar-btn text size. */
+/* Home and Back — a bit bigger than the smaller default .top-bar-btn
+   text size, but noticeably smaller than the Settings gear (1.3rem) —
+   Home and Back also carry a text label ("⌂ Home", "‹ Back"), not just
+   a bare glyph, so matching (or even coming close to) the gear's size
+   made them wide enough to overlap the center title on longer brand
+   names like "Midwest Seed Genetics". Tighter horizontal padding too,
+   for the same reason — every pixel here is pixels the title doesn't get. */
 .top-bar-btn-nav {
-  font-size: 1.3rem;
+  font-size: 1rem;
+  padding-left: 6px;
+  padding-right: 6px;
 }
 
 .sync-icon-synced {
@@ -478,6 +510,20 @@ h3.section-header:first-child {
 
 .launch-note {
   text-align: center;
+}
+
+/* Sign In button — no brand is known yet on this screen (that's decided
+   AFTER signing in), so it can't use var(--accent) without misleadingly
+   showing whichever brand's green/red happens to be the CSS defaults.
+   Uses a blue-gray pulled straight from the Republic shield artwork
+   instead, so it reads as neutral "Republic" branding rather than
+   accidentally Midwest- or NC+-colored. */
+.launch-form-body .btn-primary {
+  background: #0c2336;
+}
+
+.launch-form-body .btn-primary:active {
+  background: #16344c;
 }
 
 /* ---------- manage users (admin) ---------- */

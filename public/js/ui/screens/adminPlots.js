@@ -5,12 +5,14 @@
 // in-app via the Manage Users screen, see manageUsers.js) listing every
 // signed-in user's saved plots via GET /.netlify/functions/plots?
 // scope=all. Read-only: no edit/delete here, just cross-operation
-// visibility. Reachable only via workspaceMenu's "All Plots (Admin)"
-// row, which itself only renders when authStore.isAdmin() is true — but
-// this screen re-checks independently since the server is the real
-// authority (a stale client-side role check should never be trusted
-// alone; the function itself also re-checks the caller's own isAdmin
-// flag, returning 403 if it isn't set — see netlify/functions/plots.js).
+// visibility. Reachable from the Home Screen's "All Plots (Admin)" button
+// (plotChooser.js) and from the Plot Workspace menu's own row
+// (workspaceMenu.js), both of which only render when authStore.isAdmin()
+// is true — but this screen re-checks independently since the server is
+// the real authority (a stale client-side role check should never be
+// trusted alone; the function itself also re-checks the caller's own
+// isAdmin flag, returning 403 if it isn't set — see
+// netlify/functions/plots.js).
 
 import { h, mount, clear } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
@@ -18,7 +20,7 @@ import * as authStore from "../authStore.js";
 import { navigate } from "../router.js";
 
 export async function render(container) {
-  const topBar = createTopBar({ title: "All Plots (Admin)", onBack: () => navigate("workspace") });
+  const topBar = createTopBar({ title: "All Plots (Admin)", onBack: () => navigate("plot-chooser") });
   const bodyEl = h("div", { className: "screen-body" }, [h("p", { className: "empty-state" }, "Loading…")]);
   mount(container, h("div", { className: "screen admin-plots-screen" }, [topBar, bodyEl]));
 

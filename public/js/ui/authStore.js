@@ -65,17 +65,20 @@ export function getCredentials() {
 /**
  * Signs in, creating the account on first use (see auth.js — sign-up and
  * sign-in are the same call). Persists the resulting session to
- * localStorage on success.
- * @param {{email: string}} params
- * @returns {Promise<{ok: true, user: Object}|{ok: false, error: string}>}
+ * localStorage on success. `name` is optional and normally omitted — the
+ * sign-in form only collects an email; accountScreen.js makes a second
+ * call with a name once the user answers the "what's your name?" prompt
+ * that's shown when `isNewUser` comes back true.
+ * @param {{email: string, name?: string}} params
+ * @returns {Promise<{ok: true, user: Object, isNewUser: boolean}|{ok: false, error: string}>}
  */
-export async function signIn({ email }) {
+export async function signIn({ email, name }) {
   let res;
   try {
     res = await fetch("/.netlify/functions/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, name }),
     });
   } catch (e) {
     return { ok: false, error: "Couldn't reach the server — check your connection and try again." };
@@ -95,7 +98,7 @@ export async function signIn({ email }) {
   session = payload.user;
   writeJson(SESSION_KEY, session);
   pubsub.notify();
-  return { ok: true, user: session };
+  return { ok: true, user: session, isNewUser: Boolean(payload.isNewUser) };
 }
 
 /** Clears the local session. There's no server-side session to invalidate. */

@@ -1,94 +1,101 @@
 // netlify/functions/plots.js
 //
-// Cloud sync endpoint for saved plots. One function, one Netlify Blobs
-// store ("plots"), one JSON blob per user (key "user-<sub>.json") holding
-// that user's full SavedTrial[] array — the same shape libraryStore.js
-// keeps in localStorage. The client always sends/receives the *whole*
-// array; for a small farm operation's plot count this is simpler and far
-// less failure-prone than incremental per-trial endpoints, at a
-// negligible bandwidth cost.
+// Cloud sync endpoint for saved plots. One JSON blob per user (key
+// "<email>.json" in the "plots" Blobs store) holding that user's full
+// SavedTrial[] array — the same shape libraryStore.js keeps in
+// localStorage. The client always sends/receives the *whole* array; for
+// a small farm operation's plot count this is simpler and far less
+// failure-prone than incremental per-trial endpoints, at a negligible
+// bandwidth cost.
 //
-// Auth: every request must be signed in (Netlify Identity). Netlify
-// decodes the caller's JWT (sent as `Authorization: Bearer <token>` by
-// the client — see src/ui/authStore.js) and, for functions using this
-// classic (event, context) handler signature, exposes it as
-// context.clientContext.user. No token verification code needed here —
-// that's Netlify's job before our handler even runs.
+// Auth: every request carries just `email` (query string for GET, JSON
+// body for PUT) — no password, no passcode, nothing else. Each user only
+// ever sees their own trials via the default scope=self. `scope=all`
+// additionally requires the caller's own stored user record to have
+// isAdmin === true (checked server-side via requireAdmin(), never
+// trusted from the client alone) — see _shared.js's top comment for the
+// security tradeoff this implies.
 //
 // Endpoints (all under /.netlify/functions/plots):
-//   GET  ?scope=self (default) -> { trials: SavedTrial[] }  (caller's own)
-//   GET  ?scope=all            -> { users: [{userId, email, trials}] }
-//                                  (admin role required)
-//   PUT  body {trials: [...]}  -> overwrites the caller's stored trials
+//   GET  ?email=&scope=self (default) -> { trials: SavedTrial[] } (caller's own)
+//   GET  ?email=&scope=all            -> { users: [{email, name, trials}] } (admin only)
+//   PUT  body {email, trials: [...]}  -> overwrites the caller's stored trials
 
-const { getStore } = require("@netlify/blobs");
+const { getStore, connectLambda } = require("@netlify/blobs");
+const { json, normalizeEmail, userKey, requireAdmin } = require("./_shared");
 
-function userKey(sub) {
-  return `user-${sub}.json`;
-}
-
-function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  };
-}
-
-async function handleGetSelf(store, user) {
-  const trials = (await store.get(userKey(user.sub), { type: "json" })) || [];
+async function handleGetSelf(plotsStore, email) {
+  const trials = (await plotsStore.get(userKey(email), { type: "json" })) || [];
   return json(200, { trials });
 }
 
-async function handleGetAll(store, user) {
-  const roles = (user.app_metadata && user.app_metadata.roles) || [];
-  if (!roles.includes("admin")) {
-    return json(403, { error: "Admin role required." });
-  }
-  const { blobs } = await store.list({ prefix: "user-" });
+async function handleGetAll(usersStore, plotsStore, email) {
+  const adminCheck = await requireAdmin(usersStore, email);
+  if (!adminCheck.ok) return json(adminCheck.statusCode, { error: adminCheck.error });
+
+  const { blobs } = await plotsStore.list();
   const users = [];
   for (const b of blobs) {
     const [trials, meta] = await Promise.all([
-      store.get(b.key, { type: "json" }),
-      store.getMetadata(b.key),
+      plotsStore.get(b.key, { type: "json" }),
+      plotsStore.getMetadata(b.key),
     ]);
     users.push({
-      userId: b.key.replace(/^user-/, "").replace(/\.json$/, ""),
-      email: (meta && meta.metadata && meta.metadata.email) || null,
+      email: (meta && meta.metadata && meta.metadata.email) || b.key.replace(/\.json$/, ""),
+      name: (meta && meta.metadata && meta.metadata.name) || null,
       trials: trials || [],
     });
   }
+  // Alphabetical by name (falling back to email) so the admin view is
+  // stable and scannable rather than in arbitrary blob-listing order.
+  users.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
   return json(200, { users });
 }
 
-async function handlePut(store, user, event) {
+async function handlePut(usersStore, plotsStore, event) {
   let payload;
   try {
     payload = JSON.parse(event.body || "{}");
   } catch (e) {
     return json(400, { error: "Invalid JSON body." });
   }
+
+  const email = normalizeEmail(payload.email);
+  if (!email) return json(400, { error: "Missing email." });
+
   const trials = Array.isArray(payload.trials) ? payload.trials : [];
-  await store.setJSON(userKey(user.sub), trials, { metadata: { email: user.email || "" } });
+  const userRecord = await usersStore.get(userKey(email), { type: "json" });
+  await plotsStore.setJSON(userKey(email), trials, {
+    metadata: { email, name: (userRecord && userRecord.name) || "" },
+  });
   return json(200, { ok: true, count: trials.length });
 }
 
-exports.handler = async (event, context) => {
-  const user = context.clientContext && context.clientContext.user;
-  if (!user) {
-    return json(401, { error: "Sign in required." });
-  }
+exports.handler = async (event) => {
+  // This handler uses the classic (event, context) "Lambda compatibility"
+  // signature, and in that mode Netlify Blobs' environment is NOT wired
+  // up automatically the way it is for the modern (req, context) function
+  // signature — getStore() throws MissingBlobsEnvironmentError if called
+  // without this first, which crashes the function and surfaces to the
+  // client as a bare "502 Bad Gateway" with no further detail. This must
+  // run before any getStore()/getDeployStore() call.
+  connectLambda(event);
 
-  const store = getStore("plots");
+  const usersStore = getStore("users");
+  const plotsStore = getStore("plots");
 
   if (event.httpMethod === "GET") {
-    const scope = (event.queryStringParameters && event.queryStringParameters.scope) || "self";
-    if (scope === "all") return handleGetAll(store, user);
-    return handleGetSelf(store, user);
+    const q = event.queryStringParameters || {};
+    const email = normalizeEmail(q.email);
+    if (!email) return json(400, { error: "Missing email." });
+
+    const scope = q.scope || "self";
+    if (scope === "all") return handleGetAll(usersStore, plotsStore, email);
+    return handleGetSelf(plotsStore, email);
   }
 
   if (event.httpMethod === "PUT") {
-    return handlePut(store, user, event);
+    return handlePut(usersStore, plotsStore, event);
   }
 
   return json(405, { error: "Method not allowed." });

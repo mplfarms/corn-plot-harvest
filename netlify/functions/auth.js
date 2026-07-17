@@ -48,6 +48,7 @@ exports.handler = async (event) => {
   const store = getStore("users");
   const key = userKey(email);
   let record = await store.get(key, { type: "json" });
+  const isNewUser = !record;
 
   if (!record) {
     record = {
@@ -62,5 +63,9 @@ exports.handler = async (event) => {
   }
 
   await store.setJSON(key, record);
-  return json(200, { user: record });
+  // isNewUser lets the client know to prompt for a name right after this
+  // first sign-in (see accountScreen.js) — the account itself is already
+  // created at this point (with name defaulted to the email), so a
+  // cancelled/skipped prompt still leaves a fully working account.
+  return json(200, { user: record, isNewUser });
 };

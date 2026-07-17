@@ -11,13 +11,17 @@
 // per-brand Home Screen (plotChooser.js, #/plot-chooser) is Home (see
 // topBar.js).
 //
-// Signing in is just an email address — no name, no password, no email
+// The form itself only ever asks for an email — no password, no email
 // verification, no shared passcode (see authStore.js / auth.js /
-// _shared.js's top comment for the full tradeoff this implies), and the
-// resulting session is kept in localStorage indefinitely (no expiry, no
-// TTL) so it stays signed in across restarts on any device/browser
-// capable of persisting it. It's also what decides the default Brand
-// View:
+// _shared.js's top comment for the full tradeoff this implies). A
+// first-time email auto-creates the account right then (name defaulted
+// to the email address), and immediately follows up with a one-time
+// "what's your name?" prompt (see handleSubmit's isNewUser branch below)
+// so admin screens have something better than an email to show — a
+// returning email skips straight past that. The resulting session is
+// kept in localStorage indefinitely (no expiry, no TTL) so it stays
+// signed in across restarts on any device/browser capable of persisting
+// it. Email is also what decides the default Brand View:
 //   - @midwestseedgenetics.com / @midwestseed.com / @republicseed.com
 //     -> Midwest Seed Genetics, straight into the Home Screen
 //   - @nc-plus.com -> NC+, straight into the Home Screen
@@ -27,6 +31,7 @@
 // (see brand.js's brandIdForEmail()).
 
 import { h, mount } from "../dom.js";
+import { showPrompt } from "../components/modal.js";
 import * as authStore from "../authStore.js";
 import * as brandStore from "../stores/brandStore.js";
 import { brandIdForEmail } from "../brand.js";
@@ -81,6 +86,26 @@ export function render(container) {
     if (!result.ok) {
       showError(result.error);
       return;
+    }
+
+    // Brand-new account (auto-created by the signIn call above, with its
+    // name defaulted to the email itself) — ask for a real name once, so
+    // admin screens (Manage Users, All Plots) show something more useful
+    // than an email address. Skipping the prompt is fine: the account
+    // already works either way, just with name === email until they
+    // update it (there's no separate "edit name" UI — signing in again
+    // with a name from the browser console/devtools is the only way, and
+    // that's an acceptable gap for a low-stakes internal tool).
+    if (result.isNewUser) {
+      const name = await showPrompt({
+        title: "Welcome!",
+        message: "What's your name? This helps tell your saved plots apart from your teammates' — especially for whoever's checking All Plots (Admin).",
+        placeholder: "Your name",
+        confirmLabel: "Continue",
+      });
+      if (name && name.trim()) {
+        await authStore.signIn({ email, name: name.trim() });
+      }
     }
 
     const knownBrandId = brandIdForEmail(email);

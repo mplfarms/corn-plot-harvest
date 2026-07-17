@@ -16,6 +16,7 @@ import { getBrand } from "../brand.js";
 import * as brandStore from "../stores/brandStore.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
+import * as authStore from "../authStore.js";
 import { createTopBar } from "../components/topBar.js";
 import { navigate } from "../router.js";
 
@@ -59,7 +60,22 @@ export function render(container) {
     ]
   );
 
-  const heroActions = h("div", { className: "home-actions" }, [newPlotBtn, savedPlotsBtn]);
+  // Admin-only — visible only when the signed-in user's own stored
+  // record has isAdmin === true (server re-checks this independently on
+  // every call anyway; see adminPlots.js and _shared.js's requireAdmin()).
+  const allPlotsAdminBtn = authStore.isAdmin()
+    ? h(
+        "button",
+        {
+          type: "button",
+          className: "home-btn home-btn-secondary",
+          onclick: () => navigate("admin-plots"),
+        },
+        "All Plots (Admin)"
+      )
+    : null;
+
+  const heroActions = h("div", { className: "home-actions" }, [newPlotBtn, savedPlotsBtn, allPlotsAdminBtn]);
 
   const hero = h("div", { className: "home-hero" }, [heroTop, heroActions]);
 
