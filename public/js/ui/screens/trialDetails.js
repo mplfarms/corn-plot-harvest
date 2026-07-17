@@ -10,6 +10,7 @@
 import { h, mount, clear } from "../dom.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as listsStore from "../stores/listsStore.js";
+import * as adminEditStore from "../stores/adminEditStore.js";
 import * as geoData from "../geoData.js";
 import { createTopBar } from "../components/topBar.js";
 import { createWheelSelect, createExtendableWheelSelect } from "../components/wheelSelect.js";
@@ -99,6 +100,9 @@ function textAreaInput({ value, placeholder, oninput }) {
 
 
 export function render(container) {
+  // See adminEditStore.clearIfStale()'s comment — safe to call unconditionally.
+  adminEditStore.clearIfStale();
+
   const header = trialStore.getState().header;
   const fixed = listsStore.fixedLists();
 

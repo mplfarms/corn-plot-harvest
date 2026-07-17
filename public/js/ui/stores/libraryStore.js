@@ -8,6 +8,7 @@
 
 import { createPubSub, debounce, readJson, writeJson } from "./pubsub.js";
 import * as trialStore from "./trialStore.js";
+import * as adminEditStore from "./adminEditStore.js";
 
 const KEY = "cph.savedTrials";
 const AUTOSAVE_DEBOUNCE_MS = 500;
@@ -80,7 +81,16 @@ export function getById(id) {
   return state.trials.find((t) => t.id === id);
 }
 
+// Both of these skip entirely while an admin-edit session is active
+// (see adminEditStore.js): trialStore's draft slot then holds a
+// TEAMMATE's trial, not the signed-in admin's own — auto-saving it here
+// would upsert it into the admin's own local library, which
+// cloudSyncStore.js would then push to the server under the admin's own
+// email, silently re-attaching someone else's plot to the wrong account.
+// adminEditStore.saveAndExit() writes straight to the real owner's cloud
+// record instead, bypassing this local library entirely.
 const debouncedAutosave = debounce((draft) => {
+  if (adminEditStore.isActive()) return;
   if (draft.header.cooperatorName.trim() !== "") {
     upsert(draft.id, draft.header, draft.entries);
   }
@@ -94,6 +104,7 @@ const debouncedAutosave = debounce((draft) => {
  */
 export function flushDraftToLibrary() {
   debouncedAutosave.cancel();
+  if (adminEditStore.isActive()) return;
   const draft = trialStore.getState();
   if (draft.header.cooperatorName.trim() !== "") {
     upsert(draft.id, draft.header, draft.entries);

@@ -11,6 +11,7 @@ import * as trialStore from "../stores/trialStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
 import * as authStore from "../authStore.js";
 import * as cloudSyncStore from "../stores/cloudSyncStore.js";
+import * as adminEditStore from "../stores/adminEditStore.js";
 import { createTopBar } from "../components/topBar.js";
 import { showConfirm } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
@@ -74,16 +75,26 @@ function syncStatusIcon(container) {
 }
 
 export function render(container) {
+  // See adminEditStore.clearIfStale()'s comment — safe to call unconditionally.
+  adminEditStore.clearIfStale();
+
   const brand = getBrand(brandStore.getState().selectedBrand);
   const draft = trialStore.getState();
   const cooperator = draft.header.cooperatorName.trim();
   const entryCount = draft.entries.length;
+  const adminEditing = adminEditStore.isActive();
 
   const topBar = createTopBar({
     title: brand ? brand.displayName : "Workspace",
     onBack: () => navigate("plot-chooser"),
     right: syncStatusIcon(container),
   });
+
+  const adminEditBanner = adminEditing
+    ? h("div", { className: "preview-owner-banner" }, [
+        `Admin Edit — editing ${adminEditStore.getOwnerLabel()}'s plot. Use Save Changes below to write back to their account.`,
+      ])
+    : null;
 
   const rows = h("div", { className: "chooser-list" }, [
     menuRow("Enter Plot Details", cooperator || "No cooperator set yet", () => navigate("trial-details")),
@@ -93,11 +104,44 @@ export function render(container) {
       () => navigate("entries")
     ),
     menuRow("Plot Summary & Results", "Ranked results & export", () => navigate("plot-summary")),
-    menuRow("Saved Plots", `${libraryStore.getState().trials.length} saved`, () =>
-      navigate("saved-plots", { enterWorkspaceOnSelect: false })
-    ),
-    authStore.isAdmin() ? menuRow("All Plots (Admin)", "See every user's saved plots", () => navigate("admin-plots")) : null,
+    // Both hidden during an admin-edit session — either one swaps
+    // trialStore's draft out from under the in-progress edit (Saved
+    // Plots loads one of the ADMIN's own trials; All Plots re-enters
+    // this same flow for a different one) with no save/discard
+    // confirmation, silently abandoning unsaved changes here.
+    adminEditing
+      ? null
+      : menuRow("Saved Plots", `${libraryStore.getState().trials.length} saved`, () =>
+          navigate("saved-plots", { enterWorkspaceOnSelect: false })
+        ),
+    !adminEditing && authStore.isAdmin()
+      ? menuRow("All Plots (Admin)", "See every user's saved plots", () => navigate("admin-plots"))
+      : null,
   ]);
+
+  const saveAdminEditBtn = adminEditing
+    ? h(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-primary btn-block",
+          onclick: async (e) => {
+            e.target.disabled = true;
+            e.target.textContent = "Saving…";
+            const result = await adminEditStore.saveAndExit();
+            if (!result.ok) {
+              e.target.disabled = false;
+              e.target.textContent = "Save Changes";
+              showToast(`Couldn't save: ${result.error}`, { type: "error" });
+              return;
+            }
+            showToast("Saved to their account.", { type: "success" });
+            navigate("admin-plots");
+          },
+        },
+        "Save Changes"
+      )
+    : null;
 
   const startNewBtn = h(
     "button",
@@ -105,6 +149,18 @@ export function render(container) {
       type: "button",
       className: "btn btn-danger btn-block",
       onclick: async () => {
+        if (adminEditing) {
+          const ok = await showConfirm({
+            title: "Discard Admin Edit?",
+            message: `This discards your unsaved changes to ${adminEditStore.getOwnerLabel()}'s plot and returns your own workspace to how it was.`,
+            confirmLabel: "Discard Changes",
+            destructive: true,
+          });
+          if (!ok) return;
+          adminEditStore.discardAndExit();
+          navigate("admin-plots");
+          return;
+        }
         const ok = await showConfirm({
           title: "Enter a New Plot?",
           message:
@@ -118,15 +174,17 @@ export function render(container) {
         navigate("trial-details");
       },
     },
-    "Enter a New Plot"
+    adminEditing ? "Discard Admin Edit" : "Enter a New Plot"
   );
 
   const screen = h("div", { className: "screen workspace-menu-screen" }, [
     topBar,
     h("div", { className: "screen-body" }, [
       h("h2", { className: "screen-heading" }, "Plot Workspace"),
+      adminEditBanner,
       rows,
       h("div", { className: "section-spacer" }),
+      saveAdminEditBtn,
       startNewBtn,
     ]),
   ]);

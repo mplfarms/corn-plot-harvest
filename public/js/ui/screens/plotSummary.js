@@ -9,6 +9,7 @@ import { getBrand, entriesForBrandView } from "../brand.js";
 import * as brandStore from "../stores/brandStore.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as listsStore from "../stores/listsStore.js";
+import * as adminEditStore from "../stores/adminEditStore.js";
 import { createTopBar } from "../components/topBar.js";
 import { showToast } from "../components/toast.js";
 import { showCustomModal } from "../components/modal.js";
@@ -162,7 +163,19 @@ function significanceBadgeClass(significance) {
 }
 
 export function render(container, params) {
+  // See adminEditStore.clearIfStale()'s comment — safe to call unconditionally.
+  adminEditStore.clearIfStale();
+
   const brand = getBrand(brandStore.getState().selectedBrand);
+  // Admin editing someone else's plot (see adminEditStore.js) works by
+  // temporarily loading that trial into this same trialStore draft slot
+  // — trialStore.loadTrial() — so this screen (and Plot Details/Plot
+  // Hybrids) need no special-casing at all to support it; they just
+  // read/edit "the current draft" exactly as normal. adminEditStore is
+  // what keeps that safe: while a session is active it suppresses
+  // libraryStore's auto-save-to-library rule, so this never leaks into
+  // the admin's own device library or gets cloud-pushed under the
+  // admin's own account (see libraryStore.js's isActive() guard).
   const draft = trialStore.getState();
   const header = draft.header;
   const entries = draft.entries;
@@ -320,6 +333,12 @@ export function render(container, params) {
     ]),
   ]);
 
+  const adminEditBanner = adminEditStore.isActive()
+    ? h("div", { className: "preview-owner-banner" }, [
+        `Admin Edit — editing ${adminEditStore.getOwnerLabel()}'s plot. Changes save to their account, not yours.`,
+      ])
+    : null;
+
   // ---- Segmented control ----
   const segmented = h(
     "div",
@@ -457,6 +476,7 @@ export function render(container, params) {
   const screen = h("div", { className: "screen plot-summary-screen" }, [
     topBar,
     h("div", { className: "screen-body" }, [
+      adminEditBanner,
       headerCard,
       segmented,
       summaryCard,

@@ -7,12 +7,16 @@
 
 import { h, mount } from "../dom.js";
 import * as trialStore from "../stores/trialStore.js";
+import * as adminEditStore from "../stores/adminEditStore.js";
 import { createTopBar } from "../components/topBar.js";
 import { navigate } from "../router.js";
 import { entryDisplayTitle } from "../../core/models.js";
 import { dryYield } from "../../core/yieldCalculator.js";
 
 export function render(container) {
+  // See adminEditStore.clearIfStale()'s comment — safe to call unconditionally.
+  adminEditStore.clearIfStale();
+
   const draft = trialStore.getState();
   const entries = draft.entries;
 

@@ -165,12 +165,21 @@ a {
 
 /* ---------- top bar ---------- */
 
+/* Three-column grid, not flexbox — the two outer columns are equal `1fr`
+   shares, so the middle (title) column sits truly centered regardless of
+   how much content Home/Back vs. the sync icon/gear happen to carry on
+   any given screen. A flexbox space-between approach can't guarantee
+   this: if the left and right groups aren't the same width (e.g. a Back
+   button appears, or the sync icon does), the title visibly drifts off
+   center. Grid's 1fr/auto/1fr keeps it centered even when they're
+   lopsided, as long as neither side's content overflows its own share
+   (icon-only buttons here are small enough that this never happens). */
 .top-bar {
   background: var(--chrome);
   color: #ffffff;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
   position: sticky;
@@ -182,15 +191,8 @@ a {
   display: flex;
   align-items: center;
   gap: 2px;
+  justify-self: start;
   min-width: 0;
-  /* Content-sized, not an even three-way split with the title: Home and
-     Back need to stay fully readable ("⌂ Home", "‹ Back"), so they claim
-     only the width their own label needs and never shrink. All the
-     give when space is tight comes from the title instead (flex:1 1 auto
-     below) — a truncated brand name reads fine ("Midwest Seed Gen…"),
-     but a truncated button label ("⌂ …") does not, so the title is the
-     one that should give way, never Home/Back. */
-  flex: 0 0 auto;
 }
 
 .top-bar-title {
@@ -198,24 +200,19 @@ a {
   font-weight: 700;
   font-size: 1.05rem;
   text-align: center;
-  flex: 1 1 auto;
+  justify-self: center;
   min-width: 0;
+  max-width: 60vw;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* Guarantees a visible gap from Home/Back regardless of exactly how
-     wide those buttons render (their own width varies with the Back
-     label's text and can't always be predicted precisely) — without
-     this, a long brand name's ellipsis-truncated text starts flush
-     against "Back" with no breathing room. */
-  padding: 0 6px;
 }
 
 .top-bar-right {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex: 0 0 auto;
+  justify-self: end;
   min-width: 0;
 }
 
@@ -224,22 +221,12 @@ a {
   border: none;
   color: #ffffff;
   font-weight: 600;
-  font-size: 0.95rem;
   padding: 10px 8px;
   min-height: 44px;
+  min-width: 44px;
   border-radius: 8px;
   cursor: pointer;
-  /* Belt-and-suspenders against the center title: a flex item's default
-     min-width is its content size, which stops it from ever actually
-     shrinking below that no matter how little room .top-bar-left has —
-     min-width:0 here lets it actually shrink, and the truncation rules
-     make a too-tight fit end in an ellipsis instead of visibly running
-     into the title text next to it. */
-  min-width: 0;
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1;
 }
 
 .top-bar-btn:active {
@@ -257,17 +244,14 @@ a {
   line-height: 1;
 }
 
-/* Home and Back — a bit bigger than the smaller default .top-bar-btn
-   text size, but noticeably smaller than the Settings gear (1.3rem) —
-   Home and Back also carry a text label ("⌂ Home", "‹ Back"), not just
-   a bare glyph, so matching (or even coming close to) the gear's size
-   made them wide enough to overlap the center title on longer brand
-   names like "Midwest Seed Genetics". Tighter horizontal padding too,
-   for the same reason — every pixel here is pixels the title doesn't get. */
+/* Home and Back are icon-only now (⌂, ‹ — no text label), sized to match
+   the Settings gear (1.3rem) so all three chrome buttons read as one
+   consistent set. Removing the old text labels is what makes this
+   possible without any overlap risk: a bare glyph at this size never
+   comes close to the center title's space the way "⌂ Home"/"‹ Back"
+   used to. */
 .top-bar-btn-nav {
-  font-size: 1rem;
-  padding-left: 6px;
-  padding-right: 6px;
+  font-size: 1.3rem;
 }
 
 .sync-icon-synced {
@@ -1366,6 +1350,31 @@ h3.section-header:first-child {
 
 .saved-plots-search {
   margin-bottom: 4px;
+}
+
+.preview-owner-banner {
+  background: var(--highlight);
+  color: #16241c;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.admin-plot-row {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.admin-plot-row:active {
+  opacity: 0.7;
 }
 
 /* ---------- GPS / location status ---------- */

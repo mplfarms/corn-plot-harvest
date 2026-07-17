@@ -43,15 +43,15 @@ export function createTopBar(opts) {
     h(
       "button",
       { type: "button", className: "top-bar-btn top-bar-btn-nav", "aria-label": "Home", onclick: opts.onHome || goHome },
-      "⌂ Home"
+      "⌂"
     ),
   ];
   if (opts.onBack) {
     left.push(
       h(
         "button",
-        { type: "button", className: "top-bar-btn top-bar-btn-nav", onclick: opts.onBack },
-        `‹ ${opts.backLabel || "Back"}`
+        { type: "button", className: "top-bar-btn top-bar-btn-nav", "aria-label": opts.backLabel || "Back", onclick: opts.onBack },
+        "‹"
       )
     );
   }
