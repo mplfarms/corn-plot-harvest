@@ -5,7 +5,7 @@
 // 4 export/share/print/email actions.
 
 import { h, mount } from "../dom.js";
-import { getBrand } from "../brand.js";
+import { getBrand, entriesForBrandView } from "../brand.js";
 import * as brandStore from "../stores/brandStore.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as listsStore from "../stores/listsStore.js";
@@ -166,6 +166,11 @@ export function render(container, params) {
   const draft = trialStore.getState();
   const header = draft.header;
   const entries = draft.entries;
+  // Relabeled view of entries used only for this screen and its PDF
+  // export (Plot Entries editing and the XLSX export use the real,
+  // unrelabeled `entries` above) — see entriesForBrandView() for the
+  // Midwest Seed Genetics <-> NC+ mirrored relabeling rule.
+  const displayEntries = entriesForBrandView(entries, brand);
   const metric = (params && params.metric) || RankingMetric.DRY_YIELD;
 
   function goMetric(nextMetric) {
@@ -213,9 +218,9 @@ export function render(container, params) {
   }
 
   async function buildRankedPdfBlob() {
-    const results = computeRanked(entries, metric, header);
+    const results = computeRanked(displayEntries, metric, header);
     const logoDataUrl = await getLogoDataUrl(brand).catch(() => null);
-    return buildPdf({ header, results, metric, allEntries: entries, brand, logoDataUrl });
+    return buildPdf({ header, results, metric, allEntries: displayEntries, brand, logoDataUrl });
   }
 
   async function buildFullXlsxBlob() {
@@ -333,7 +338,7 @@ export function render(container, params) {
   );
 
   // ---- Dry Yield Summary card ----
-  const summary = dryYieldSummary(entries);
+  const summary = dryYieldSummary(displayEntries);
 
   // Only brands with 2+ hybrids in this plot get an average (a "brand
   // average" of one hybrid isn't meaningful); the selected brand (Midwest
@@ -391,7 +396,7 @@ export function render(container, params) {
 
   // ---- Ranked Results ----
   const meta = rankingMetricMeta[metric];
-  const ranked = computeRanked(entries, metric, header);
+  const ranked = computeRanked(displayEntries, metric, header);
   const showsMoistureLine = metric !== RankingMetric.MOISTURE;
 
   const significanceLegend = h("div", { className: "significance-legend" }, [

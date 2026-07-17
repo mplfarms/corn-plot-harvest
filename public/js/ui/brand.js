@@ -76,6 +76,31 @@ export function getBrand(brandId) {
 }
 
 /**
+ * Returns a copy of `entries` with .brand relabeled for display purposes
+ * when a Brand View is selected: any entry belonging to the *other*
+ * brand (matched by its catalogBrandName) is shown under the currently
+ * selected brand's catalogBrandName instead — e.g. with "Midwest Seed
+ * Genetics" selected as the Brand View, every "NC+ Hybrids" entry
+ * displays (and groups, for brand averages) as "Midwest Seed Genetics",
+ * and the mirror image happens when "NC+" is selected. Entries for any
+ * other/third-party brand are left untouched.
+ *
+ * Only meant for the Plot Summary screen and its PDF export — Plot
+ * Entries editing and the XLSX export intentionally keep entries' real
+ * (unrelabeled) brand, since those are the source-of-truth data.
+ * @param {import('../core/models.js').PlotEntry[]} entries
+ * @param {typeof BRANDS[BrandId]|null} brand - the currently selected Brand View
+ * @returns {import('../core/models.js').PlotEntry[]}
+ */
+export function entriesForBrandView(entries, brand) {
+  if (!brand) return entries;
+  const otherBrand = brand.id === "midwestSeedGenetics" ? BRANDS.ncPlus : BRANDS.midwestSeedGenetics;
+  return entries.map((entry) =>
+    entry.brand.trim() === otherBrand.catalogBrandName ? { ...entry, brand: brand.catalogBrandName } : entry
+  );
+}
+
+/**
  * Applies a brand's palette as CSS custom properties on :root. Safe to
  * call with null to reset to the default (Midwest) palette used by the
  * BrandSelect screen before any brand is chosen.
