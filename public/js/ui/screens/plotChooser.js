@@ -1,4 +1,15 @@
 // src/ui/screens/plotChooser.js
+//
+// The branded Home Screen — the first real screen a user lands on for a
+// given brand (after choosing/skipping the Account step, or immediately
+// on return visits once a brand is already remembered — see main.js).
+// One solid-color hero per brand: "Corn Plot Entry" and that brand's
+// logo sit toward the top, "Enter a New Plot" and "Saved Plots" sit
+// toward the bottom. The background color itself is brand-specific
+// (var(--chrome) — dark green for Midwest Seed Genetics, blue for NC+)
+// and needs no per-brand branching here since applyBrandTheme() (see
+// brand.js) already keeps that CSS variable in sync with whichever
+// brand is currently selected.
 
 import { h, mount } from "../dom.js";
 import { getBrand } from "../brand.js";
@@ -16,41 +27,43 @@ export function render(container) {
     title: brand ? brand.displayName : "Corn Plot Harvest",
   });
 
-  const savedRow = h(
-    "button",
-    {
-      type: "button",
-      className: "chooser-row",
-      onclick: () => navigate("saved-plots", { enterWorkspaceOnSelect: true }),
-    },
-    [
-      h("span", { className: "chooser-row-title" }, "Saved Plots"),
-      h("span", { className: "chooser-row-badge" }, String(savedCount)),
-      h("span", { className: "chooser-row-chevron" }, "›"),
-    ]
-  );
+  const heroTop = h("div", { className: "home-hero-top" }, [
+    h("h1", { className: "home-title" }, "Corn Plot Entry"),
+    brand ? h("img", { className: "home-logo", src: brand.logo, alt: brand.displayName }) : null,
+  ]);
 
-  const newRow = h(
+  const newPlotBtn = h(
     "button",
     {
       type: "button",
-      className: "chooser-row chooser-row-primary",
+      className: "home-btn home-btn-primary",
       onclick: () => {
         libraryStore.flushDraftToLibrary();
         trialStore.startNewTrial();
         navigate("trial-details");
       },
     },
-    [h("span", { className: "chooser-row-title" }, "Enter a New Plot"), h("span", { className: "chooser-row-chevron" }, "›")]
+    "Enter a New Plot"
   );
 
-  const screen = h("div", { className: "screen plot-chooser-screen" }, [
-    topBar,
-    h("div", { className: "screen-body" }, [
-      h("h2", { className: "screen-heading" }, "Plot Chooser"),
-      h("div", { className: "chooser-list" }, [savedRow, newRow]),
-    ]),
-  ]);
+  const savedPlotsBtn = h(
+    "button",
+    {
+      type: "button",
+      className: "home-btn home-btn-secondary",
+      onclick: () => navigate("saved-plots", { enterWorkspaceOnSelect: true }),
+    },
+    [
+      h("span", {}, "Saved Plots"),
+      savedCount > 0 ? h("span", { className: "home-btn-badge" }, String(savedCount)) : null,
+    ]
+  );
+
+  const heroActions = h("div", { className: "home-actions" }, [newPlotBtn, savedPlotsBtn]);
+
+  const hero = h("div", { className: "home-hero" }, [heroTop, heroActions]);
+
+  const screen = h("div", { className: "screen home-screen" }, [topBar, hero]);
 
   mount(container, screen);
 }

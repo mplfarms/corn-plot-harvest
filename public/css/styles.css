@@ -494,6 +494,114 @@ h3.section-header:first-child {
   margin: 0;
 }
 
+/* ---------- home screen (plot chooser) ---------- */
+
+.home-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Fills all space below the top bar with a solid brand-color background
+   (var(--chrome) — dark green for Midwest Seed Genetics, blue for NC+,
+   kept in sync with the selected brand by applyBrandTheme()). The title
+   and logo sit in the upper portion (pushed down toward the vertical
+   middle — the "horizon" — by .home-hero-top's margin-top below rather
+   than sitting flush against the top edge), and the two action buttons
+   are pinned toward the bottom via margin-top: auto on .home-actions,
+   lifted slightly off the very bottom edge by its own margin-bottom. */
+.home-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--chrome);
+  color: #ffffff;
+  padding: 48px 24px calc(32px + env(safe-area-inset-bottom));
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
+}
+
+.home-hero-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+  margin-top: 96px;
+}
+
+.home-title {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+/* Sized by height only (not a fixed square) so the white card behind the
+   logo takes on the logo's own aspect ratio — proportionately wide for
+   Midwest Seed Genetics' wide rectangular logo, staying square for NC+'s
+   square one — instead of one fixed box letterboxing whichever logo
+   isn't square. */
+.home-logo {
+  height: 100px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 14px 18px;
+}
+
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 360px;
+  margin-top: auto;
+  margin-bottom: 28px;
+}
+
+.home-btn {
+  min-height: 52px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.home-btn-primary {
+  background: #ffffff;
+  color: var(--chrome);
+  border: none;
+}
+
+.home-btn-secondary {
+  background: transparent;
+  color: #ffffff;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+}
+
+.home-btn-badge {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.home-btn-primary .home-btn-badge {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--chrome);
+}
+
 /* ---------- chooser rows / menu rows ---------- */
 
 .chooser-list {
