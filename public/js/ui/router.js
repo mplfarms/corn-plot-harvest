@@ -45,8 +45,8 @@ function currentPath() {
 
 function renderCurrent() {
   if (!appContainer) return;
-  const path = currentPath() || "brand-select";
-  const screen = routes[path] || routes["brand-select"];
+  const path = currentPath() || "account";
+  const screen = routes[path] || routes["account"];
   screen.render(appContainer, currentParams);
 
   // Screens replace #app's content in place (see dom.js's mount()) rather

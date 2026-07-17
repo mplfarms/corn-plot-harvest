@@ -98,7 +98,7 @@ export function render(container) {
     user
       ? [
           h("h3", { className: "section-header" }, "Account"),
-          h("p", { className: "account-status-text" }, `Signed in as ${user.name} (${user.email})`),
+          h("p", { className: "account-status-text" }, `Signed in as ${user.email}`),
           h(
             "button",
             {

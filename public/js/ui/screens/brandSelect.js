@@ -1,8 +1,15 @@
 // src/ui/screens/brandSelect.js
+//
+// The manual Brand View picker — "the screen where they select brand
+// view" that the launch screen (accountScreen.js) sends signed-in users
+// to when their email's domain isn't recognized as belonging to a
+// specific brand (see brand.js's brandIdForEmail()). Also still directly
+// reachable any time from Settings' Brand View control.
 
 import { h, mount } from "../dom.js";
 import { BRANDS } from "../brand.js";
 import * as brandStore from "../stores/brandStore.js";
+import * as authStore from "../authStore.js";
 import { navigate } from "../router.js";
 
 function brandButton(brand) {
@@ -13,7 +20,10 @@ function brandButton(brand) {
       className: "brand-select-btn",
       onclick: () => {
         brandStore.selectBrand(brand.id);
-        navigate("account");
+        // Reached either already signed in (from the launch screen, for
+        // an unrecognized email domain) or not signed in at all (a
+        // direct/legacy visit) — route onward accordingly.
+        navigate(authStore.getUser() ? "workspace" : "account");
       },
     },
     [
@@ -26,6 +36,13 @@ function brandButton(brand) {
 export function render(container) {
   const screen = h("div", { className: "screen brand-select-screen" }, [
     h("div", { className: "brand-select-content" }, [
+      authStore.getUser()
+        ? h(
+            "button",
+            { type: "button", className: "brand-select-back-link", onclick: () => navigate("account", { force: true }) },
+            "‹ Back"
+          )
+        : null,
       h("h1", { className: "brand-select-title" }, "Corn Plot Harvest"),
       h("p", { className: "brand-select-subtitle" }, "Select Brand"),
       h("div", { className: "brand-select-buttons" }, [

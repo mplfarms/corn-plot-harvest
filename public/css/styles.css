@@ -425,41 +425,52 @@ h3.section-header:first-child {
   font-size: 0.78rem;
 }
 
-/* ---------- brand-view prompt (unrecognized email domain at sign-in) ---------- */
+/* ---------- launch screen (Home / sign in with email) ---------- */
 
-.brand-prompt-buttons {
-  display: flex;
-  gap: 12px;
-  margin-top: 14px;
+/* Fixed white background regardless of light/dark mode — this is the
+   app's title/brand splash, same idea as brand-select-screen forcing its
+   own navy background below rather than following --bg. */
+.launch-screen {
+  background: #ffffff;
+  color: #16241c;
+  justify-content: flex-start;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.brand-prompt-btn {
-  flex: 1;
+.launch-branding {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px 10px;
-  border: 1.5px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg);
-  cursor: pointer;
+  padding: max(28px, env(safe-area-inset-top)) 24px 12px;
 }
 
-.brand-prompt-btn:active {
-  background: var(--card-bg);
-}
-
-.brand-prompt-logo {
-  max-height: 48px;
-  max-width: 100%;
+.launch-shield {
+  display: block;
+  width: auto;
+  height: auto;
+  max-height: min(26vh, 220px);
+  max-width: 70%;
   object-fit: contain;
 }
 
-.brand-prompt-name {
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--text);
+.launch-brand-train {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  object-fit: contain;
+  margin-top: 18px;
+}
+
+.launch-form-body {
+  width: 100%;
+  max-width: 420px;
+  margin: 8px auto 0;
+  gap: 12px;
+}
+
+.launch-note {
   text-align: center;
 }
 
@@ -516,6 +527,20 @@ h3.section-header:first-child {
   gap: 20px;
   padding: 24px;
   text-align: center;
+  position: relative;
+}
+
+.brand-select-back-link {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 8px;
+  cursor: pointer;
 }
 
 .brand-select-title {

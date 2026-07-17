@@ -10,15 +10,18 @@
 // content (e.g. Plot Summary's share menu), which sits to the left of
 // the Settings gear so the gear always stays the rightmost element.
 //
-// "Home" means the blue splash/Brand Select screen (brandSelect.js,
-// routed at #/brand-select — the "Corn Plot Harvest" title screen where
-// you pick Midwest Seed Genetics or NC+), not the Plot Workspace menu or
-// the branded per-brand Home Screen (plotChooser.js, #/plot-chooser).
-// That per-brand screen is still reachable — it's what several screens'
-// own Back buttons return to (see workspaceMenu.js, savedPlots.js) — only
-// this top bar's Home button was repointed, so tapping Home always drops
-// back to the same splash screen regardless of which brand/screen you're
-// currently in.
+// "Home" means the white launch/sign-in screen (accountScreen.js, routed
+// at #/account — the shield + brand-train screen with the Sign In With
+// Email form), not the Plot Workspace menu or the branded per-brand Home
+// Screen (plotChooser.js, #/plot-chooser). That per-brand screen is
+// still reachable — it's what several screens' own Back buttons return
+// to (see workspaceMenu.js, savedPlots.js) — only this top bar's Home
+// button was repointed, so tapping Home always drops back to the same
+// launch screen regardless of which brand/screen you're currently in.
+// force:true makes it show even for an already-signed-in user (whose
+// email/brand are already known) rather than bouncing straight back into
+// the workspace, mirroring how it always showed unconditionally back
+// when this was the separate, un-gated Brand Select splash screen.
 
 import { h } from "../dom.js";
 import { navigate } from "../router.js";
@@ -26,7 +29,7 @@ import * as libraryStore from "../stores/libraryStore.js";
 
 function goHome() {
   libraryStore.flushDraftToLibrary();
-  navigate("brand-select");
+  navigate("account", { force: true });
 }
 
 /**

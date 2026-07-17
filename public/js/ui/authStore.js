@@ -1,16 +1,18 @@
 // src/ui/authStore.js
 //
-// Local session store for this app's lightweight auth: just Name + Email,
-// no password, no email verification, and no shared passcode either (the
-// team explicitly asked for the passcode to be dropped — see auth.js and
-// _shared.js's top comment for the resulting tradeoff). There is no JWT
-// and no server-side session — a "session" here is just {name, email,
-// isAdmin}, cached in localStorage. Every other module that needs to
-// prove who's calling (cloudSyncStore.js, adminPlots.js, manageUsers.js)
-// reads the email from getCredentials() here and sends it explicitly on
-// every request; the server re-checks the isAdmin flag on the caller's
-// own stored record for every admin action — but there's no way for the
-// server to verify the email actually belongs to whoever typed it in.
+// Local session store for this app's lightweight auth: just an Email
+// address, no name, no password, no email verification, and no shared
+// passcode either — deliberately as simple as possible, since none of
+// this data is sensitive (see auth.js and _shared.js's top comment for
+// the resulting tradeoff). There is no JWT and no server-side session —
+// a "session" here is just {name, email, isAdmin} (name defaults to the
+// email itself server-side — see auth.js), cached in localStorage. Every
+// other module that needs to prove who's calling (cloudSyncStore.js,
+// adminPlots.js, manageUsers.js) reads the email from getCredentials()
+// here and sends it explicitly on every request; the server re-checks
+// the isAdmin flag on the caller's own stored record for every admin
+// action — but there's no way for the server to verify the email
+// actually belongs to whoever typed it in.
 
 import { createPubSub, readJson, writeJson } from "./stores/pubsub.js";
 
@@ -64,16 +66,16 @@ export function getCredentials() {
  * Signs in, creating the account on first use (see auth.js — sign-up and
  * sign-in are the same call). Persists the resulting session to
  * localStorage on success.
- * @param {{name: string, email: string}} params
+ * @param {{email: string}} params
  * @returns {Promise<{ok: true, user: Object}|{ok: false, error: string}>}
  */
-export async function signIn({ name, email }) {
+export async function signIn({ email }) {
   let res;
   try {
     res = await fetch("/.netlify/functions/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email }),
+      body: JSON.stringify({ email }),
     });
   } catch (e) {
     return { ok: false, error: "Couldn't reach the server — check your connection and try again." };

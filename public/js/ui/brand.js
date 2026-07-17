@@ -103,8 +103,9 @@ export function entriesForBrandView(entries, brand) {
 // Email domains whose employees should default straight into a specific
 // Brand View at sign-in, rather than being asked — see accountScreen.js.
 // Keys are lowercase, no "@". Any domain not listed here falls back to
-// prompting the user to choose (also handled in accountScreen.js).
+// sending the user to the manual Brand View picker (brandSelect.js).
 const BRAND_ID_BY_EMAIL_DOMAIN = {
+  "midwestseedgenetics.com": "midwestSeedGenetics",
   "midwestseed.com": "midwestSeedGenetics",
   "republicseed.com": "midwestSeedGenetics",
   "nc-plus.com": "ncPlus",
