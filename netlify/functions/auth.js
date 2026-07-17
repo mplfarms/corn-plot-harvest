@@ -1,10 +1,19 @@
 // netlify/functions/auth.js
 //
-// The entire "sign in" flow for this app: POST {name, email, passcode}.
-// There's no separate sign-up step and no password — a first-time email
-// creates a new user record, a returning email just updates its name (in
-// case they typed it differently) and logs the existing record back in.
-// See _shared.js's top comment for the security tradeoff this implies.
+// The entire "sign in" flow for this app: POST {email} — email only, no
+// name, no password, no email verification, and no passcode of any kind
+// (deliberately simple: this is low-stakes farm data, not anything
+// sensitive). There's no separate sign-up step either — a first-time
+// email creates a new user record, a returning email just logs the
+// existing record back in. See _shared.js's top comment for the security
+// tradeoff this implies (in short: knowing someone's email is enough to
+// sign in as them).
+//
+// "name" is optional and defaults to the email address itself when not
+// supplied (the current sign-in form doesn't ask for one at all) — it's
+// kept as a stored field purely so the admin screens (Manage Users, All
+// Plots) have *something* to head each user's card/section with; when a
+// caller does pass a name it's stored and shown instead.
 //
 // The very first account ever created with BOOTSTRAP_ADMIN_EMAIL becomes
 // an admin automatically (and self-heals back to admin on every sign-in,
@@ -14,7 +23,7 @@
 // Users, admin-only) rather than by editing this file again.
 
 const { getStore, connectLambda } = require("@netlify/blobs");
-const { json, normalizeEmail, isValidEmail, userKey, checkPasscode } = require("./_shared");
+const { json, normalizeEmail, isValidEmail, userKey } = require("./_shared");
 
 const BOOTSTRAP_ADMIN_EMAIL = "mplfarms@aol.com";
 
@@ -32,13 +41,9 @@ exports.handler = async (event) => {
     return json(400, { error: "Invalid JSON body." });
   }
 
-  const passcodeCheck = checkPasscode(payload.passcode);
-  if (!passcodeCheck.ok) return json(passcodeCheck.statusCode, { error: passcodeCheck.error });
-
-  const name = String(payload.name || "").trim();
   const email = normalizeEmail(payload.email);
-  if (!name) return json(400, { error: "Name is required." });
   if (!email || !isValidEmail(email)) return json(400, { error: "A valid email is required." });
+  const name = String(payload.name || "").trim() || email;
 
   const store = getStore("users");
   const key = userKey(email);
