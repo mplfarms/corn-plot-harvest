@@ -414,6 +414,78 @@ h3.section-header:first-child {
   font-size: 0.9rem;
 }
 
+.account-error-note {
+  color: var(--danger);
+}
+
+/* ---------- brand-view prompt (unrecognized email domain at sign-in) ---------- */
+
+.brand-prompt-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.brand-prompt-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.brand-prompt-btn:active {
+  background: var(--card-bg);
+}
+
+.brand-prompt-logo {
+  max-height: 48px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.brand-prompt-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+  text-align: center;
+}
+
+/* ---------- manage users (admin) ---------- */
+
+.manage-user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.manage-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.manage-user-info .section-header {
+  margin-bottom: 0;
+}
+
+.manage-user-info .field-note {
+  margin: 0;
+}
+
+.manage-user-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* ---------- brand select ---------- */
 
 .brand-select-screen {

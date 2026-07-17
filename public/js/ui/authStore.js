@@ -1,50 +1,50 @@
 // src/ui/authStore.js
 //
-// Thin wrapper around the Netlify Identity widget. Loaded via a plain
-// <script> tag in index.html (https://identity.netlify.com/v1/netlify-
-// identity-widget.js) rather than an npm package, because this app has
-// no build step for its frontend — every other module here is a native
-// ES module the browser runs directly, and the classic widget is the
-// only Netlify Identity client that works the same way (a global
-// `window.netlifyIdentity`, no bundler required). Screens never touch
-// `window.netlifyIdentity` directly — everything goes through here so
-// the rest of the app has one small, testable surface.
+// Local session store for this app's lightweight auth: Name + Email + one
+// shared team passcode, instead of Netlify Identity (removed — see
+// netlify/functions/auth.js and _shared.js's top comment for why: no
+// per-user passwords, no email verification, just a single passcode the
+// whole team shares). There is no JWT and no server-side session — a
+// "session" here is just {name, email, isAdmin} plus the passcode, cached
+// in localStorage. Every other module that needs to prove who's calling
+// (cloudSyncStore.js, adminPlots.js, manageUsers.js) reads the pair from
+// getCredentials() here and sends it explicitly on every request; the
+// server re-checks the passcode (and, for admin actions, the isAdmin flag
+// on the caller's own stored record) on every single call — nothing here
+// is trusted client-side alone.
 
-import { createPubSub } from "./stores/pubsub.js";
+import { createPubSub, readJson, writeJson } from "./stores/pubsub.js";
+
+const SESSION_KEY = "cph.authSession"; // {name, email, isAdmin}
+const PASSCODE_KEY = "cph.authPasscode";
 
 const pubsub = createPubSub();
-let didInit = false;
 
-function widget() {
-  return typeof window !== "undefined" ? window.netlifyIdentity : null;
+let session = readJson(SESSION_KEY, null);
+let passcode = null;
+try {
+  passcode = localStorage.getItem(PASSCODE_KEY) || null;
+} catch (e) {
+  passcode = null;
+}
+
+// A session without its passcode (or vice versa) is useless for making
+// authenticated calls — treat that as signed out rather than half-signed-in.
+if (!session || !passcode) {
+  session = null;
+  passcode = null;
 }
 
 /**
- * Call once at startup (main.js), after the widget's <script> tag has
- * had a chance to load. Safe to call even if the script failed to load
- * (e.g. offline on first-ever visit, before the service worker has
- * cached it) — every other function here just no-ops in that case.
+ * Call once at startup (main.js). Kept for symmetry with how every other
+ * store/screen expects an init() hook — hydration from localStorage
+ * already happened above at module load, so this is currently a no-op,
+ * but keeping the call site in main.js means a future change here (e.g.
+ * re-validating the cached session against the server on launch) doesn't
+ * need a call-site change anywhere else.
  */
 export function init() {
-  const w = widget();
-  if (!w) {
-    console.error("[authStore] netlify-identity-widget script did not load — cloud sync is unavailable this session.");
-    return;
-  }
-  if (didInit) return;
-  didInit = true;
-  w.on("init", () => pubsub.notify());
-  w.on("login", () => {
-    pubsub.notify();
-    // The widget shows a "Logged in as ..." confirmation screen and does
-    // NOT dismiss itself — without this, a signed-in user is stuck
-    // staring at that overlay forever, even though the app underneath
-    // has already moved on (see accountScreen.js's subscribe callback).
-    w.close();
-  });
-  w.on("logout", () => pubsub.notify());
-  w.on("error", (err) => console.error("[authStore] identity widget error", err));
-  w.init();
+  // No-op — see comment above.
 }
 
 /**
@@ -55,53 +55,77 @@ export function subscribe(fn) {
   return pubsub.subscribe(fn);
 }
 
-/** @returns {boolean} whether the identity widget script is present at all */
-export function isAvailable() {
-  return Boolean(widget());
-}
-
-/** @returns {Object|null} the Netlify Identity user, or null if signed out */
+/** @returns {{name: string, email: string, isAdmin: boolean}|null} */
 export function getUser() {
-  const w = widget();
-  return w ? w.currentUser() : null;
+  return session;
 }
 
-/** @returns {boolean} whether the signed-in user has the "admin" role */
+/** @returns {boolean} whether the signed-in user's stored record has isAdmin === true */
 export function isAdmin() {
-  const user = getUser();
-  const roles = (user && user.app_metadata && user.app_metadata.roles) || [];
-  return roles.includes("admin");
-}
-
-/** Opens the Identity modal to the "Create account" tab. */
-export function openSignup() {
-  const w = widget();
-  if (w) w.open("signup");
-}
-
-/** Opens the Identity modal to the "Sign in" tab. */
-export function openLogin() {
-  const w = widget();
-  if (w) w.open("login");
-}
-
-export function logout() {
-  const w = widget();
-  if (w) w.logout();
+  return Boolean(session && session.isAdmin);
 }
 
 /**
- * A fresh (auto-refreshed if expired) JWT for calling Netlify Functions,
- * or null if signed out / the refresh fails (e.g. offline).
- * @returns {Promise<string|null>}
+ * The email + passcode pair every authenticated request must send. Never
+ * a Bearer token — this app has no JWTs at all now.
+ * @returns {{email: string, passcode: string}|null} null if signed out
  */
-export async function freshToken() {
-  const w = widget();
-  if (!w || !w.currentUser()) return null;
+export function getCredentials() {
+  if (!session || !passcode) return null;
+  return { email: session.email, passcode };
+}
+
+/**
+ * Signs in, creating the account on first use (see auth.js — sign-up and
+ * sign-in are the same call). Persists the resulting session + passcode
+ * to localStorage on success.
+ * @param {{name: string, email: string, passcode: string}} params
+ * @returns {Promise<{ok: true, user: Object}|{ok: false, error: string}>}
+ */
+export async function signIn({ name, email, passcode: suppliedPasscode }) {
+  let res;
   try {
-    return await w.refresh();
+    res = await fetch("/.netlify/functions/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, passcode: suppliedPasscode }),
+    });
   } catch (e) {
-    console.error("[authStore] failed to refresh token", e);
-    return null;
+    return { ok: false, error: "Couldn't reach the server — check your connection and try again." };
   }
+
+  let payload = {};
+  try {
+    payload = await res.json();
+  } catch (e) {
+    // Ignore — payload stays {} and the generic status-based message below is used.
+  }
+
+  if (!res.ok) {
+    return { ok: false, error: payload.error || `Sign-in failed (${res.status}).` };
+  }
+
+  session = payload.user;
+  passcode = suppliedPasscode;
+  writeJson(SESSION_KEY, session);
+  try {
+    localStorage.setItem(PASSCODE_KEY, passcode);
+  } catch (e) {
+    console.error("[authStore] failed to persist passcode", e);
+  }
+  pubsub.notify();
+  return { ok: true, user: session };
+}
+
+/** Clears the local session. There's no server-side session to invalidate. */
+export function signOut() {
+  session = null;
+  passcode = null;
+  try {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(PASSCODE_KEY);
+  } catch (e) {
+    console.error("[authStore] failed to clear session", e);
+  }
+  pubsub.notify();
 }

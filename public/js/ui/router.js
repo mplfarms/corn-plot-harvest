@@ -17,6 +17,7 @@ import * as plotSummary from "./screens/plotSummary.js";
 import * as savedPlots from "./screens/savedPlots.js";
 import * as settingsScreen from "./screens/settings.js";
 import * as adminPlots from "./screens/adminPlots.js";
+import * as manageUsers from "./screens/manageUsers.js";
 
 const routes = {
   "brand-select": brandSelect,
@@ -30,6 +31,7 @@ const routes = {
   "saved-plots": savedPlots,
   settings: settingsScreen,
   "admin-plots": adminPlots,
+  "manage-users": manageUsers,
 };
 
 let appContainer = null;

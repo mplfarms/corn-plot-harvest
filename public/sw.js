@@ -6,11 +6,10 @@
 // app shell is precached on install; old-versioned caches are purged on
 // activate.
 
-const CACHE_VERSION = "v33";
+const CACHE_VERSION = "v34";
 const CACHE_NAME = `corn-plot-harvest-${CACHE_VERSION}`;
 
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-const IDENTITY_WIDGET_URL = "https://identity.netlify.com/v1/netlify-identity-widget.js";
 
 // Enumerated app-shell files (no wildcard support in the Cache API).
 // Keep this in sync with the actual contents of public/ — see the
@@ -44,6 +43,7 @@ const PRECACHE_URLS = [
   "/js/ui/screens/brandSelect.js",
   "/js/ui/screens/entriesList.js",
   "/js/ui/screens/entryEditor.js",
+  "/js/ui/screens/manageUsers.js",
   "/js/ui/screens/plotChooser.js",
   "/js/ui/screens/plotSummary.js",
   "/js/ui/screens/savedPlots.js",
@@ -95,19 +95,13 @@ self.addEventListener("install", (event) => {
       const cache = await caches.open(CACHE_NAME);
       await cache.addAll(PRECACHE_URLS);
 
-      // Best-effort: cache jsPDF and the Identity widget too, so the app
-      // works fully offline after the first successful load. This sandbox
-      // has no network access, so these will fail here — that's fine,
-      // each is wrapped so it never fails the whole install. In the real
-      // deployed app (with real internet) these succeed and are cached
-      // for offline use thereafter.
+      // Best-effort: cache jsPDF too, so the app works fully offline after
+      // the first successful load. This sandbox has no network access, so
+      // this will fail here — that's fine, it's wrapped so it never fails
+      // the whole install. In the real deployed app (with real internet)
+      // this succeeds and is cached for offline use thereafter.
       try {
         await cache.add(JSPDF_URL);
-      } catch (e) {
-        // Ignored on purpose — see comment above.
-      }
-      try {
-        await cache.add(IDENTITY_WIDGET_URL);
       } catch (e) {
         // Ignored on purpose — see comment above.
       }
@@ -135,7 +129,7 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(req.url);
   const isSameOrigin = url.origin === self.location.origin;
-  const isCacheableCdnAsset = req.url === JSPDF_URL || req.url === IDENTITY_WIDGET_URL;
+  const isCacheableCdnAsset = req.url === JSPDF_URL;
 
   // Cloud sync API calls must never be served from cache — they're the
   // live, per-user plot data, not app-shell assets. Let these fall

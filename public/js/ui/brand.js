@@ -100,6 +100,29 @@ export function entriesForBrandView(entries, brand) {
   );
 }
 
+// Email domains whose employees should default straight into a specific
+// Brand View at sign-in, rather than being asked — see accountScreen.js.
+// Keys are lowercase, no "@". Any domain not listed here falls back to
+// prompting the user to choose (also handled in accountScreen.js).
+const BRAND_ID_BY_EMAIL_DOMAIN = {
+  "midwestseed.com": "midwestSeedGenetics",
+  "republicseed.com": "midwestSeedGenetics",
+  "nc-plus.com": "ncPlus",
+};
+
+/**
+ * @param {string|null|undefined} email
+ * @returns {"midwestSeedGenetics"|"ncPlus"|null} the Brand View this
+ *   email's domain should default to, or null if the domain isn't
+ *   recognized (caller should prompt the user instead).
+ */
+export function brandIdForEmail(email) {
+  const at = String(email || "").lastIndexOf("@");
+  if (at === -1) return null;
+  const domain = String(email).slice(at + 1).trim().toLowerCase();
+  return BRAND_ID_BY_EMAIL_DOMAIN[domain] || null;
+}
+
 /**
  * Applies a brand's palette as CSS custom properties on :root. Safe to
  * call with null to reset to the default (Midwest) palette used by the

@@ -19,13 +19,6 @@
        module-eval time, so loading it with `defer` is safe even though it
        resolves after our own module scripts run. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-
-  <!-- Netlify Identity: the classic widget (not the @netlify/identity npm
-       package) since this app has no build step for its frontend — see
-       src/ui/authStore.js. Deferred classic scripts execute in document
-       order before deferred/module scripts, so window.netlifyIdentity is
-       guaranteed to exist before main.js's authStore.init() runs below. -->
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
 </head>
 <body>
   <div id="app"></div>

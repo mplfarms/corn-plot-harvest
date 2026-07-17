@@ -97,14 +97,14 @@ export function render(container) {
     user
       ? [
           h("h3", { className: "section-header" }, "Account"),
-          h("p", { className: "account-status-text" }, `Signed in as ${user.email}`),
+          h("p", { className: "account-status-text" }, `Signed in as ${user.name} (${user.email})`),
           h(
             "button",
             {
               type: "button",
               className: "btn btn-secondary",
               onclick: () => {
-                authStore.logout();
+                authStore.signOut();
                 render(container);
               },
             },
@@ -126,6 +126,24 @@ export function render(container) {
         ]
   );
 
+  // Admin-only — visible only when the signed-in user's own stored record
+  // has isAdmin === true (server re-checks this on every call anyway; see
+  // manageUsers.js and _shared.js's requireAdmin()).
+  const manageUsersCard = authStore.isAdmin()
+    ? h("section", { className: "card" }, [
+        h("h3", { className: "section-header" }, "Admin"),
+        h(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-secondary btn-block",
+            onclick: () => navigate("manage-users"),
+          },
+          "Manage Users"
+        ),
+      ])
+    : null;
+
   const screen = h("div", { className: "screen settings-screen" }, [
     topBar,
     h("div", { className: "screen-body" }, [
@@ -133,6 +151,7 @@ export function render(container) {
       appearanceCard,
       brandCard,
       accountCard,
+      manageUsersCard,
     ]),
   ]);
 
