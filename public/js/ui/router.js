@@ -5,6 +5,12 @@
 // don't belong in a URL (e.g. "which entry id are we editing") are kept
 // in an in-memory object since this is a workspace app, not something
 // meant to be deep-linked/bookmarked mid-edit.
+//
+// Signing in is mandatory (see accountScreen.js) — every route other
+// than "account" itself requires a session, enforced here rather than
+// per-screen so it holds regardless of how a hash got set (a typed-in
+// URL, a stale PWA launch shortcut, browser back/forward, etc.), not
+// just normal in-app navigation.
 
 import * as brandSelect from "./screens/brandSelect.js";
 import * as accountScreen from "./screens/accountScreen.js";
@@ -18,6 +24,7 @@ import * as savedPlots from "./screens/savedPlots.js";
 import * as settingsScreen from "./screens/settings.js";
 import * as adminPlots from "./screens/adminPlots.js";
 import * as manageUsers from "./screens/manageUsers.js";
+import * as authStore from "./authStore.js";
 
 const routes = {
   "brand-select": brandSelect,
@@ -46,6 +53,15 @@ function currentPath() {
 function renderCurrent() {
   if (!appContainer) return;
   const path = currentPath() || "account";
+
+  // Every screen except the launch/sign-in screen itself requires a
+  // session now — bounce back to it rather than rendering whatever the
+  // hash happened to point at.
+  if (path !== "account" && !authStore.getUser()) {
+    window.location.hash = "#/account";
+    return;
+  }
+
   const screen = routes[path] || routes["account"];
   screen.render(appContainer, currentParams);
 

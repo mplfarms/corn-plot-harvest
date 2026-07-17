@@ -10,18 +10,15 @@
 // content (e.g. Plot Summary's share menu), which sits to the left of
 // the Settings gear so the gear always stays the rightmost element.
 //
-// "Home" means the white launch/sign-in screen (accountScreen.js, routed
-// at #/account — the shield + brand-train screen with the Sign In With
-// Email form), not the Plot Workspace menu or the branded per-brand Home
-// Screen (plotChooser.js, #/plot-chooser). That per-brand screen is
-// still reachable — it's what several screens' own Back buttons return
-// to (see workspaceMenu.js, savedPlots.js) — only this top bar's Home
-// button was repointed, so tapping Home always drops back to the same
-// launch screen regardless of which brand/screen you're currently in.
-// force:true makes it show even for an already-signed-in user (whose
-// email/brand are already known) rather than bouncing straight back into
-// the workspace, mirroring how it always showed unconditionally back
-// when this was the separate, un-gated Brand Select splash screen.
+// "Home" means the branded per-brand Home Screen (plotChooser.js, routed
+// at #/plot-chooser — "Corn Plot Entry" + that brand's logo, with "Enter
+// a New Plot" / "Saved Plots"), not the deeper Plot Workspace menu
+// (workspaceMenu.js, #/workspace — that screen's own Back button already
+// returns to plot-chooser, unaffected by this). The white Republic
+// shield launch/sign-in screen (accountScreen.js, #/account) is reserved
+// for the initial sign-on only (first visit before a brand is known, or
+// Settings' explicit "Sign In to Sync") — it is never the Home button's
+// target.
 
 import { h } from "../dom.js";
 import { navigate } from "../router.js";
@@ -29,7 +26,7 @@ import * as libraryStore from "../stores/libraryStore.js";
 
 function goHome() {
   libraryStore.flushDraftToLibrary();
-  navigate("account", { force: true });
+  navigate("plot-chooser");
 }
 
 /**
@@ -45,13 +42,17 @@ export function createTopBar(opts) {
   const left = [
     h(
       "button",
-      { type: "button", className: "top-bar-btn", "aria-label": "Home", onclick: opts.onHome || goHome },
+      { type: "button", className: "top-bar-btn top-bar-btn-nav", "aria-label": "Home", onclick: opts.onHome || goHome },
       "⌂ Home"
     ),
   ];
   if (opts.onBack) {
     left.push(
-      h("button", { type: "button", className: "top-bar-btn", onclick: opts.onBack }, `‹ ${opts.backLabel || "Back"}`)
+      h(
+        "button",
+        { type: "button", className: "top-bar-btn top-bar-btn-nav", onclick: opts.onBack },
+        `‹ ${opts.backLabel || "Back"}`
+      )
     );
   }
 

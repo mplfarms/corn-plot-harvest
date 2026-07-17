@@ -22,8 +22,9 @@ function brandButton(brand) {
         brandStore.selectBrand(brand.id);
         // Reached either already signed in (from the launch screen, for
         // an unrecognized email domain) or not signed in at all (a
-        // direct/legacy visit) — route onward accordingly.
-        navigate(authStore.getUser() ? "workspace" : "account");
+        // direct/legacy visit) — either way, a brand is now known, so
+        // head to the Home Screen.
+        navigate(authStore.getUser() ? "plot-chooser" : "account");
       },
     },
     [

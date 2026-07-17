@@ -7,4 +7,4 @@
 // controls actual cache invalidation) but keeping them in lockstep makes
 // "what build are you on" a quick, unambiguous question to answer.
 
-export const APP_VERSION = "v38";
+export const APP_VERSION = "v39";

@@ -232,6 +232,12 @@ a {
   line-height: 1;
 }
 
+/* Home and Back — sized to match the Settings gear rather than the
+   smaller default .top-bar-btn text size. */
+.top-bar-btn-nav {
+  font-size: 1.3rem;
+}
+
 .sync-icon-synced {
   color: #4ade80;
 }
@@ -652,7 +658,7 @@ h3.section-header:first-child {
    square one — instead of one fixed box letterboxing whichever logo
    isn't square. */
 .home-logo {
-  height: 100px;
+  height: 116px;
   width: auto;
   max-width: 100%;
   object-fit: contain;

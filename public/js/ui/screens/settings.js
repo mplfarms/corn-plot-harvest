@@ -106,7 +106,11 @@ export function render(container) {
               className: "btn btn-secondary",
               onclick: () => {
                 authStore.signOut();
-                render(container);
+                // Signing in is mandatory (see accountScreen.js /
+                // router.js) — head straight back to the launch/sign-in
+                // screen rather than leaving this screen rendered in a
+                // signed-out state.
+                navigate("account");
               },
             },
             "Sign Out"
@@ -114,15 +118,15 @@ export function render(container) {
         ]
       : [
           h("h3", { className: "section-header" }, "Account"),
-          h("p", { className: "account-status-text" }, "Not signed in — plots are only saved on this device."),
+          h("p", { className: "account-status-text" }, "Not signed in."),
           h(
             "button",
             {
               type: "button",
               className: "btn btn-secondary",
-              onclick: () => navigate("account", { force: true }),
+              onclick: () => navigate("account"),
             },
-            "Sign In to Sync"
+            "Sign In"
           ),
         ]
   );

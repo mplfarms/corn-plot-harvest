@@ -1,21 +1,28 @@
 // src/ui/screens/accountScreen.js
 //
-// The app's launch screen — white background, the Republic shield in the
-// upper third, the four-brand logo train below it, and a one-field
-// Sign In With Email form. This is now also "Home": router.js's default
-// route and topBar.js's Home button both land here (see those files).
-// Nothing here is required — the app is fully useful offline with no
-// account, exactly as before this feature existed.
+// The app's launch/sign-in screen — white background, the Republic
+// shield in the upper third, the four-brand logo train below it, and a
+// one-field Sign In With Email form. Signing in is now mandatory (there
+// is no "Continue Without Signing In" — see router.js's guard, which
+// bounces every other route back here when there's no session) — this is
+// the first thing anyone sees until they sign in, and it's also where
+// Settings' "Sign In to Sync" (after a Sign Out) sends them back to. It
+// is NOT "Home" — once signed in and a brand is known, the branded
+// per-brand Home Screen (plotChooser.js, #/plot-chooser) is Home (see
+// topBar.js).
 //
 // Signing in is just an email address — no name, no password, no email
 // verification, no shared passcode (see authStore.js / auth.js /
-// _shared.js's top comment for the full tradeoff this implies). It's
-// also what decides the default Brand View:
+// _shared.js's top comment for the full tradeoff this implies), and the
+// resulting session is kept in localStorage indefinitely (no expiry, no
+// TTL) so it stays signed in across restarts on any device/browser
+// capable of persisting it. It's also what decides the default Brand
+// View:
 //   - @midwestseedgenetics.com / @midwestseed.com / @republicseed.com
-//     -> Midwest Seed Genetics, straight into the workspace
-//   - @nc-plus.com -> NC+, straight into the workspace
+//     -> Midwest Seed Genetics, straight into the Home Screen
+//   - @nc-plus.com -> NC+, straight into the Home Screen
 //   - anything else -> the manual Brand View picker (brandSelect.js),
-//     which then continues into the workspace itself once a brand is
+//     which then continues into the Home Screen itself once a brand is
 //     chosen (see that file)
 // (see brand.js's brandIdForEmail()).
 
@@ -25,32 +32,12 @@ import * as brandStore from "../stores/brandStore.js";
 import { brandIdForEmail } from "../brand.js";
 import { navigate } from "../router.js";
 
-const SKIP_KEY = "cph.skipAccountPrompt";
-
-export function render(container, params) {
-  // Settings' "Sign In to Sync" button (and the Home button, see
-  // topBar.js) sends the user here explicitly with force:true — that's a
-  // deliberate request to see the launch screen, so it must bypass both
-  // shortcuts below (especially the "previously skipped" one), or
-  // tapping it would just bounce right back out.
-  const force = Boolean(params && params.force);
-
-  // Already signed in (returning visit) — nothing to ask, go straight in.
-  if (!force && authStore.getUser()) {
-    navigate("workspace");
-    return;
-  }
-
-  // Previously chose "Continue Without Signing In" — don't nag every time.
-  let skipRemembered = false;
-  if (!force) {
-    try {
-      skipRemembered = localStorage.getItem(SKIP_KEY) === "1";
-    } catch (e) {
-      // localStorage unavailable — just show the prompt every time; harmless.
-    }
-  }
-  if (skipRemembered) {
+export function render(container) {
+  // Already signed in (returning visit, or landed here right after
+  // Sign Out re-routed here — see settings.js) — nothing to ask if
+  // there's also a brand on file; otherwise fall through and show the
+  // form so a signed-in-but-brandless account still gets somewhere.
+  if (authStore.getUser() && brandStore.getState().selectedBrand) {
     navigate("plot-chooser");
     return;
   }
@@ -96,16 +83,10 @@ export function render(container, params) {
       return;
     }
 
-    try {
-      localStorage.removeItem(SKIP_KEY);
-    } catch (e) {
-      // Ignore.
-    }
-
     const knownBrandId = brandIdForEmail(email);
     if (knownBrandId) {
       brandStore.selectBrand(knownBrandId);
-      navigate("workspace");
+      navigate("plot-chooser");
     } else {
       // Unrecognized domain — send them to the manual Brand View picker
       // instead of guessing; they're already signed in at this point.
@@ -143,23 +124,7 @@ export function render(container, params) {
       h(
         "p",
         { className: "field-note launch-note" },
-        "Sign in with your email to access your saved plots from any phone, tablet, or computer. This is optional — everything works fully offline without an account."
-      ),
-      h(
-        "button",
-        {
-          type: "button",
-          className: "btn-link-block",
-          onclick: () => {
-            try {
-              localStorage.setItem(SKIP_KEY, "1");
-            } catch (e) {
-              // Ignore — worst case, this screen is shown again next time.
-            }
-            navigate("plot-chooser");
-          },
-        },
-        "Continue Without Signing In"
+        "Sign in with your email to access your saved plots from any phone, tablet, or computer. You'll stay signed in on this device."
       ),
     ]),
   ]);
