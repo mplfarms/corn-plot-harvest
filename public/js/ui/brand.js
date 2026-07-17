@@ -109,6 +109,10 @@ export function entriesForBrandView(entries, brand) {
 export function applyBrandTheme(brandId) {
   const brand = getBrand(brandId) || BRANDS.midwestSeedGenetics;
   const root = document.documentElement;
+  // Lets CSS target brand-specific one-offs (see .box-plot-box's NC+
+  // override in styles.css) without needing a matching JS-set custom
+  // property for every such case.
+  root.setAttribute("data-brand", brand.id);
   root.style.setProperty("--accent", brand.accent);
   root.style.setProperty("--accent-light", brand.accentLight);
   root.style.setProperty("--accent-pale", brand.accentPale);

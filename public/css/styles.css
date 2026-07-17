@@ -1432,6 +1432,15 @@ h3.section-header:first-child {
   stroke-width: 1.5;
 }
 
+/* NC+'s box uses its chrome blue (the same blue as its top bar and Home
+   Screen) instead of its saturated red accent — median/mean below stay
+   on the regular accent color, and fill-opacity/stroke-width above are
+   inherited unchanged, so only the box's own color differs. */
+[data-brand="ncPlus"] .box-plot-box {
+  fill: var(--chrome);
+  stroke: var(--chrome);
+}
+
 .box-plot-median {
   stroke: var(--accent-strong);
   stroke-width: 2.5;

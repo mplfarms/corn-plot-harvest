@@ -230,7 +230,15 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     const chartCenterY = y + 9;
     const boxHalfHeight = 7;
     const capHalfHeight = 5;
+    // Median line / mean marker keep the brand's regular accent color
+    // (unchanged). The IQR box itself uses a separate color: for NC+,
+    // that's its chrome blue (the same blue already used for its top bar
+    // and Home Screen) rather than its saturated red accent — requested
+    // specifically for the box, not the rest of the chart. Midwest's box
+    // stays exactly as it was (its accent IS already this app's original
+    // green, so there's nothing to change there).
     const [r, g, b] = hexToRgb(brand ? brand.accent : null);
+    const [boxR, boxG, boxB] = hexToRgb(brand && brand.id === "ncPlus" ? brand.chrome : brand ? brand.accent : null);
 
     const xMin = scale(min);
     const xQ1 = scale(q1);
@@ -253,14 +261,18 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     const boxW = Math.max(xQ3 - xQ1, 1);
     doc.saveGraphicsState();
     doc.setGState(doc.GState({ opacity: 0.35 }));
-    doc.setFillColor(r, g, b);
+    doc.setFillColor(boxR, boxG, boxB);
     doc.rect(xQ1, chartCenterY - boxHalfHeight, boxW, boxHalfHeight * 2, "F");
     doc.restoreGraphicsState();
 
-    doc.setDrawColor(r, g, b);
+    doc.setDrawColor(boxR, boxG, boxB);
     doc.setLineWidth(1.2);
     doc.rect(xQ1, chartCenterY - boxHalfHeight, boxW, boxHalfHeight * 2, "D");
 
+    // Back to the regular accent color for the median line — see the
+    // comment above drawBoxPlot's color setup for why this can differ
+    // from the box's own color.
+    doc.setDrawColor(r, g, b);
     doc.setLineWidth(1.8);
     doc.line(xMedian, chartCenterY - boxHalfHeight, xMedian, chartCenterY + boxHalfHeight);
 
@@ -270,6 +282,7 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     if (Math.abs(mean - median) > Math.max(0.05, range * 0.01)) {
       const xMean = scale(mean);
       doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(r, g, b);
       doc.circle(xMean, chartCenterY, 3, "FD");
     }
 
