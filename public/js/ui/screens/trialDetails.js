@@ -16,6 +16,7 @@ import { createWheelSelect, createExtendableWheelSelect } from "../components/wh
 import { createDatePicker } from "../components/datePicker.js";
 import { openSearchListPicker } from "../components/searchListPicker.js";
 import { navigate } from "../router.js";
+import { fetchSoilTypeForCoordinates } from "../../core/soilLookup.js";
 
 // Above this many ZIP matches for a city, an inline row of tappable
 // chips gets unwieldy (some large cities have dozens of ZIPs, including
@@ -319,47 +320,78 @@ export function render(container) {
     locationStatusEl.className = "location-status" + (kind ? ` location-status-${kind}` : "");
   }
 
+  // Runs after GPS succeeds: looks up the most prevalent soil texture at
+  // that point (USDA NRCS SSURGO data, via soilLookup.js) and, if a
+  // confident match is found, pre-populates the Soil Type wheel with it.
+  // Never blocks or errors the GPS status itself — a failed/inconclusive
+  // soil lookup just leaves Soil Type for manual selection, same as
+  // before this feature existed. References `soilTypeWheel` and `fixed`,
+  // both defined further down in this same render() call — safe since
+  // this only ever actually runs later, after render() has finished
+  // building the whole screen (either from the button's onclick or from
+  // the auto-locate call at the end of render()).
+  async function attemptSoilLookup(lat, lon, accuracy) {
+    const accuracyText = `Location captured (±${Math.round(accuracy)}m).`;
+    const matched = await fetchSoilTypeForCoordinates(lat, lon, fixed.soilTypeOptions);
+    if (matched) {
+      trialStore.updateHeader({ soilType: matched });
+      soilTypeWheel.setValue(matched);
+      setLocationStatus(`${accuracyText} Soil type set to ${matched}.`, "success");
+    } else {
+      setLocationStatus(`${accuracyText} Couldn't determine a soil type for this location — select manually.`, "success");
+    }
+  }
+
+  // Shared by both the "Use Device Location or Enter Manually" button and
+  // the automatic attempt (see the bottom of render()) that fires on its
+  // own for a plot that doesn't have GPS coordinates yet — "default to
+  // the device location" means the user shouldn't have to tap anything
+  // first, but the button still exists as a manual re-trigger (e.g. after
+  // moving to a different field, or after initially denying permission).
+  async function runLocationCapture() {
+    if (!("geolocation" in navigator)) {
+      setLocationStatus("Geolocation isn't supported on this device.", "failure");
+      return;
+    }
+    setLocationStatus("Requesting location permission…", "requesting");
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        const status = await navigator.permissions.query({ name: "geolocation" });
+        if (status.state === "denied") {
+          setLocationStatus("Location permission denied. Enable it in your browser's site settings.", "failure");
+          return;
+        }
+      }
+    } catch (e) {
+      // Permissions API not available on this browser (e.g. Safari) — proceed anyway.
+    }
+
+    setLocationStatus("Locating…", "locating");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = round6(Math.abs(pos.coords.latitude));
+        const lon = round6(-Math.abs(pos.coords.longitude));
+        trialStore.updateHeader({ gpsLatitude: lat, gpsLongitude: lon });
+        latInput.value = String(lat);
+        lonInput.value = String(lon);
+        setLocationStatus(`Location captured (±${Math.round(pos.coords.accuracy)}m). Looking up soil type…`, "success");
+        attemptSoilLookup(lat, lon, pos.coords.accuracy);
+      },
+      (err) => {
+        setLocationStatus(err.message || "Unable to determine location.", "failure");
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
+
   const useLocationBtn = h(
     "button",
     {
       type: "button",
       className: "btn btn-secondary",
-      onclick: async () => {
-        if (!("geolocation" in navigator)) {
-          setLocationStatus("Geolocation isn't supported on this device.", "failure");
-          return;
-        }
-        setLocationStatus("Requesting location permission…", "requesting");
-        try {
-          if (navigator.permissions && navigator.permissions.query) {
-            const status = await navigator.permissions.query({ name: "geolocation" });
-            if (status.state === "denied") {
-              setLocationStatus("Location permission denied. Enable it in your browser's site settings.", "failure");
-              return;
-            }
-          }
-        } catch (e) {
-          // Permissions API not available on this browser (e.g. Safari) — proceed anyway.
-        }
-
-        setLocationStatus("Locating…", "locating");
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const lat = round6(Math.abs(pos.coords.latitude));
-            const lon = round6(-Math.abs(pos.coords.longitude));
-            trialStore.updateHeader({ gpsLatitude: lat, gpsLongitude: lon });
-            latInput.value = String(lat);
-            lonInput.value = String(lon);
-            setLocationStatus(`Location captured (±${Math.round(pos.coords.accuracy)}m).`, "success");
-          },
-          (err) => {
-            setLocationStatus(err.message || "Unable to determine location.", "failure");
-          },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        );
-      },
+      onclick: runLocationCapture,
     },
-    "Use Device Location"
+    "Use Device Location or Enter Manually"
   );
 
   const gpsSection = h("section", { className: "card" }, [
@@ -418,6 +450,11 @@ export function render(container) {
     field("Tillage", tillageWheel.el),
     field("Irrigation", irrigationWheel.el),
     field("Soil Type", soilTypeWheel.el),
+    h(
+      "p",
+      { className: "field-note" },
+      "Pre-populated from GPS Location. To change, select from the dropdown list."
+    ),
     field("Previous Crop", previousCropWheel.el),
     field("Planting Population", populationWheel.el),
   ]);
@@ -514,4 +551,17 @@ export function render(container) {
   ]);
 
   mount(container, screen);
+
+  // "Default to the device location" — for a plot that doesn't have GPS
+  // coordinates yet, go get them automatically rather than waiting for
+  // the user to tap "Use Device Location or Enter Manually" first (that
+  // button still exists for a manual re-trigger, e.g. after moving to a
+  // different field, or retrying after an earlier denial). Never
+  // re-triggers once coordinates exist — same "don't overwrite what's
+  // already there" rule as the State-defaults-to-Iowa behavior — so this
+  // only fires for a genuinely new/not-yet-located plot, not every time
+  // this screen is revisited for one that already has a location.
+  if (!Number.isFinite(header.gpsLatitude) && !Number.isFinite(header.gpsLongitude)) {
+    runLocationCapture();
+  }
 }
