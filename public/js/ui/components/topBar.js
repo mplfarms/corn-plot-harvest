@@ -10,15 +10,15 @@
 // content (e.g. Plot Summary's share menu), which sits to the left of
 // the Settings gear so the gear always stays the rightmost element.
 //
-// "Home" means the branded Home Screen (plotChooser.js, routed at
-// #/plot-chooser — the "Corn Plot Entry" title/logo screen with "Enter a
-// New Plot" and "Saved Plots"), not the Plot Workspace menu — the brand
-// is chosen once up front and from then on stays fixed for the session;
-// switching brands is a deliberate action tucked into Settings (see
-// settings.js), not something the Home button does as a side effect.
-// The Plot Workspace screen ("workspace") is still reachable and is
-// still what several screens' own Back buttons return to — only this
-// top bar's Home button was repointed.
+// "Home" means the blue splash/Brand Select screen (brandSelect.js,
+// routed at #/brand-select — the "Corn Plot Harvest" title screen where
+// you pick Midwest Seed Genetics or NC+), not the Plot Workspace menu or
+// the branded per-brand Home Screen (plotChooser.js, #/plot-chooser).
+// That per-brand screen is still reachable — it's what several screens'
+// own Back buttons return to (see workspaceMenu.js, savedPlots.js) — only
+// this top bar's Home button was repointed, so tapping Home always drops
+// back to the same splash screen regardless of which brand/screen you're
+// currently in.
 
 import { h } from "../dom.js";
 import { navigate } from "../router.js";
@@ -26,7 +26,7 @@ import * as libraryStore from "../stores/libraryStore.js";
 
 function goHome() {
   libraryStore.flushDraftToLibrary();
-  navigate("plot-chooser");
+  navigate("brand-select");
 }
 
 /**

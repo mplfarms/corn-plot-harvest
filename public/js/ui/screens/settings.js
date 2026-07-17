@@ -11,6 +11,7 @@ import * as brandStore from "../stores/brandStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
 import * as themeStore from "../stores/themeStore.js";
 import * as authStore from "../authStore.js";
+import { APP_VERSION } from "../../version.js";
 import { navigate } from "../router.js";
 
 const MODES = [
@@ -144,6 +145,8 @@ export function render(container) {
       ])
     : null;
 
+  const versionFooter = h("p", { className: "settings-version-footer" }, `Corn Plot Harvest ${APP_VERSION}`);
+
   const screen = h("div", { className: "screen settings-screen" }, [
     topBar,
     h("div", { className: "screen-body" }, [
@@ -152,6 +155,7 @@ export function render(container) {
       brandCard,
       accountCard,
       manageUsersCard,
+      versionFooter,
     ]),
   ]);
 

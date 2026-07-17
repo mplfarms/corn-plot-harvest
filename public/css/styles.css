@@ -418,6 +418,13 @@ h3.section-header:first-child {
   color: var(--danger);
 }
 
+.settings-version-footer {
+  margin: 8px 0 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
 /* ---------- brand-view prompt (unrecognized email domain at sign-in) ---------- */
 
 .brand-prompt-buttons {
