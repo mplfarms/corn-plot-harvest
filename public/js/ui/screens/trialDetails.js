@@ -449,12 +449,15 @@ export function render(container) {
     ),
     field("Tillage", tillageWheel.el),
     field("Irrigation", irrigationWheel.el),
-    field("Soil Type", soilTypeWheel.el),
-    h(
-      "p",
-      { className: "field-note" },
-      "Pre-populated from GPS Location. To change, select from the dropdown list."
-    ),
+    h("label", { className: "field" }, [
+      h("span", { className: "field-label" }, "Soil Type"),
+      h(
+        "p",
+        { className: "field-note" },
+        "Pre-populated from GPS Location. To change, select from the dropdown list."
+      ),
+      soilTypeWheel.el,
+    ]),
     field("Previous Crop", previousCropWheel.el),
     field("Planting Population", populationWheel.el),
   ]);
