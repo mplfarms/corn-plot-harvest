@@ -1,39 +1,24 @@
 // src/ui/authStore.js
 //
-// Local session store for this app's lightweight auth: Name + Email + one
-// shared team passcode, instead of Netlify Identity (removed — see
-// netlify/functions/auth.js and _shared.js's top comment for why: no
-// per-user passwords, no email verification, just a single passcode the
-// whole team shares). There is no JWT and no server-side session — a
-// "session" here is just {name, email, isAdmin} plus the passcode, cached
-// in localStorage. Every other module that needs to prove who's calling
-// (cloudSyncStore.js, adminPlots.js, manageUsers.js) reads the pair from
-// getCredentials() here and sends it explicitly on every request; the
-// server re-checks the passcode (and, for admin actions, the isAdmin flag
-// on the caller's own stored record) on every single call — nothing here
-// is trusted client-side alone.
+// Local session store for this app's lightweight auth: just Name + Email,
+// no password, no email verification, and no shared passcode either (the
+// team explicitly asked for the passcode to be dropped — see auth.js and
+// _shared.js's top comment for the resulting tradeoff). There is no JWT
+// and no server-side session — a "session" here is just {name, email,
+// isAdmin}, cached in localStorage. Every other module that needs to
+// prove who's calling (cloudSyncStore.js, adminPlots.js, manageUsers.js)
+// reads the email from getCredentials() here and sends it explicitly on
+// every request; the server re-checks the isAdmin flag on the caller's
+// own stored record for every admin action — but there's no way for the
+// server to verify the email actually belongs to whoever typed it in.
 
 import { createPubSub, readJson, writeJson } from "./stores/pubsub.js";
 
 const SESSION_KEY = "cph.authSession"; // {name, email, isAdmin}
-const PASSCODE_KEY = "cph.authPasscode";
 
 const pubsub = createPubSub();
 
 let session = readJson(SESSION_KEY, null);
-let passcode = null;
-try {
-  passcode = localStorage.getItem(PASSCODE_KEY) || null;
-} catch (e) {
-  passcode = null;
-}
-
-// A session without its passcode (or vice versa) is useless for making
-// authenticated calls — treat that as signed out rather than half-signed-in.
-if (!session || !passcode) {
-  session = null;
-  passcode = null;
-}
 
 /**
  * Call once at startup (main.js). Kept for symmetry with how every other
@@ -66,29 +51,29 @@ export function isAdmin() {
 }
 
 /**
- * The email + passcode pair every authenticated request must send. Never
- * a Bearer token — this app has no JWTs at all now.
- * @returns {{email: string, passcode: string}|null} null if signed out
+ * The email every authenticated request must send. Never a Bearer token
+ * or passcode — this app has neither anymore.
+ * @returns {{email: string}|null} null if signed out
  */
 export function getCredentials() {
-  if (!session || !passcode) return null;
-  return { email: session.email, passcode };
+  if (!session) return null;
+  return { email: session.email };
 }
 
 /**
  * Signs in, creating the account on first use (see auth.js — sign-up and
- * sign-in are the same call). Persists the resulting session + passcode
- * to localStorage on success.
- * @param {{name: string, email: string, passcode: string}} params
+ * sign-in are the same call). Persists the resulting session to
+ * localStorage on success.
+ * @param {{name: string, email: string}} params
  * @returns {Promise<{ok: true, user: Object}|{ok: false, error: string}>}
  */
-export async function signIn({ name, email, passcode: suppliedPasscode }) {
+export async function signIn({ name, email }) {
   let res;
   try {
     res = await fetch("/.netlify/functions/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, passcode: suppliedPasscode }),
+      body: JSON.stringify({ name, email }),
     });
   } catch (e) {
     return { ok: false, error: "Couldn't reach the server — check your connection and try again." };
@@ -106,13 +91,7 @@ export async function signIn({ name, email, passcode: suppliedPasscode }) {
   }
 
   session = payload.user;
-  passcode = suppliedPasscode;
   writeJson(SESSION_KEY, session);
-  try {
-    localStorage.setItem(PASSCODE_KEY, passcode);
-  } catch (e) {
-    console.error("[authStore] failed to persist passcode", e);
-  }
   pubsub.notify();
   return { ok: true, user: session };
 }
@@ -120,10 +99,8 @@ export async function signIn({ name, email, passcode: suppliedPasscode }) {
 /** Clears the local session. There's no server-side session to invalidate. */
 export function signOut() {
   session = null;
-  passcode = null;
   try {
     localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(PASSCODE_KEY);
   } catch (e) {
     console.error("[authStore] failed to clear session", e);
   }

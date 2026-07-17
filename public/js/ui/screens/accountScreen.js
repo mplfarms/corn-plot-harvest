@@ -6,8 +6,8 @@
 // is fully useful offline with no account, exactly as before this feature
 // existed. Sign-up and sign-in are the same form/action now (see
 // authStore.js) — there's no separate "Create Account" step, no password,
-// and no email verification, just Name + Email + the team's shared
-// passcode.
+// no email verification, and no shared passcode either, just Name +
+// Email.
 //
 // On a successful sign-in, this also sets the user's default Brand View:
 // known company-email domains (@midwestseed.com / @republicseed.com ->
@@ -126,13 +126,6 @@ export function render(container, params) {
     autocomplete: "email",
     value: (existingUser && existingUser.email) || "",
   });
-  const passcodeInput = h("input", {
-    type: "password",
-    className: "text-input",
-    id: "account-passcode-input",
-    autocomplete: "off",
-  });
-
   const errorNote = h("p", { className: "field-note account-error-note hidden" });
 
   function showError(message) {
@@ -149,18 +142,16 @@ export function render(container, params) {
   async function handleSubmit() {
     const name = nameInput.value.trim();
     const email = emailInput.value.trim();
-    const passcode = passcodeInput.value;
 
     errorNote.classList.add("hidden");
     errorNote.textContent = "";
 
     if (!name) return showError("Enter your name.");
     if (!email) return showError("Enter your email.");
-    if (!passcode) return showError("Enter the team passcode.");
 
     submitBtn.disabled = true;
     submitBtn.textContent = "Signing In…";
-    const result = await authStore.signIn({ name, email, passcode });
+    const result = await authStore.signIn({ name, email });
     submitBtn.disabled = false;
     submitBtn.textContent = "Sign In";
 
@@ -182,7 +173,7 @@ export function render(container, params) {
     navigate("workspace");
   }
 
-  passcodeInput.addEventListener("keydown", (e) => {
+  emailInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       handleSubmit();
@@ -190,11 +181,11 @@ export function render(container, params) {
   });
 
   const card = h("section", { className: "card account-card" }, [
-    h("h2", { className: "screen-heading" }, "Sync Your Plots"),
+    h("h2", { className: "screen-heading" }, "Sign In With Email"),
     h(
       "p",
       { className: "field-note" },
-      "Sign in with your name, email, and the team passcode to access your saved plots from any phone, tablet, or computer. This is optional — everything works fully offline without an account."
+      "Sign in with your name and email to access your saved plots from any phone, tablet, or computer. This is optional — everything works fully offline without an account."
     ),
     h("div", { className: "field" }, [
       h("label", { className: "field-label", for: "account-name-input" }, "Name"),
@@ -203,10 +194,6 @@ export function render(container, params) {
     h("div", { className: "field" }, [
       h("label", { className: "field-label", for: "account-email-input" }, "Email"),
       emailInput,
-    ]),
-    h("div", { className: "field" }, [
-      h("label", { className: "field-label", for: "account-passcode-input" }, "Team Passcode"),
-      passcodeInput,
     ]),
     errorNote,
     submitBtn,

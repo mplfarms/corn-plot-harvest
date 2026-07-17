@@ -10,8 +10,7 @@
 // this screen re-checks independently since the server is the real
 // authority (a stale client-side role check should never be trusted
 // alone; the function itself also re-checks the caller's own isAdmin
-// flag and the shared passcode, returning 403/401 if either fails — see
-// netlify/functions/plots.js).
+// flag, returning 403 if it isn't set — see netlify/functions/plots.js).
 
 import { h, mount, clear } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
@@ -32,7 +31,7 @@ export async function render(container) {
   try {
     const creds = authStore.getCredentials();
     if (!creds) throw new Error("Not signed in.");
-    const url = `/.netlify/functions/plots?scope=all&email=${encodeURIComponent(creds.email)}&passcode=${encodeURIComponent(creds.passcode)}`;
+    const url = `/.netlify/functions/plots?scope=all&email=${encodeURIComponent(creds.email)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     const { users } = await res.json();

@@ -5,8 +5,8 @@
 // Reachable only from Settings' "Manage Users" row, which itself only
 // renders when authStore.isAdmin() is true — but this screen re-checks
 // independently since the server is the real authority (see
-// adminUsers.js's requireAdmin() — every action re-checks the passcode
-// and the caller's own isAdmin flag on every single call).
+// adminUsers.js's requireAdmin() — every action re-checks the caller's
+// own isAdmin flag on every single call).
 //
 // Deleting an account also deletes that account's cloud-saved plots
 // (enforced server-side in adminUsers.js's handleDelete) — the confirm
@@ -29,7 +29,7 @@ async function callAdminUsers(payload) {
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...payload, email: creds.email, passcode: creds.passcode }),
+    body: JSON.stringify({ ...payload, email: creds.email }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Server returned ${res.status}`);
@@ -53,7 +53,7 @@ export async function render(container) {
     try {
       const creds = authStore.getCredentials();
       if (!creds) throw new Error("Not signed in.");
-      const url = `${ENDPOINT}?email=${encodeURIComponent(creds.email)}&passcode=${encodeURIComponent(creds.passcode)}`;
+      const url = `${ENDPOINT}?email=${encodeURIComponent(creds.email)}`;
       const res = await fetch(url);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `Server returned ${res.status}`);

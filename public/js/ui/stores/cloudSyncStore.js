@@ -76,16 +76,16 @@ function mergeByLastModified(localTrials, cloudTrials) {
   return Array.from(byId.values());
 }
 
-// No JWT anymore — every request carries email+passcode explicitly (see
-// authStore.js). GET requests get them as query params; PUT/POST requests
-// get them merged into the JSON body.
+// No JWT and no passcode — every request carries just the signed-in
+// user's email explicitly (see authStore.js). GET requests get it as a
+// query param; PUT/POST requests get it merged into the JSON body.
 async function authedFetch(options) {
   const creds = authStore.getCredentials();
   if (!creds) return null;
 
   const method = (options && options.method) || "GET";
   if (method === "GET") {
-    const url = `${ENDPOINT}?email=${encodeURIComponent(creds.email)}&passcode=${encodeURIComponent(creds.passcode)}`;
+    const url = `${ENDPOINT}?email=${encodeURIComponent(creds.email)}`;
     return fetch(url, options);
   }
 
@@ -98,7 +98,7 @@ async function authedFetch(options) {
   return fetch(ENDPOINT, {
     ...options,
     headers: { "Content-Type": "application/json", ...(options && options.headers) },
-    body: JSON.stringify({ ...body, email: creds.email, passcode: creds.passcode }),
+    body: JSON.stringify({ ...body, email: creds.email }),
   });
 }
 
