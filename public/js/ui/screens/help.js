@@ -177,6 +177,7 @@ export function render(container) {
         "Switch between Light, Dark, or System appearance.",
         "Switch your Brand View if you work across more than one brand.",
         "See which email you're signed in as, and Sign Out.",
+        "Edit My Info — update your First Name, Last Name, and Mobile Number any time (your email itself can't be changed here, since that's how you sign in).",
         "Delete My Account — permanently removes your account. Every plot you've saved transfers to your farm's admin first, so nothing is lost, but this can't be undone and you'll need to sign back in (creating a fresh account) to keep using the app afterward. You'll be asked to confirm twice, including typing the word DELETE, before anything happens.",
         "Open this Help guide, or (for admins) Manage Users.",
       ]),
@@ -185,11 +186,12 @@ export function render(container) {
     helpSection("For Admins", [
       p("If your account has admin access, you'll see a couple of extra things other users don't:"),
       sub("All Plots (Admin)"),
-      p("Browse every teammate's saved plots in one place. Tap any plot to open and edit it directly — a banner at the top reminds you whose plot you're in the whole time you're working on it. When you're done, tap “Save Changes” to write your edits back to their account, or “Discard Admin Edit” to back out without saving anything."),
+      p("Browse every teammate's saved plots in one place — every registered user gets their own card here, even one who hasn't saved a plot yet. Tap any plot to open and edit it directly — a banner at the top reminds you whose plot you're in the whole time you're working on it. When you're done, tap “Save Changes” to write your edits back to their account, or “Discard Admin Edit” to back out without saving anything. Tap the “☰” on any card to see that person's First Name, Last Name, Email, and Phone."),
       sub("Manage Users"),
-      p("Reachable from Settings, this lists everyone who's ever signed in, and lets you:"),
+      p("Reachable from Settings, this lists everyone who's ever signed in (admin(s) first, then everyone else alphabetically by last name), and lets you:"),
       ul([
         "Make Admin / Remove Admin — give or take away admin access.",
+        "☰ (the button on each card) — edit that person's First Name, Last Name, and Mobile Number directly, the same as they could for themselves from their own Settings.",
         "Merge Into… — for when the same person ends up with two accounts (usually from signing in with a different email on a different device). This moves all of one account's plots onto the other and removes the duplicate. Nothing is lost.",
         "Delete — permanently removes someone's account and all their saved plots. Because this can't be undone, you'll be asked to confirm twice, including typing the word DELETE.",
       ]),

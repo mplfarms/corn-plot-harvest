@@ -577,7 +577,13 @@ h3.section-header:first-child {
 
 /* ---------- manage users (admin) ---------- */
 
-.manage-user-card {
+/* .manage-user-card itself is just a plain .card now — its header (name +
+   "☰" edit button, see .admin-user-header) is the full-bleed dark bar at
+   the top (same look as All Plots (Admin)'s cards), and everything below
+   it (email/role + the action buttons) sits in .manage-user-card-body,
+   which is what actually carries the side-by-side flex layout the whole
+   card used to have on itself before the header existed. */
+.manage-user-card-body {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -589,10 +595,6 @@ h3.section-header:first-child {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.manage-user-info .section-header {
-  margin-bottom: 0;
 }
 
 .manage-user-info .field-note {

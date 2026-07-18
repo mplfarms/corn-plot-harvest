@@ -105,6 +105,49 @@ export async function signIn({ email, name, firstName, lastName, mobileNumber })
   return { ok: true, user: session, isNewUser: Boolean(payload.isNewUser) };
 }
 
+/**
+ * Lets the signed-in user edit their own First Name, Last Name, and
+ * Mobile Number (see updateProfile.js — Email itself isn't editable
+ * here, it's the account's identity). Unlike signIn(), every field is
+ * set to exactly what's passed, including an empty string to clear a
+ * field — this is a deliberate edit, not a sign-in ping. Updates the
+ * cached local session with the server's response on success, so
+ * anything reading authStore.getUser() reflects the change immediately
+ * without needing to sign in again.
+ * @param {{firstName?: string, lastName?: string, mobileNumber?: string}} params
+ * @returns {Promise<{ok: true, user: Object}|{ok: false, error: string}>}
+ */
+export async function updateProfile({ firstName, lastName, mobileNumber }) {
+  if (!session) return { ok: false, error: "Not signed in." };
+
+  let res;
+  try {
+    res = await fetch("/.netlify/functions/updateProfile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: session.email, firstName, lastName, mobileNumber }),
+    });
+  } catch (e) {
+    return { ok: false, error: "Couldn't reach the server — check your connection and try again." };
+  }
+
+  let payload = {};
+  try {
+    payload = await res.json();
+  } catch (e) {
+    // Ignore — payload stays {} and the generic status-based message below is used.
+  }
+
+  if (!res.ok) {
+    return { ok: false, error: payload.error || `Update failed (${res.status}).` };
+  }
+
+  session = payload.user;
+  writeJson(SESSION_KEY, session);
+  pubsub.notify();
+  return { ok: true, user: session };
+}
+
 /** Clears the local session. There's no server-side session to invalidate. */
 export function signOut() {
   session = null;

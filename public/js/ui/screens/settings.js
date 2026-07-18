@@ -12,6 +12,7 @@ import * as libraryStore from "../stores/libraryStore.js";
 import * as themeStore from "../stores/themeStore.js";
 import * as authStore from "../authStore.js";
 import { doubleConfirm } from "../components/doubleConfirm.js";
+import { promptEditUserDetails } from "../components/editUserDetailsModal.js";
 import { showToast } from "../components/toast.js";
 import { APP_VERSION } from "../../version.js";
 import { navigate } from "../router.js";
@@ -97,6 +98,29 @@ export function render(container) {
   // ---- Account ----
   const user = authStore.getUser();
 
+  // Self-service profile edit (netlify/functions/updateProfile.js): lets
+  // anyone signed in fix up their own First Name, Last Name, and Mobile
+  // Number at any time — not just the one-time "Welcome!" form a
+  // brand-new account sees (see newUserDetailsModal.js). Email itself
+  // isn't editable here since it's the account's identity.
+  async function handleEditMyInfo() {
+    const result = await promptEditUserDetails({
+      title: "Edit My Info",
+      email: user.email,
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      mobileNumber: user.mobileNumber || "",
+    });
+    if (!result) return;
+    const outcome = await authStore.updateProfile(result);
+    if (!outcome.ok) {
+      showToast(`Couldn't update your info: ${outcome.error}`, { type: "error" });
+      return;
+    }
+    showToast("Your info was updated.");
+    render(container);
+  }
+
   // Self-service account deletion (netlify/functions/deleteAccount.js):
   // every saved plot transfers to the farm's designated admin account
   // first (tagged with transferredFrom — see savedPlots.js's badge), so
@@ -142,6 +166,15 @@ export function render(container) {
       ? [
           h("h3", { className: "section-header" }, "Account"),
           h("p", { className: "account-status-text" }, `Signed in as ${user.email}`),
+          h(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-secondary",
+              onclick: handleEditMyInfo,
+            },
+            "Edit My Info"
+          ),
           h(
             "button",
             {

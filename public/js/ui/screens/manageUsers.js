@@ -27,16 +27,25 @@
 // data at once, so a first dialog explains the consequences and a
 // second step requires typing "DELETE" before anything actually
 // happens, matching deleteAccount.js's self-service equivalent.
+//
+// Each card's header also has a "☰" button (same look as All Plots
+// (Admin)'s — see adminPlots.js) — here it opens an EDITABLE First
+// Name/Last Name/Mobile Number form (editUserDetailsModal.js) rather
+// than a read-only one, since this screen's whole job is managing user
+// accounts: an admin can fix up ANY user's details from here, via
+// updateProfile.js's adminEmail path.
 
 import { h, mount, clear } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
 import { doubleConfirm } from "../components/doubleConfirm.js";
+import { promptEditUserDetails } from "../components/editUserDetailsModal.js";
 import { showToast } from "../components/toast.js";
 import { openSearchListPicker } from "../components/searchListPicker.js";
 import * as authStore from "../authStore.js";
 import { navigate } from "../router.js";
 
 const ENDPOINT = "/.netlify/functions/adminUsers";
+const UPDATE_PROFILE_ENDPOINT = "/.netlify/functions/updateProfile";
 
 async function callAdminUsers(payload) {
   const creds = authStore.getCredentials();
@@ -45,6 +54,19 @@ async function callAdminUsers(payload) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...payload, email: creds.email }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `Server returned ${res.status}`);
+  return body;
+}
+
+async function callUpdateProfile(payload) {
+  const creds = authStore.getCredentials();
+  if (!creds) throw new Error("Not signed in.");
+  const res = await fetch(UPDATE_PROFILE_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...payload, adminEmail: creds.email }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Server returned ${res.status}`);
@@ -110,6 +132,24 @@ export async function render(container) {
           // that's actually empty and stays put.
           onChange: (label) => setTimeout(() => handleMergeTargetChosen(sourceUser, labelToUser.get(label)), 0),
         });
+      }
+
+      async function handleEditDetails(u) {
+        const result = await promptEditUserDetails({
+          title: `Edit ${userLabel(u)}`,
+          email: u.email,
+          firstName: u.firstName || "",
+          lastName: u.lastName || "",
+          mobileNumber: u.mobileNumber || "",
+        });
+        if (!result) return;
+        try {
+          await callUpdateProfile({ email: u.email, ...result });
+          showToast(`Updated ${result.firstName || u.email}'s info.`);
+          await load();
+        } catch (e) {
+          showToast(`Couldn't update ${u.name || u.email}: ${e.message}`, { type: "error" });
+        }
       }
 
       async function handleMergeTargetChosen(sourceUser, targetUser) {
@@ -188,18 +228,31 @@ export async function render(container) {
           "Delete"
         );
 
+        const menuBtn = h(
+          "button",
+          {
+            type: "button",
+            className: "admin-user-menu-btn",
+            "aria-label": `Edit ${userLabel(u)}`,
+            title: "Edit this user's info",
+            onclick: () => handleEditDetails(u),
+          },
+          "☰"
+        );
+
         bodyEl.appendChild(
           h("section", { className: "card manage-user-card" }, [
-            h("div", { className: "manage-user-info" }, [
-              h("h3", { className: "section-header" }, u.name || "(no name)"),
-              h("p", { className: "field-note" }, u.email),
-              h(
-                "p",
-                { className: "field-note" },
-                u.isAdmin ? "Admin" : "Standard user"
-              ),
+            h("div", { className: "section-header admin-user-header" }, [
+              h("p", { className: "admin-user-header-name" }, u.name || "(no name)"),
+              menuBtn,
             ]),
-            h("div", { className: "manage-user-actions" }, [toggleBtn, mergeBtn, deleteBtn]),
+            h("div", { className: "manage-user-card-body" }, [
+              h("div", { className: "manage-user-info" }, [
+                h("p", { className: "field-note" }, u.email),
+                h("p", { className: "field-note" }, u.isAdmin ? "Admin" : "Standard user"),
+              ]),
+              h("div", { className: "manage-user-actions" }, [toggleBtn, mergeBtn, deleteBtn]),
+            ]),
           ])
         );
       }
