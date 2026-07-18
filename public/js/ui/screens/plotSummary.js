@@ -326,7 +326,7 @@ export function render(container, params) {
       title: "How to read these results",
       onclick: () => navigate("plot-summary-help"),
     },
-    h("span", { className: "top-bar-btn-help-badge" }, "?")
+    h("span", { className: "top-bar-btn-help-badge" }, "i")
   );
 
   const topBar = createTopBar({

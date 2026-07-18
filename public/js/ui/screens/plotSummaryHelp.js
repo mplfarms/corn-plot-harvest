@@ -1,8 +1,8 @@
 // src/ui/screens/plotSummaryHelp.js
 //
 // A focused "how do I read this screen" guide for Plot Summary & Results
-// specifically — reachable via the "?" icon plotSummary.js adds to its
-// own top bar (next to the Settings gear). The main Help guide (help.js)
+// specifically — reachable via the "i" info icon plotSummary.js adds to
+// its own top bar (next to the Settings gear). The main Help guide (help.js)
 // already covers this screen at a summary level as part of the whole
 // app; this screen goes deeper on the same handful of things people
 // actually get confused by looking at a results screen for the first

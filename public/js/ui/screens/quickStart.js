@@ -48,7 +48,7 @@ const STEPS = [
   {
     title: "Check your results",
     text: "Tap “Plot Summary & Results” to see every hybrid ranked, plus averages and a chart of the spread.",
-    tip: "Tip: tap the “?” icon next to the gear at the top of this screen any time for a detailed explanation of the tabs, the chart, and what the colored numbers mean.",
+    tip: "Tip: tap the “i” info icon next to the gear at the top of this screen any time for a detailed explanation of the tabs, the chart, and what the colored numbers mean.",
   },
   {
     title: "Share it",

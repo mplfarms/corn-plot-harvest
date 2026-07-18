@@ -255,11 +255,13 @@ a {
   font-size: 1.5rem;
 }
 
-/* Plot Summary's "?" help icon, in the top-bar-right slot alongside the
+/* Plot Summary's "i" info icon, in the top-bar-right slot alongside the
    gear (see topBar.js's `right` opt — it sits immediately to the left of
-   the permanent Settings gear). A circled glyph reads clearly as "help"
-   at a glance, distinct from the gear's plain icon and the sync icon's
-   text-weight glyph. */
+   the permanent Settings gear). A circled glyph reads clearly as "more
+   info" at a glance, distinct from the gear's plain icon and the sync
+   icon's text-weight glyph. Italic serif "i" (rather than the button's
+   normal sans-serif) reads as the conventional ⓘ information symbol
+   instead of a plain lowercase letter. */
 .top-bar-btn-help {
   font-size: 1rem;
 }
@@ -272,6 +274,8 @@ a {
   height: 22px;
   border: 2px solid #ffffff;
   border-radius: 50%;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
   font-weight: 700;
   line-height: 1;
 }
