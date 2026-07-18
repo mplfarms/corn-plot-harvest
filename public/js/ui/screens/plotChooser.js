@@ -10,6 +10,11 @@
 // and needs no per-brand branching here since applyBrandTheme() (see
 // brand.js) already keeps that CSS variable in sync with whichever
 // brand is currently selected.
+//
+// "Quick Start Guide" sits below the other actions, styled as a plain
+// link (home-btn-ghost) rather than another bordered button — it's
+// informational, not something to weigh equally against "Enter a New
+// Plot" — and points to quickStart.js's short getting-started guide.
 
 import { h, mount } from "../dom.js";
 import { getBrand } from "../brand.js";
@@ -75,7 +80,28 @@ export function render(container) {
       )
     : null;
 
-  const heroActions = h("div", { className: "home-actions" }, [newPlotBtn, savedPlotsBtn, allPlotsAdminBtn]);
+  // A plain, less prominent link rather than another bordered button —
+  // this is informational, not an action, and shouldn't visually compete
+  // with "Enter a New Plot"/"Saved Plots" for a first-time user's
+  // attention. Goes to quickStart.js's short getting-started guide; the
+  // much longer Help screen lives in Settings instead (see settings.js),
+  // since Settings is where every other "about the app" item already is.
+  const quickStartBtn = h(
+    "button",
+    {
+      type: "button",
+      className: "home-btn home-btn-ghost",
+      onclick: () => navigate("quick-start"),
+    },
+    "📖 Quick Start Guide"
+  );
+
+  const heroActions = h("div", { className: "home-actions" }, [
+    newPlotBtn,
+    savedPlotsBtn,
+    allPlotsAdminBtn,
+    quickStartBtn,
+  ]);
 
   const hero = h("div", { className: "home-hero" }, [heroTop, heroActions]);
 

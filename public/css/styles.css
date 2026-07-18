@@ -748,6 +748,18 @@ h3.section-header:first-child {
   color: var(--chrome);
 }
 
+/* Informational, not an action — deliberately lighter-weight than
+   home-btn-primary/-secondary so it doesn't compete with "Enter a New
+   Plot" for attention, while keeping the same tap-target size. */
+.home-btn-ghost {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: underline;
+  font-size: 0.95rem;
+  margin-top: 2px;
+}
+
 /* ---------- chooser rows / menu rows ---------- */
 
 .chooser-list {
@@ -1393,6 +1405,17 @@ h3.section-header:first-child {
   letter-spacing: 0.02em;
 }
 
+.badge-transferred {
+  background: var(--accent-light);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
 .saved-plots-search {
   margin-bottom: 4px;
 }
@@ -1866,4 +1889,139 @@ h3.section-header:first-child {
   box-shadow: none;
   border: 1px solid var(--border);
   margin-top: 4px;
+}
+
+/* ---------- Quick Start Guide (quickStart.js) ---------- */
+
+.quick-start-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.quick-start-step {
+  display: flex;
+  gap: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.quick-start-step-number {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quick-start-step-text {
+  min-width: 0;
+}
+
+.quick-start-step-title {
+  margin: 0 0 4px;
+  font-weight: 700;
+}
+
+.quick-start-step-body {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.quick-start-more-help {
+  margin-top: 18px;
+  text-align: center;
+}
+
+/* ---------- Help screen (help.js) ---------- */
+
+.help-intro-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.help-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.help-section-title {
+  padding: 14px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+/* Custom disclosure arrow instead of the browser's default marker, so it
+   matches the app's own chevrons (chooser-row-chevron) rather than
+   looking like a stray bullet — ::-webkit-marker/::marker are both
+   needed since only one applies depending on the browser. */
+.help-section-title::-webkit-details-marker {
+  display: none;
+}
+
+.help-section-title::marker {
+  content: "";
+}
+
+.help-section-title::after {
+  content: "›";
+  float: right;
+  color: var(--text-muted);
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+
+.help-section[open] .help-section-title::after {
+  transform: rotate(270deg);
+}
+
+.help-section-body {
+  padding: 0 16px 16px;
+}
+
+.help-p {
+  margin: 0 0 10px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.help-p:last-child {
+  margin-bottom: 0;
+}
+
+.help-list {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.45;
+}
+
+.help-subheading {
+  margin: 14px 0 6px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.help-subheading:first-child {
+  margin-top: 0;
 }

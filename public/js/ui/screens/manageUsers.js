@@ -21,10 +21,16 @@
 // adminUsers.js's handleMerge() comment) — this moves the source
 // account's saved plots onto the chosen target account and deletes the
 // source account, so it stops showing up as a duplicate.
+//
+// Both Delete and Merge Into… use doubleConfirm() rather than a single
+// showConfirm() — these move or delete an entire account's worth of
+// data at once, so a first dialog explains the consequences and a
+// second step requires typing "DELETE" before anything actually
+// happens, matching deleteAccount.js's self-service equivalent.
 
 import { h, mount, clear } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
-import { showConfirm } from "../components/modal.js";
+import { doubleConfirm } from "../components/doubleConfirm.js";
 import { showToast } from "../components/toast.js";
 import { openSearchListPicker } from "../components/searchListPicker.js";
 import * as authStore from "../authStore.js";
@@ -108,13 +114,12 @@ export async function render(container) {
 
       async function handleMergeTargetChosen(sourceUser, targetUser) {
         if (!targetUser) return;
-        const ok = await showConfirm({
+        const ok = await doubleConfirm({
           title: "Merge Accounts?",
           message: `This moves every saved plot from ${userLabel(sourceUser)} onto ${userLabel(
             targetUser
           )}, then permanently deletes the ${userLabel(sourceUser)} account. This can't be undone.`,
           confirmLabel: "Merge Accounts",
-          destructive: true,
         });
         if (!ok) return;
         try {
@@ -165,11 +170,10 @@ export async function render(container) {
             disabled: isSelf,
             title: isSelf ? "You can't delete your own account." : "",
             onclick: async () => {
-              const ok = await showConfirm({
+              const ok = await doubleConfirm({
                 title: "Delete This Account?",
                 message: `This permanently deletes ${u.name || u.email}'s account and all of their cloud-saved plots. This can't be undone.`,
                 confirmLabel: "Delete Account",
-                destructive: true,
               });
               if (!ok) return;
               try {

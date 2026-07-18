@@ -6,6 +6,13 @@
 // on Plot Summary (params.enterWorkspaceOnSelect === true); from inside
 // the workspace menu it just navigates in place (also to Plot Summary,
 // since that's "opening a different saved plot" per the spec).
+//
+// A plot that moved here from a deleted/merged-away account (see
+// adminUsers.js's handleMerge() and deleteAccount.js) carries a
+// transferredFrom field and shows a "From {name}" badge, rather than
+// silently blending into whoever's library it landed in — deliberately
+// NOT re-sorted into its own group, so the list stays in its normal
+// most-recently-touched order regardless of where each plot came from.
 
 import { h, mount, clear } from "../dom.js";
 import * as trialStore from "../stores/trialStore.js";
@@ -67,6 +74,13 @@ export function render(container, params) {
       if (trial.header.state) subtitleParts.push(trial.header.state);
       subtitleParts.push(`${trial.entries.length} ${trial.entries.length === 1 ? "entry" : "entries"}`);
 
+      // Set once, server-side, whenever a plot moves accounts — either an
+      // admin's "Merge Into…" (adminUsers.js's handleMerge()) or a user's
+      // own "Delete My Account" (deleteAccount.js) — so it's still
+      // identifiable as having belonged to a teammate rather than being
+      // silently absorbed into whoever's library it landed in.
+      const transferredFrom = trial.transferredFrom;
+
       const row = h("div", { className: "entry-row" }, [
         h(
           "button",
@@ -83,6 +97,13 @@ export function render(container, params) {
               h("span", { className: "entry-row-title" }, [
                 trial.header.cooperatorName.trim() || "Untitled Plot",
                 isCurrent ? h("span", { className: "badge-current" }, "Current") : null,
+                transferredFrom
+                  ? h(
+                      "span",
+                      { className: "badge-transferred", title: `Transferred from ${transferredFrom.email}` },
+                      `From ${transferredFrom.name || transferredFrom.email}`
+                    )
+                  : null,
               ]),
               h("span", { className: "entry-row-subtitle" }, subtitleParts.join(" • ")),
             ]),

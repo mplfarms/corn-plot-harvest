@@ -11,8 +11,12 @@ import * as brandStore from "../stores/brandStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
 import * as themeStore from "../stores/themeStore.js";
 import * as authStore from "../authStore.js";
+import { doubleConfirm } from "../components/doubleConfirm.js";
+import { showToast } from "../components/toast.js";
 import { APP_VERSION } from "../../version.js";
 import { navigate } from "../router.js";
+
+const DELETE_ACCOUNT_ENDPOINT = "/.netlify/functions/deleteAccount";
 
 const MODES = [
   { value: "light", label: "Light" },
@@ -92,6 +96,45 @@ export function render(container) {
 
   // ---- Account ----
   const user = authStore.getUser();
+
+  // Self-service account deletion (netlify/functions/deleteAccount.js):
+  // every saved plot transfers to the farm's designated admin account
+  // first (tagged with transferredFrom — see savedPlots.js's badge), so
+  // nothing is lost, then this account is gone for good. Executes
+  // immediately once confirmed (no admin approval step, per explicit
+  // request) — doubleConfirm()'s two-step "type DELETE" dialog is the
+  // safeguard against an accidental tap, not a review gate. The one
+  // account this can never be used on (the farm's bootstrap admin) just
+  // gets a clear error back from the server if attempted — not worth
+  // special-casing client-side for what's a single, well-known account.
+  async function handleDeleteMyAccount() {
+    const ok = await doubleConfirm({
+      title: "Delete My Account?",
+      message:
+        "This permanently deletes your account. Every plot you've saved to the cloud transfers to your farm's admin account first, so nothing is lost — but you'll be signed out immediately and this account itself can't be recovered.",
+      confirmLabel: "Delete My Account",
+    });
+    if (!ok) return;
+    try {
+      const res = await fetch(DELETE_ACCOUNT_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Server returned ${res.status}`);
+      authStore.signOut();
+      navigate("account");
+      showToast(
+        `Your account was deleted. ${body.transferredCount} saved plot${
+          body.transferredCount === 1 ? "" : "s"
+        } transferred to ${body.transferredToName}.`
+      );
+    } catch (e) {
+      showToast(`Couldn't delete your account: ${e.message}`, { type: "error" });
+    }
+  }
+
   const accountCard = h(
     "section",
     { className: "card account-card" },
@@ -115,6 +158,15 @@ export function render(container) {
             },
             "Sign Out"
           ),
+          h(
+            "button",
+            {
+              type: "button",
+              className: "btn btn-danger",
+              onclick: handleDeleteMyAccount,
+            },
+            "Delete My Account"
+          ),
         ]
       : [
           h("h3", { className: "section-header" }, "Account"),
@@ -130,6 +182,22 @@ export function render(container) {
           ),
         ]
   );
+
+  // Available to every signed-in user, not just admins — the Help screen
+  // (help.js) itself has a section describing admin-only features, but
+  // reading about them doesn't require being one.
+  const helpCard = h("section", { className: "card" }, [
+    h("h3", { className: "section-header" }, "Help"),
+    h(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-secondary btn-block",
+        onclick: () => navigate("help"),
+      },
+      "Help & How-To Guide"
+    ),
+  ]);
 
   // Admin-only — visible only when the signed-in user's own stored record
   // has isAdmin === true (server re-checks this on every call anyway; see
@@ -158,6 +226,7 @@ export function render(container) {
       appearanceCard,
       brandCard,
       accountCard,
+      helpCard,
       manageUsersCard,
       versionFooter,
     ]),

@@ -24,6 +24,8 @@ import * as savedPlots from "./screens/savedPlots.js";
 import * as settingsScreen from "./screens/settings.js";
 import * as adminPlots from "./screens/adminPlots.js";
 import * as manageUsers from "./screens/manageUsers.js";
+import * as quickStart from "./screens/quickStart.js";
+import * as help from "./screens/help.js";
 import * as authStore from "./authStore.js";
 
 const routes = {
@@ -39,6 +41,8 @@ const routes = {
   settings: settingsScreen,
   "admin-plots": adminPlots,
   "manage-users": manageUsers,
+  "quick-start": quickStart,
+  help: help,
 };
 
 let appContainer = null;
