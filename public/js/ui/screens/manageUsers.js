@@ -1,23 +1,32 @@
 // src/ui/screens/manageUsers.js
 //
 // Admin-only screen: list every registered account and promote/demote
-// admin status or delete an account, via netlify/functions/adminUsers.js.
-// Reachable only from Settings' "Manage Users" row, which itself only
-// renders when authStore.isAdmin() is true — but this screen re-checks
-// independently since the server is the real authority (see
-// adminUsers.js's requireAdmin() — every action re-checks the caller's
-// own isAdmin flag on every single call).
+// admin status, delete an account, or merge one account into another,
+// via netlify/functions/adminUsers.js. Reachable only from Settings'
+// "Manage Users" row, which itself only renders when
+// authStore.isAdmin() is true — but this screen re-checks independently
+// since the server is the real authority (see adminUsers.js's
+// requireAdmin() — every action re-checks the caller's own isAdmin flag
+// on every single call).
 //
 // Deleting an account also deletes that account's cloud-saved plots
 // (enforced server-side in adminUsers.js's handleDelete) — the confirm
 // dialog here says so explicitly. An admin can't delete their own
 // account (also enforced server-side), so a team can never accidentally
 // lock itself out of admin access.
+//
+// "Merge Into…" exists for the common real case: the same person shows
+// up as two separate accounts on the All Plots (Admin) screen because
+// they signed in with a different email on a different device (see
+// adminUsers.js's handleMerge() comment) — this moves the source
+// account's saved plots onto the chosen target account and deletes the
+// source account, so it stops showing up as a duplicate.
 
 import { h, mount, clear } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
 import { showConfirm } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
+import { openSearchListPicker } from "../components/searchListPicker.js";
 import * as authStore from "../authStore.js";
 import { navigate } from "../router.js";
 
@@ -69,6 +78,54 @@ export async function render(container) {
 
       const selfEmail = (authStore.getUser() || {}).email;
 
+      function userLabel(u) {
+        return u.name && u.name !== u.email ? `${u.name} (${u.email})` : u.email;
+      }
+
+      async function handleMergeInto(sourceUser) {
+        const others = users.filter((other) => other.email !== sourceUser.email);
+        if (others.length === 0) {
+          showToast("There's no other account to merge into.", { type: "error" });
+          return;
+        }
+        const labelToUser = new Map(others.map((other) => [userLabel(other), other]));
+        openSearchListPicker({
+          title: `Merge "${userLabel(sourceUser)}" Into…`,
+          value: "",
+          options: Array.from(labelToUser.keys()),
+          // The modal system (modal.js) is a single shared overlay, not a
+          // stack — selectAndClose() inside the picker calls onChange
+          // (this function) and THEN immediately calls the picker's own
+          // modal.close(), which clears the overlay. Opening the confirm
+          // dialog synchronously in here would mount it into that same
+          // overlay only to have the picker's close() wipe it out right
+          // after. Deferring to the next tick lets the picker's close()
+          // run first, so the confirm dialog mounts into an overlay
+          // that's actually empty and stays put.
+          onChange: (label) => setTimeout(() => handleMergeTargetChosen(sourceUser, labelToUser.get(label)), 0),
+        });
+      }
+
+      async function handleMergeTargetChosen(sourceUser, targetUser) {
+        if (!targetUser) return;
+        const ok = await showConfirm({
+          title: "Merge Accounts?",
+          message: `This moves every saved plot from ${userLabel(sourceUser)} onto ${userLabel(
+            targetUser
+          )}, then permanently deletes the ${userLabel(sourceUser)} account. This can't be undone.`,
+          confirmLabel: "Merge Accounts",
+          destructive: true,
+        });
+        if (!ok) return;
+        try {
+          const result = await callAdminUsers({ action: "merge", sourceEmail: sourceUser.email, targetEmail: targetUser.email });
+          showToast(`Merged into ${userLabel(targetUser)} — ${result.mergedTrialCount} total saved plot(s) now on that account.`);
+          await load();
+        } catch (e) {
+          showToast(`Couldn't merge: ${e.message}`, { type: "error" });
+        }
+      }
+
       for (const u of users) {
         const isSelf = u.email === selfEmail;
         const toggleBtn = h(
@@ -86,6 +143,18 @@ export async function render(container) {
             },
           },
           u.isAdmin ? "Remove Admin" : "Make Admin"
+        );
+
+        const mergeBtn = h(
+          "button",
+          {
+            type: "button",
+            className: "btn btn-secondary",
+            disabled: users.length < 2,
+            title: users.length < 2 ? "There's no other account to merge into." : "",
+            onclick: () => handleMergeInto(u),
+          },
+          "Merge Into…"
         );
 
         const deleteBtn = h(
@@ -126,7 +195,7 @@ export async function render(container) {
                 u.isAdmin ? "Admin" : "Standard user"
               ),
             ]),
-            h("div", { className: "manage-user-actions" }, [toggleBtn, deleteBtn]),
+            h("div", { className: "manage-user-actions" }, [toggleBtn, mergeBtn, deleteBtn]),
           ])
         );
       }
