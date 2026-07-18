@@ -37,6 +37,19 @@ function sub(title) {
   return h("h4", { className: "help-subheading" }, title);
 }
 
+// A labeled contact row ("Email: mikelage@republicseed.com") whose value
+// is itself a tap-to-act link — tel: opens the phone's own dialer with
+// the number pre-filled, mailto: opens the device's default mail app
+// with a blank new message already addressed. Both are standard browser
+// link schemes, so this needs no extra permissions or app code — the
+// OS/browser handles the hand-off entirely.
+function contactRow(label, displayValue, href) {
+  return h("p", { className: "help-p help-contact-row" }, [
+    h("strong", {}, `${label}: `),
+    h("a", { className: "help-link", href }, displayValue),
+  ]);
+}
+
 function helpSection(title, children, opts) {
   return h(
     "details",
@@ -88,11 +101,17 @@ export function render(container) {
       sub("Cooperator"),
       p("The grower's name and location: Name, Address, State, County, City, and Zip. Picking a State first narrows down the County list to match."),
       sub("GPS Location"),
-      p("Tap “Use Device Location or Enter Manually” and your phone/tablet will ask permission to use your location. Allow it, and your coordinates fill in automatically — the app also looks up the soil type at that spot for you."),
-      p("Prefer not to use GPS? Just type the Latitude and Longitude directly into those two fields instead — nothing requires the automatic version to work."),
+      p("For a brand-new plot with no location saved yet, the app asks for your location automatically the moment you open Plot Details — you don't need to tap anything first. Recommended: tap Allow when your phone or tablet asks. It's faster and far more accurate than typing coordinates in by hand, and it's what triggers the automatic Soil Type lookup described just below."),
+      p("Once allowed, your Latitude and Longitude fill in on their own, along with roughly how accurate the reading is (for example, “Location captured (±5m)”)."),
+      p("Moved to a different field, or want to re-capture your location later? Tap “Use Device Location or Enter Manually” again any time. The automatic request only happens once, for a brand-new plot with nothing saved yet — reopening an existing plot never overwrites a location you've already set unless you tap that button yourself."),
+      p("Prefer not to use GPS at all? Just type the Latitude and Longitude directly into those two fields by hand instead — nothing else in the app requires the automatic version to work, though see the Soil Type note below for the one tradeoff of doing it that way."),
       p("If you accidentally tapped “Don't Allow” on the location prompt: the fastest fix is to just type the coordinates in by hand. To let the app try again automatically, you'll need to re-enable Location for this app/site in your phone or browser's own settings (this varies by phone — look for Settings → the app or website → Location/Permissions). See Troubleshooting below for more."),
+      sub("Soil Type"),
+      p("Right after your location is captured automatically via GPS, the app looks up the most common soil type at that exact spot (using USDA soil survey data) and fills in the Soil Type field on the Planting section for you — one less thing to look up or guess at. You'll see a note like “Soil type set to [name]” appear under GPS Location when this happens."),
+      p("This automatic lookup only runs when your location comes from the GPS button — if you type your Latitude and Longitude in by hand instead, Soil Type is left for you to pick manually. Either way, you can always open the Soil Type list yourself afterward and choose a different value; the automatic fill is just a starting point, never a lock."),
+      p("Occasionally the app can't confidently match a soil type for a given spot (this happens in areas with less detailed survey data available) — when that happens it says so plainly and simply leaves Soil Type for you to select manually, the same as if GPS hadn't been used at all."),
       sub("Planting"),
-      p("Tillage, Irrigation, Previous Crop, Planting Population, and Date Planted."),
+      p("Tillage, Irrigation, Soil Type (see above), Previous Crop, Planting Population, and Date Planted."),
       sub("Harvest"),
       p("Who collected the data (Collected By), their Phone and Email, and the Date Harvested."),
       sub("Yield Calculation"),
@@ -104,11 +123,18 @@ export function render(container) {
       sub("Identity"),
       p("Brand/Company, Hybrid, Trait, Seed Treatment, and Relative Maturity (RM) — these describe which product this entry is."),
       sub("Yield Measurements"),
-      p("You have two options here, and you only need one of them:"),
+      p("There are two different ways to get a Dry Yield number onto an entry — use whichever one fits how you actually collected your data. You never need to do both."),
+      sub("Option 1: Enter it yourself (yield monitor, scale ticket, or another app)"),
+      p("If you already have a yield number from somewhere else — a combine's yield monitor, a scale ticket, a third-party yield-mapping app, or your own math — just type it straight into the Dry Yield (bu/ac) field. The app uses exactly what you type, with no calculation or adjustment applied, so this is the fastest option any time you already trust the number."),
+      sub("Option 2: Let the app calculate it for you"),
+      p("Don't have a Dry Yield number yet? Leave that field blank and fill in your raw sample measurements instead, and the app does the math automatically:"),
       ul([
-        "Already know the Dry Yield in bu/ac? Type it directly into that field and you're done.",
-        "Don't have it calculated yet? Fill in Sample Net Wt., Moisture %, Test Weight, Strip Length, Number of Rows, and Width instead, and the app calculates Dry Yield for you automatically.",
+        "Sample Net Wt. (lbs) — the weight of the harvested sample.",
+        "Moisture % — the moisture reading at harvest.",
+        "Strip Length (ft), Number of Rows, and Width (in) — how much ground that sample came from.",
       ]),
+      p("The app converts those into bu/ac for you, adjusted to the standard 15.5% base moisture — nothing to calculate by hand. Test Weight is also on this screen and worth recording for your own records, but it isn't part of the Dry Yield formula itself."),
+      p("You can switch between the two at any time: type a number into Dry Yield to override whatever the app calculated, or clear that field back to empty to return to the automatic calculation from your raw measurements. The field's placeholder text shows you the calculated value even while it's blank, so you can always see what the app would use."),
       p("Comments at the bottom is a free-text spot for notes on that specific hybrid."),
       p("Back on the Plot Hybrids list: tap any row to edit it, use the ↑ / ↓ arrows to reorder entries, or the 🗑 trash icon to remove one."),
     ]),
@@ -181,6 +207,13 @@ export function render(container) {
       p("They transfer automatically to your farm's admin account before your account is removed — nothing is thrown away. See “Delete My Account” under Settings above."),
       sub("Still stuck?"),
       p("Ask whoever manages this app for your team (your admin) — they can look up your account and saved plots from their own Manage Users and All Plots screens."),
+    ]),
+
+    helpSection("Contact Us", [
+      p("Have a question this guide didn't answer, found something that doesn't seem right, or just want to talk to a person? Reach out directly:"),
+      contactRow("Email", "mikelage@republicseed.com", "mailto:mikelage@republicseed.com"),
+      contactRow("Phone", "(712) 420-2348", "tel:+17124202348"),
+      p("Tapping either one opens it directly — the email address starts a new message in your phone or computer's own mail app, and the phone number dials right from your device."),
     ]),
   ];
 

@@ -459,7 +459,7 @@ h3.section-header:first-child {
    one consistent "Republic blue" rather than a plain white page with a
    blue logo dropped on top. */
 .launch-screen {
-  background: linear-gradient(160deg, #eef4fb 0%, #c7dbf0 100%);
+  background: linear-gradient(160deg, #dfe9f6 0%, #aecbe9 100%);
   color: #16241c;
   justify-content: flex-start;
   padding-top: env(safe-area-inset-top);
@@ -1919,6 +1919,17 @@ h3.section-header:first-child {
   line-height: 1.45;
 }
 
+.quick-start-step-tip {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  background: var(--highlight);
+  color: #16241c;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .quick-start-more-help {
   margin-top: 18px;
   text-align: center;
@@ -2003,4 +2014,14 @@ h3.section-header:first-child {
 
 .help-subheading:first-child {
   margin-top: 0;
+}
+
+.help-link {
+  color: var(--accent-strong);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.help-contact-row {
+  font-size: 1rem;
 }
