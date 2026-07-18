@@ -244,14 +244,15 @@ a {
   line-height: 1;
 }
 
-/* Home and Back are icon-only now (⌂, ‹ — no text label), sized to match
-   the Settings gear (1.3rem) so all three chrome buttons read as one
-   consistent set. Removing the old text labels is what makes this
-   possible without any overlap risk: a bare glyph at this size never
-   comes close to the center title's space the way "⌂ Home"/"‹ Back"
-   used to. */
+/* Home and Back are icon-only (⌂, ‹ — no text label). Deliberately a
+   bit bigger than the Settings gear (1.3rem) now — glyphs at the same
+   font-size don't read as visually equal weight (⌂/‹ have less ink than
+   ⚙), so a small bump keeps all three feeling like one consistent set
+   rather than Home/Back looking smaller. Still nowhere near crowding the
+   center title: a bare glyph at this size is a fraction of the width
+   "⌂ Home"/"‹ Back" used to take. */
 .top-bar-btn-nav {
-  font-size: 1.3rem;
+  font-size: 1.5rem;
 }
 
 .sync-icon-synced {
