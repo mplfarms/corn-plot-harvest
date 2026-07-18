@@ -29,6 +29,10 @@
 //     which then continues into the Home Screen itself once a brand is
 //     chosen (see that file)
 // (see brand.js's brandIdForEmail()).
+//
+// Also links to quickStart.js's short getting-started guide (see
+// router.js's mandatory-sign-in guard, which specifically exempts that
+// one route so it works before signing in too).
 
 import { h, mount } from "../dom.js";
 import { showPrompt } from "../components/modal.js";
@@ -150,6 +154,19 @@ export function render(container) {
         "p",
         { className: "field-note launch-note" },
         "Sign in with your email to access your saved plots from any phone, tablet, or computer. You'll stay signed in on this device."
+      ),
+      // Deliberately reachable before signing in — someone brand new to
+      // the app may not even be sure what to type above yet. router.js
+      // exempts "quick-start" from its mandatory-sign-in guard
+      // specifically so this works; see that file's comment.
+      h(
+        "button",
+        {
+          type: "button",
+          className: "launch-quick-start-link",
+          onclick: () => navigate("quick-start"),
+        },
+        "📖 Quick Start Guide"
       ),
     ]),
   ]);

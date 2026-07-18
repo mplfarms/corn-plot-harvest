@@ -1,16 +1,26 @@
 // src/ui/screens/quickStart.js
 //
 // A short, plain-language "how do I even start" guide — reachable from a
-// link on the branded Home Screen (plotChooser.js), for someone opening
-// the app for the very first time and not sure what to tap. Deliberately
-// short: 8 steps, no jargon, nothing that requires scrolling through
-// paragraphs to find. The full, section-by-section Help screen
-// (help.js, reachable from Settings) covers every field and every
-// screen in much more depth — this is meant to get a brand-new user
-// through their first plot, not to be a reference.
+// link on the branded Home Screen (plotChooser.js) AND from the splash/
+// sign-in screen itself (accountScreen.js), for someone opening the app
+// for the very first time and not sure what to tap, even before they've
+// signed in. Deliberately short: 8 steps, no jargon, nothing that
+// requires scrolling through paragraphs to find. The full,
+// section-by-section Help screen (help.js, reachable from Settings)
+// covers every field and every screen in much more depth — this is
+// meant to get a brand-new user through their first plot, not to be a
+// reference.
+//
+// This is the one screen besides "account" itself that router.js's
+// mandatory-sign-in guard exempts — see its comment — so its own Back
+// button has to pick the right destination depending on whether that
+// guard would otherwise have bounced the visitor here: signed-in users
+// came from the Home Screen and return there; a signed-out visitor came
+// straight from the splash screen and returns there instead.
 
 import { h, mount } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
+import * as authStore from "../authStore.js";
 import { navigate } from "../router.js";
 
 const STEPS = [
@@ -51,7 +61,7 @@ const STEPS = [
 export function render(container) {
   const topBar = createTopBar({
     title: "Quick Start Guide",
-    onBack: () => navigate("plot-chooser"),
+    onBack: () => navigate(authStore.getUser() ? "plot-chooser" : "account"),
   });
 
   const stepsList = h(

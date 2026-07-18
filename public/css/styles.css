@@ -450,11 +450,16 @@ h3.section-header:first-child {
 
 /* ---------- launch screen (Home / sign in with email) ---------- */
 
-/* Fixed white background regardless of light/dark mode — this is the
+/* Fixed light-blue gradient regardless of light/dark mode — this is the
    app's title/brand splash, same idea as brand-select-screen forcing its
-   own navy background below rather than following --bg. */
+   own navy background below rather than following --bg. The gradient is
+   a much lighter tint of the same navy blue the Republic shield artwork
+   itself uses (#0c2336 — see .launch-form-body .btn-primary below),
+   rather than an unrelated color, so the page and the shield read as
+   one consistent "Republic blue" rather than a plain white page with a
+   blue logo dropped on top. */
 .launch-screen {
-  background: #ffffff;
+  background: linear-gradient(160deg, #eef4fb 0%, #c7dbf0 100%);
   color: #16241c;
   justify-content: flex-start;
   padding-top: env(safe-area-inset-top);
@@ -509,6 +514,24 @@ h3.section-header:first-child {
 
 .launch-form-body .btn-primary:active {
   background: #16344c;
+}
+
+/* Informational, not part of the sign-in form itself — styled as a
+   plain underlined link (same idea as .home-btn-ghost on the Home
+   Screen) rather than another bordered button, in the same navy blue
+   as the shield/primary button so it still reads as intentional rather
+   than a stray gray link. */
+.launch-quick-start-link {
+  background: transparent;
+  border: none;
+  color: #0c2336;
+  text-decoration: underline;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 10px 8px;
+  min-height: 44px;
+  cursor: pointer;
+  align-self: center;
 }
 
 /* ---------- manage users (admin) ---------- */
@@ -1237,50 +1260,6 @@ h3.section-header:first-child {
   min-width: 32px;
   min-height: 32px;
   font-size: 0.9rem;
-}
-
-/* ---------- pull-to-refresh ---------- */
-
-.pull-refresh-indicator {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding-top: env(safe-area-inset-top);
-  background: var(--chrome);
-  color: #ffffff;
-  font-weight: 600;
-  font-size: 0.85rem;
-  z-index: 25;
-  pointer-events: none;
-  transform: translateY(-56px);
-}
-
-.pull-refresh-ready {
-  background: var(--accent-light);
-}
-
-.pull-refresh-icon {
-  font-size: 1.1rem;
-  display: inline-block;
-}
-
-.pull-refresh-icon-spin {
-  animation: pull-refresh-spin 0.8s linear infinite;
-}
-
-@keyframes pull-refresh-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ---------- entries / saved plots lists ---------- */

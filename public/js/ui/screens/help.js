@@ -80,7 +80,6 @@ export function render(container) {
         "⚙ (gear) — opens Settings.",
       ]),
       p("On the Plot Workspace screen, you'll also see a ⇄ icon next to the gear. That's your sync status — green means everything's safely backed up to the cloud, red means it hasn't synced yet (tap it to try again). More on this under “Staying in Sync” below."),
-      p("On a phone or tablet, you can also pull down from the very top of any screen (like refreshing an email inbox) to refresh — it re-syncs your plots and reloads whatever screen you're on."),
     ]),
 
     helpSection("Starting a New Plot", [
@@ -143,7 +142,6 @@ export function render(container) {
     helpSection("Staying in Sync Across Devices", [
       p("As long as you're signed in, everything you enter automatically backs up to the cloud and stays in sync across every phone, tablet, or computer you sign into with that same email."),
       p("The ⇄ icon on the Plot Workspace screen shows whether that's currently up to date (green) or not (red — tap it to retry). If you're ever offline, don't worry: nothing is lost, it just catches up the next time you have a connection and tap that icon (or open the app again)."),
-      p("On a touchscreen, you can also pull down from the top of any screen to trigger a sync and refresh manually."),
     ]),
 
     helpSection("Settings", [

@@ -10,7 +10,10 @@
 // than "account" itself requires a session, enforced here rather than
 // per-screen so it holds regardless of how a hash got set (a typed-in
 // URL, a stale PWA launch shortcut, browser back/forward, etc.), not
-// just normal in-app navigation.
+// just normal in-app navigation. "quick-start" is the one other
+// exception — the splash/sign-in screen links straight to it (see
+// accountScreen.js) so someone can read "how do I even use this app"
+// before they've signed in at all, not just after.
 
 import * as brandSelect from "./screens/brandSelect.js";
 import * as accountScreen from "./screens/accountScreen.js";
@@ -58,10 +61,10 @@ function renderCurrent() {
   if (!appContainer) return;
   const path = currentPath() || "account";
 
-  // Every screen except the launch/sign-in screen itself requires a
-  // session now — bounce back to it rather than rendering whatever the
-  // hash happened to point at.
-  if (path !== "account" && !authStore.getUser()) {
+  // Every screen except the launch/sign-in screen (and its linked Quick
+  // Start Guide) requires a session now — bounce back to it rather than
+  // rendering whatever the hash happened to point at.
+  if (path !== "account" && path !== "quick-start" && !authStore.getUser()) {
     window.location.hash = "#/account";
     return;
   }
@@ -103,16 +106,5 @@ export function navigate(path, params) {
 export function initRouter(container) {
   appContainer = container;
   window.addEventListener("hashchange", renderCurrent);
-  renderCurrent();
-}
-
-/**
- * Re-renders whatever screen the hash currently points at, without
- * changing the route or its in-memory params. Used by pullToRefresh.js so
- * a swipe-down-to-refresh picks up fresh server data on screens that load
- * it on render (adminPlots.js, manageUsers.js), not just the cloud-synced
- * trial library.
- */
-export function refreshCurrent() {
   renderCurrent();
 }
