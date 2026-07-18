@@ -101,3 +101,14 @@ export function initRouter(container) {
   window.addEventListener("hashchange", renderCurrent);
   renderCurrent();
 }
+
+/**
+ * Re-renders whatever screen the hash currently points at, without
+ * changing the route or its in-memory params. Used by pullToRefresh.js so
+ * a swipe-down-to-refresh picks up fresh server data on screens that load
+ * it on render (adminPlots.js, manageUsers.js), not just the cloud-synced
+ * trial library.
+ */
+export function refreshCurrent() {
+  renderCurrent();
+}

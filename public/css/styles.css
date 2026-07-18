@@ -1227,6 +1227,50 @@ h3.section-header:first-child {
   font-size: 0.9rem;
 }
 
+/* ---------- pull-to-refresh ---------- */
+
+.pull-refresh-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-top: env(safe-area-inset-top);
+  background: var(--chrome);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  z-index: 25;
+  pointer-events: none;
+  transform: translateY(-56px);
+}
+
+.pull-refresh-ready {
+  background: var(--accent-light);
+}
+
+.pull-refresh-icon {
+  font-size: 1.1rem;
+  display: inline-block;
+}
+
+.pull-refresh-icon-spin {
+  animation: pull-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes pull-refresh-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ---------- entries / saved plots lists ---------- */
 
 .entries-list {

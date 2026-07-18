@@ -12,6 +12,7 @@ import * as authStore from "./ui/authStore.js";
 import "./ui/stores/themeStore.js"; // self-applies persisted theme mode on load
 import "./ui/stores/cloudSyncStore.js"; // wires up push/pull subscriptions on load
 import { initRouter } from "./ui/router.js";
+import { initPullToRefresh } from "./ui/components/pullToRefresh.js";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -40,6 +41,7 @@ async function start() {
 
   const container = document.getElementById("app");
   initRouter(container);
+  initPullToRefresh();
 }
 
 start();

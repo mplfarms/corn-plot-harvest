@@ -6,5 +6,14 @@
 // (this one is purely a label for troubleshooting with the user; sw.js's
 // controls actual cache invalidation) but keeping them in lockstep makes
 // "what build are you on" a quick, unambiguous question to answer.
+//
+// Naming convention (per explicit request): "v26.<build>" — the "26"
+// stays fixed, "<build>" increments by one on every delivered build,
+// with " (Beta)" appended until told otherwise. sw.js's CACHE_VERSION
+// mirrors the same "v26.<build>" number but stays free of spaces/
+// parens (it's used to build an internal cache name / can end up in a
+// filename, not shown to the user), so the two stay in lockstep without
+// literally matching character-for-character. Next build after this one
+// is v26.47.
 
-export const APP_VERSION = "v44";
+export const APP_VERSION = "v26.46 (Beta)";
