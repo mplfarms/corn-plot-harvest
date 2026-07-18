@@ -317,10 +317,23 @@ export function render(container, params) {
     "Share This Plot"
   );
 
+  const helpBtn = h(
+    "button",
+    {
+      type: "button",
+      className: "top-bar-btn top-bar-btn-help",
+      "aria-label": "How to read these results",
+      title: "How to read these results",
+      onclick: () => navigate("plot-summary-help"),
+    },
+    h("span", { className: "top-bar-btn-help-badge" }, "?")
+  );
+
   const topBar = createTopBar({
     title: "Plot Summary",
     onBack: () => navigate("workspace"),
     backLabel: "Menu",
+    right: helpBtn,
   });
 
   // ---- Header card ----

@@ -6,7 +6,7 @@
 // app shell is precached on install; old-versioned caches are purged on
 // activate.
 
-const CACHE_VERSION = "v26.53-beta";
+const CACHE_VERSION = "v26.55-beta";
 const CACHE_NAME = `corn-plot-harvest-${CACHE_VERSION}`;
 
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
@@ -49,6 +49,7 @@ const PRECACHE_URLS = [
   "/js/ui/screens/manageUsers.js",
   "/js/ui/screens/plotChooser.js",
   "/js/ui/screens/plotSummary.js",
+  "/js/ui/screens/plotSummaryHelp.js",
   "/js/ui/screens/quickStart.js",
   "/js/ui/screens/savedPlots.js",
   "/js/ui/screens/settings.js",

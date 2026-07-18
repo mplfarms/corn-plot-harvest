@@ -147,6 +147,7 @@ export function render(container) {
       p("If two or more brands are represented with multiple hybrids each, you'll also see an average for each brand."),
       p("In the Ranked Results list, each hybrid gets a colored number badge: green means it came in well above the plot's average, yellow means well below, and gray means close to average — this color reflects how that hybrid actually performed, not just where it landed in the ranking."),
       p("Tap “Edit This Plot” to jump back to Plot Hybrids and keep editing."),
+      p("Want more detail on any of this? Tap the “?” icon next to the gear at the top of the Plot Summary screen for a deeper walkthrough of the tabs, the box plot, and the rank badges, right there on the results screen."),
     ]),
 
     helpSection("Sharing & Exporting Your Results", [

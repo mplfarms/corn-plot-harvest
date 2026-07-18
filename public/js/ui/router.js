@@ -29,6 +29,7 @@ import * as adminPlots from "./screens/adminPlots.js";
 import * as manageUsers from "./screens/manageUsers.js";
 import * as quickStart from "./screens/quickStart.js";
 import * as help from "./screens/help.js";
+import * as plotSummaryHelp from "./screens/plotSummaryHelp.js";
 import * as authStore from "./authStore.js";
 
 const routes = {
@@ -46,6 +47,7 @@ const routes = {
   "manage-users": manageUsers,
   "quick-start": quickStart,
   help: help,
+  "plot-summary-help": plotSummaryHelp,
 };
 
 let appContainer = null;
