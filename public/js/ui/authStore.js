@@ -5,8 +5,11 @@
 // passcode either — deliberately as simple as possible, since none of
 // this data is sensitive (see auth.js and _shared.js's top comment for
 // the resulting tradeoff). There is no JWT and no server-side session —
-// a "session" here is just {name, email, isAdmin} (name defaults to the
-// email itself server-side — see auth.js), cached in localStorage. Every
+// a "session" here is just whatever the server hands back for the
+// account — {name, email, isAdmin, firstName, lastName, mobileNumber}
+// (name defaults to the email itself server-side — see auth.js;
+// firstName/lastName/mobileNumber default to empty strings for accounts
+// that never answered the "Welcome!" prompt), cached in localStorage. Every
 // other module that needs to prove who's calling (cloudSyncStore.js,
 // adminPlots.js, manageUsers.js) reads the email from getCredentials()
 // here and sends it explicitly on every request; the server re-checks
@@ -65,20 +68,21 @@ export function getCredentials() {
 /**
  * Signs in, creating the account on first use (see auth.js — sign-up and
  * sign-in are the same call). Persists the resulting session to
- * localStorage on success. `name` is optional and normally omitted — the
- * sign-in form only collects an email; accountScreen.js makes a second
- * call with a name once the user answers the "what's your name?" prompt
- * that's shown when `isNewUser` comes back true.
- * @param {{email: string, name?: string}} params
+ * localStorage on success. `name`/`firstName`/`lastName`/`mobileNumber`
+ * are all optional and normally omitted — the sign-in form only collects
+ * an email; accountScreen.js makes a second call with these once the user
+ * answers the "Welcome!" prompt that's shown when `isNewUser` comes back
+ * true (see promptNewUserDetails() in newUserDetailsModal.js).
+ * @param {{email: string, name?: string, firstName?: string, lastName?: string, mobileNumber?: string}} params
  * @returns {Promise<{ok: true, user: Object, isNewUser: boolean}|{ok: false, error: string}>}
  */
-export async function signIn({ email, name }) {
+export async function signIn({ email, name, firstName, lastName, mobileNumber }) {
   let res;
   try {
     res = await fetch("/.netlify/functions/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name }),
+      body: JSON.stringify({ email, name, firstName, lastName, mobileNumber }),
     });
   } catch (e) {
     return { ok: false, error: "Couldn't reach the server — check your connection and try again." };

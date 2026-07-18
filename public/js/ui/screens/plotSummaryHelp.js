@@ -70,6 +70,7 @@ export function render(container) {
       p("Trial Mean is the plot's average Dry Yield across every entry that has a complete, usable number — this is the number every individual hybrid gets compared against for its rank badge color."),
       p("Entries is simply how many hybrids have a complete enough Dry Yield to be counted — an entry missing required measurements (and with nothing typed into Dry Yield directly) won't factor into the Mean, CV, or box plot, though it still shows up at the bottom of the Ranked Results list."),
       p("CV (Coefficient of Variation) shows how spread out the results are, as a percentage of the mean. A lower CV means the hybrids in this plot performed close together; a higher CV means bigger swings between your best and worst performers. It needs at least 2 entries with a Dry Yield to calculate at all."),
+      p("As a rule of thumb, a CV under about 10% points to a clean, consistent plot — the field itself stayed even, so the differences between hybrids are more likely to be real and worth trusting. A noticeably higher CV means more variability crept in somewhere (soil, drainage, planting, and so on), so treat the rankings with a bit more caution rather than reading every spot as purely hybrid performance."),
     ]),
 
     helpSection("The Dry Yield Distribution Chart (Box & Whisker)", [

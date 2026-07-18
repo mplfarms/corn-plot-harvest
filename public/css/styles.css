@@ -358,6 +358,11 @@ h3.section-header:first-child {
   outline-offset: 1px;
 }
 
+.text-input:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 
 .text-area {
   min-height: 84px;
@@ -474,13 +479,16 @@ h3.section-header:first-child {
 /* Fixed light-blue gradient regardless of light/dark mode — this is the
    app's title/brand splash, same idea as brand-select-screen forcing its
    own navy background below rather than following --bg. The gradient is
-   a much lighter tint of the same navy blue the Republic shield artwork
-   itself uses (#0c2336 — see .launch-form-body .btn-primary below),
-   rather than an unrelated color, so the page and the shield read as
-   one consistent "Republic blue" rather than a plain white page with a
-   blue logo dropped on top. */
+   a tint of the same navy blue the Republic shield artwork itself uses
+   (#0c2336 — see .launch-form-body .btn-primary below), rather than an
+   unrelated color, so the page and the shield read as one consistent
+   "Republic blue" rather than a plain white page with a blue logo
+   dropped on top. Darkened twice by explicit request since first
+   introduced — most recently by ~25% (each stop's RGB channels × 0.75)
+   — still comfortably legible against the dark navy (#16241c) text/links
+   that sit directly on it. */
 .launch-screen {
-  background: linear-gradient(160deg, #c5d5ea 0%, #82a8d1 100%);
+  background: linear-gradient(160deg, #94a0b0 0%, #627e9d 100%);
   color: #16241c;
   justify-content: flex-start;
   padding-top: env(safe-area-inset-top);
@@ -492,6 +500,18 @@ h3.section-header:first-child {
   flex-direction: column;
   align-items: center;
   padding: max(28px, env(safe-area-inset-top)) 24px 12px;
+}
+
+/* The app's name, above the Republic shield. Same navy as the shield
+   artwork/primary button (#0c2336) rather than the screen's default text
+   color, so it reads as a wordmark rather than body copy. */
+.launch-title {
+  margin: 0 0 14px;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #0c2336;
 }
 
 .launch-shield {
@@ -1443,6 +1463,69 @@ h3.section-header:first-child {
 
 .admin-plot-row:active {
   opacity: 0.7;
+}
+
+/* All Plots (Admin) card header: name + email stacked on the left, a "☰"
+   details button pinned to the far right — replaces the old plain
+   single-line .section-header text for this screen only (still uses the
+   same base .section-header background/padding, just as a flex row
+   instead of a bare text node). */
+.admin-user-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-user-header-text {
+  min-width: 0;
+}
+
+.admin-user-header-name {
+  margin: 0;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-user-header-email {
+  margin: 2px 0 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-user-menu-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 1.2rem;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.admin-user-menu-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* The "☰" button's detail popover (showCustomModal) body — First Name,
+   Last Name, Email, Phone for that one user. */
+.admin-user-detail-row {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+
+.admin-user-detail-row:last-child {
+  margin-bottom: 0;
 }
 
 /* ---------- GPS / location status ---------- */
