@@ -32,13 +32,17 @@ const ZIP_CHIP_LIMIT = 8;
 // vary per plot, but this one no longer does.
 const BASE_MOISTURE_LOCKED = 15.5;
 
-// Collected By/Phone/Email are likewise locked, derived automatically from
-// whoever's account the plot belongs to rather than typed in by hand —
-// "Collected By" no longer means a collection METHOD (that was the old
-// wheel picker backed by listsStore.CATEGORY.COLLECTED_BY, left in place
-// unused rather than removed, in case it's needed again) but WHO: the
-// person's account name, "Last Name, First Name". See resolveActiveUser()
-// and lastFirstName() below.
+// Collected By/Phone/Email are pre-populated (once, while still blank)
+// from whoever's account the plot belongs to, but are editable fields from
+// there on — someone can collect on another person's behalf, or fix a
+// stale phone/email, without it getting silently overwritten on the next
+// visit to this screen. "Collected By" no longer means a collection
+// METHOD (that was the old wheel picker backed by
+// listsStore.CATEGORY.COLLECTED_BY, left in place unused rather than
+// removed, in case it's needed again) but WHO: the person's account name,
+// "Last Name, First Name", via resolveActiveUser()/lastFirstName() below.
+// Phone is normalized to "(555) 555-5555" as it's typed — see
+// formatPhoneNumber()/phoneInput() below.
 
 const US_STATES = [
   ["AL", "Alabama"], ["AK", "Alaska"], ["AZ", "Arizona"], ["AR", "Arkansas"], ["CA", "California"],
@@ -70,6 +74,37 @@ function textInput({ value, placeholder, oninput, type = "text", inputmode }) {
     value: value || "",
     placeholder: placeholder || "",
     oninput: (e) => oninput(e.target.value),
+  });
+}
+
+// Formats a US phone number as "(555) 555-5555", progressively, so it
+// reads correctly whether it's the fully pre-populated 10-digit value or
+// still being typed/edited by hand. Anything past 10 digits is dropped
+// rather than wrapping into an extension — this app has no field for one.
+function formatPhoneNumber(raw) {
+  const digits = String(raw || "").replace(/\D/g, "").slice(0, 10);
+  if (!digits) return "";
+  if (digits.length < 4) return `(${digits}`;
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+// A plain text input, but every keystroke reformats the field's own value
+// to "(555) 555-5555" as it's typed, and the value handed to `oninput` is
+// the formatted string (so it's what ends up stored and what appears
+// anywhere else this header field is shown, e.g. Plot Summary / exports).
+function phoneInput({ value, oninput }) {
+  return h("input", {
+    type: "tel",
+    inputmode: "tel",
+    className: "text-input",
+    value: formatPhoneNumber(value),
+    placeholder: "(555) 555-5555",
+    oninput: (e) => {
+      const formatted = formatPhoneNumber(e.target.value);
+      e.target.value = formatted;
+      oninput(formatted);
+    },
   });
 }
 
@@ -129,18 +164,24 @@ export function render(container) {
     trialStore.updateHeader({ baseMoisturePercent: BASE_MOISTURE_LOCKED });
   }
 
-  // Collected By/Phone/Email are likewise auto-corrected on every render
-  // to whatever the current account details resolve to (see
-  // resolveActiveUser() above) — same "keep exports/consumers correct"
-  // reasoning as baseMoisturePercent above. This also means a plot picks
-  // up a name/phone/email change made later in Settings automatically,
-  // the next time this screen is opened.
+  // Collected By/Phone/Email are pre-populated from the current account
+  // details (see resolveActiveUser() above) but are now plain editable
+  // fields, same as Name/Address/City — so this only fills them in the
+  // FIRST time (while still blank, e.g. a brand-new plot), and never
+  // overwrites a value that's already there. A later name/phone/email
+  // change in Settings no longer reaches back into existing plots; a
+  // manual edit made here is the one that sticks.
   const activeUser = resolveActiveUser();
   const derivedCollectedBy = lastFirstName(activeUser);
-  const derivedPhone = (activeUser && activeUser.mobileNumber) || "";
+  const derivedPhone = formatPhoneNumber((activeUser && activeUser.mobileNumber) || "");
   const derivedEmail = (activeUser && activeUser.email) || "";
-  if (header.collectedBy !== derivedCollectedBy || header.phone !== derivedPhone || header.email !== derivedEmail) {
-    trialStore.updateHeader({ collectedBy: derivedCollectedBy, phone: derivedPhone, email: derivedEmail });
+  const prefillPatch = {};
+  if (!header.collectedBy) prefillPatch.collectedBy = derivedCollectedBy;
+  if (!header.phone) prefillPatch.phone = derivedPhone;
+  if (!header.email) prefillPatch.email = derivedEmail;
+  if (Object.keys(prefillPatch).length > 0) {
+    trialStore.updateHeader(prefillPatch);
+    Object.assign(header, prefillPatch);
   }
 
   const topBar = createTopBar({
@@ -515,10 +556,11 @@ export function render(container) {
   ]);
 
   // ---- Harvest section ----
-  // Collected By/Phone/Email are locked, derived fields (see
-  // resolveActiveUser()/lastFirstName() above) — no wheel picker or text
-  // input for these anymore; they always reflect whoever's account the
-  // plot belongs to.
+  // Collected By/Phone/Email are pre-populated from the account's details
+  // (see resolveActiveUser()/lastFirstName() above and the one-time
+  // prefill above) but are now ordinary editable fields, same as
+  // Name/Address/City — someone collecting on behalf of another person,
+  // or correcting a stale phone number, can just type over them.
   const harvestSection = h("section", { className: "card" }, [
     sectionHeader("Harvest Details"),
     field(
@@ -528,9 +570,9 @@ export function render(container) {
         onChange: (v) => trialStore.updateHeader({ dateHarvested: v }),
       }).el
     ),
-    field("Collected By", lockedField(derivedCollectedBy)),
-    field("Phone", lockedField(derivedPhone || "—")),
-    field("Email", lockedField(derivedEmail || "—")),
+    field("Collected By", textInput({ value: header.collectedBy, oninput: (v) => trialStore.updateHeader({ collectedBy: v }) })),
+    field("Phone", phoneInput({ value: header.phone, oninput: (v) => trialStore.updateHeader({ phone: v }) })),
+    field("Email", textInput({ value: header.email, type: "email", inputmode: "email", oninput: (v) => trialStore.updateHeader({ email: v }) })),
   ]);
 
   // ---- Yield Calculation section ----
