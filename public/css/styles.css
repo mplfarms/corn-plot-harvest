@@ -1668,6 +1668,19 @@ h3.section-header:first-child {
   gap: 14px;
 }
 
+/* The header card is a <button> (see plotSummary.js) so the whole thing
+   is tappable through to Plot Details — reset the native button chrome
+   .card's own background/border/padding still supplies, since a <button>
+   doesn't inherit width/text-align/font the way a <section> would. */
+button.summary-header-card {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .summary-header-logo {
   width: 52px;
   height: 52px;

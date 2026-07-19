@@ -337,14 +337,30 @@ export function render(container, params) {
   });
 
   // ---- Header card ----
+  // The whole card is a button that jumps straight to Plot Details for
+  // this same plot (no id/param needed — trialDetails.js just reads the
+  // current workspace draft, same as this screen does) — a shortcut to
+  // fix a typo'd cooperator name or wrong county without hunting through
+  // the workspace menu. Works the same during an admin edit as the
+  // existing "Edit This Plot" button below does (see its comment).
   const subtitle = `${filenameYear(header)} • ${header.state || "—"} • ${header.county || "—"}`;
-  const headerCard = h("section", { className: "card summary-header-card" }, [
-    brand ? h("img", { className: "summary-header-logo", src: brand.logo, alt: brand.displayName }) : null,
-    h("div", { className: "summary-header-text" }, [
-      h("h2", { className: "summary-header-name" }, header.cooperatorName.trim() || "Untitled Plot"),
-      h("p", { className: "summary-header-subtitle" }, subtitle),
-    ]),
-  ]);
+  const headerCard = h(
+    "button",
+    {
+      type: "button",
+      className: "card summary-header-card",
+      "aria-label": "Edit Plot Details",
+      onclick: () => navigate("trial-details"),
+    },
+    [
+      brand ? h("img", { className: "summary-header-logo", src: brand.logo, alt: brand.displayName }) : null,
+      h("div", { className: "summary-header-text" }, [
+        h("h2", { className: "summary-header-name" }, header.cooperatorName.trim() || "Untitled Plot"),
+        h("p", { className: "summary-header-subtitle" }, subtitle),
+      ]),
+      h("span", { className: "chooser-row-chevron" }, "›"),
+    ]
+  );
 
   const adminEditBanner = adminEditStore.isActive()
     ? h("div", { className: "preview-owner-banner" }, [
