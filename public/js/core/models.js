@@ -188,3 +188,22 @@ export function filenameYear(header) {
   }
   return new Date().getFullYear();
 }
+
+/**
+ * The year shown at the very front of the PDF export's title (see
+ * pdfBuilder.js's drawTitleAndSubtitle()) — specifically the year
+ * HARVESTED, not planted, so it's read from dateHarvested rather than
+ * reusing filenameYear() above (which is planting-year based, used
+ * elsewhere for the export filename itself). Falls back to filenameYear()
+ * — and from there, to today's year — for a plot whose Date Harvested
+ * hasn't been filled in yet, so the title never ends up blank.
+ * @param {TrialHeader} header
+ * @returns {number}
+ */
+export function harvestedYear(header) {
+  const dh = header.dateHarvested;
+  if (typeof dh === "string" && /^\d{4}/.test(dh)) {
+    return parseInt(dh.slice(0, 4), 10);
+  }
+  return filenameYear(header);
+}

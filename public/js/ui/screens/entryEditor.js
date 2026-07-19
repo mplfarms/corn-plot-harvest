@@ -39,7 +39,7 @@ function textInput({ value, placeholder, oninput, type = "text", inputmode }) {
   });
 }
 
-function listPickerRow({ title, value, options, onChange, onAddNew, addNewPromptTitle, addNewPromptMessage }) {
+function listPickerRow({ title, value, options, onChange, onAddNew, addNewPromptTitle, addNewPromptMessage, showLabel = true }) {
   let currentValue = value;
   let currentOptions = options.slice();
 
@@ -77,7 +77,7 @@ function listPickerRow({ title, value, options, onChange, onAddNew, addNewPrompt
         });
       },
     },
-    [h("span", { className: "wheel-row-label" }, title), valueEl, h("span", { className: "wheel-chevron" }, "›")]
+    [showLabel ? h("span", { className: "wheel-row-label" }, title) : null, valueEl, h("span", { className: "wheel-chevron" }, "›")]
   );
 
   return h("div", { className: "wheel-row" }, btn);
@@ -136,10 +136,16 @@ export function render(container, params) {
   }
 
   // ---- Brand / Company ----
+  // showLabel: false on every wheel/list-picker row below whose title is
+  // ALSO shown as the field() label above it — showing "Brand / Company"
+  // (etc.) a second time inside the row itself was redundant. Seed
+  // Treatment is the one exception: it has no field() label above it, so
+  // its own in-row title stays (nothing above it to be redundant with).
   const brandWheel = createExtendableWheelSelect({
     title: "Brand / Company",
     value: entry.brand,
     options: listsStore.items(listsStore.CATEGORY.BRAND_COMPANY),
+    showLabel: false,
     onChange: (v) => {
       trialStore.updateEntry(entryId, { brand: v });
       applyFirstEntryHybridRmDefault(v);
@@ -162,6 +168,7 @@ export function render(container, params) {
       options: listsStore.hybridItems(brand),
       disabled: isBlank,
       disabledReason: "Select a Brand / Company first to choose a Hybrid.",
+      showLabel: false,
       onChange: (v) => trialStore.updateEntry(entryId, { hybrid: v }),
       onAddNew: (raw) => listsStore.addCustomHybrid(raw, brand),
       addNewPromptTitle: "Add New Hybrid",
@@ -176,6 +183,7 @@ export function render(container, params) {
     title: "Trait",
     value: entry.trait,
     options: listsStore.items(listsStore.CATEGORY.TRAIT),
+    showLabel: false,
     onChange: (v) => trialStore.updateEntry(entryId, { trait: v }),
     onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.TRAIT),
     addNewPromptTitle: "Add New Trait",
@@ -199,6 +207,7 @@ export function render(container, params) {
     title: "Relative Maturity (RM)",
     value: entry.relativeMaturity,
     options: rmOptions,
+    showLabel: false,
     onChange: (v) => trialStore.updateEntry(entryId, { relativeMaturity: v }),
   });
 
@@ -214,7 +223,10 @@ export function render(container, params) {
     sectionHeader("Hybrid Details"),
     field("Brand / Company", brandWheel.el),
     field("Hybrid", hybridWheelHolder),
-    traitRow,
+    // Trait now gets its own field() label above it too, matching the
+    // spacing/style every other row in this section already has —
+    // previously it was the one row here with no title above it at all.
+    field("Trait", traitRow),
     seedTreatmentRow,
     field("Relative Maturity (RM)", rmWheel.el),
   ]);

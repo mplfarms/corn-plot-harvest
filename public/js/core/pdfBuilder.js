@@ -14,7 +14,7 @@ import {
   SIGNIFICANCE_THRESHOLD_BU_AC,
   brandAveragesForDisplay,
 } from "./yieldCalculator.js";
-import { filenameYear } from "./models.js";
+import { filenameYear, harvestedYear } from "./models.js";
 import { exportFilename } from "./xlsxBuilder.js";
 
 // Same 3-color rule as the Plot Summary screen's rank badges (see
@@ -151,10 +151,9 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     const titleMaxWidth = tableWidth - LOGO_RESERVED_WIDTH;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
-    const titleLines = doc.splitTextToSize(
-      "2026 Corn Trial Outline / Harvest Form — Ranked Results",
-      titleMaxWidth
-    );
+    // Starts with the year HARVESTED (not planted — see harvestedYear()'s
+    // comment in models.js), per explicit request.
+    const titleLines = doc.splitTextToSize(`${harvestedYear(header)} Corn Plot Outline`, titleMaxWidth);
     const titleLineHeight = 18 * 1.15;
     for (const line of titleLines) {
       doc.text(line, MARGIN, y + 18 * 0.8);

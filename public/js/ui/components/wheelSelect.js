@@ -45,6 +45,12 @@ function createWheelSelectBase(opts) {
     onAddNew = null,
     addNewPromptTitle = null,
     addNewPromptMessage = "",
+    // False when the caller already shows `title` as a field label above
+    // this row (see field() in the screens that use it) — showing it a
+    // second time inside the row itself is redundant. Defaults to true
+    // so every other existing caller (this row used on its own, with no
+    // label above it) is unaffected.
+    showLabel = true,
   } = opts;
 
   let currentValue = opts.value;
@@ -87,7 +93,7 @@ function createWheelSelectBase(opts) {
         }),
       },
       [
-        h("span", { className: "wheel-row-label" }, title),
+        showLabel ? h("span", { className: "wheel-row-label" }, title) : null,
         h(
           "span",
           { className: "wheel-row-value" + (displayLabel ? "" : " wheel-row-placeholder") },
@@ -229,7 +235,7 @@ function createWheelSelectBase(opts) {
 }
 
 /**
- * @param {{title: string, value: string, options: Array<string|{label:string,value:string}>, onChange: (value:string)=>void, placeholder?: string}} opts
+ * @param {{title: string, value: string, options: Array<string|{label:string,value:string}>, onChange: (value:string)=>void, placeholder?: string, showLabel?: boolean}} opts
  */
 export function createWheelSelect(opts) {
   return createWheelSelectBase({ ...opts, extendable: false });
@@ -240,7 +246,7 @@ export function createWheelSelect(opts) {
  *   title: string, value: string, options: Array<string|{label:string,value:string}>,
  *   onChange: (value:string)=>void, onAddNew: (raw:string)=>string,
  *   placeholder?: string, disabledReason?: string, disabled?: boolean,
- *   addNewPromptTitle?: string, addNewPromptMessage?: string,
+ *   addNewPromptTitle?: string, addNewPromptMessage?: string, showLabel?: boolean,
  * }} opts
  */
 export function createExtendableWheelSelect(opts) {
