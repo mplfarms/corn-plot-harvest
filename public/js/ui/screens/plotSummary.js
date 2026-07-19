@@ -4,7 +4,7 @@
 // Summary card, Ranked Results list, and a toolbar share menu with the
 // 4 export/share/print/email actions.
 
-import { h, mount } from "../dom.js";
+import { h, mount, debounceGuard } from "../dom.js";
 import { getBrand, entriesForBrandView } from "../brand.js";
 import * as brandStore from "../stores/brandStore.js";
 import * as trialStore from "../stores/trialStore.js";
@@ -14,7 +14,7 @@ import { createTopBar } from "../components/topBar.js";
 import { showToast } from "../components/toast.js";
 import { showCustomModal } from "../components/modal.js";
 import { navigate } from "../router.js";
-import { filenameYear } from "../../core/models.js";
+import { filenameYear, formatHeaderDate, gpsCellText } from "../../core/models.js";
 import {
   RankingMetric,
   rankingMetricMeta,
@@ -337,20 +337,82 @@ export function render(container, params) {
   });
 
   // ---- Header card ----
-  // The whole card is a button that jumps straight to Plot Details for
-  // this same plot (no id/param needed — trialDetails.js just reads the
-  // current workspace draft, same as this screen does) — a shortcut to
-  // fix a typo'd cooperator name or wrong county without hunting through
-  // the workspace menu. Works the same during an admin edit as the
-  // existing "Edit This Plot" button below does (see its comment).
+  // Tapping the card expands/collapses an inline, read-only recap of the
+  // rest of Plot Details right below it — blank fields are skipped, so
+  // only whatever's actually been filled in shows up. This is NOT a
+  // second render of trialDetails.js's real fields (no wheels/pickers,
+  // nothing editable here) — just plain label/value rows built fresh
+  // from the same `header` object, so it's always in sync with whatever
+  // was last saved. The "Edit Plot Details" link at the bottom of the
+  // expanded panel is the actual way in to change anything (works the
+  // same during an admin edit as the existing "Edit This Plot" button
+  // below does — see its comment).
   const subtitle = `${filenameYear(header)} • ${header.state || "—"} • ${header.county || "—"}`;
+
+  function detailRow(label, value) {
+    if (!value) return null;
+    return h("div", { className: "plot-details-summary-row" }, [
+      h("span", { className: "plot-details-summary-label" }, label),
+      h("span", { className: "plot-details-summary-value" }, value),
+    ]);
+  }
+
+  const gpsText = gpsCellText(header);
+  const detailRows = [
+    detailRow("Address", header.address),
+    detailRow("City", header.city),
+    detailRow("Zip", header.zip),
+    detailRow("GPS", gpsText || null),
+    detailRow("Date Planted", formatHeaderDate(header.datePlanted)),
+    detailRow("Tillage", header.tillage),
+    detailRow("Irrigation", header.irrigation),
+    detailRow("Soil Type", header.soilType),
+    detailRow("Previous Crop", header.previousCrop),
+    detailRow("Planting Population", header.plantingPopulation),
+    detailRow("Date Harvested", formatHeaderDate(header.dateHarvested)),
+    detailRow("Collected By", header.collectedBy),
+    detailRow("Phone", header.phone),
+    detailRow("Email", header.email),
+    detailRow("Drying Shrink Rate", header.dryingShrinkRate === null || header.dryingShrinkRate === undefined ? "" : String(header.dryingShrinkRate)),
+    detailRow("Price per Bushel", header.pricePerBushel === null || header.pricePerBushel === undefined ? "" : String(header.pricePerBushel)),
+    detailRow("Plot Notes", header.trialNotes),
+  ].filter(Boolean);
+
+  const editDetailsLink = h(
+    "button",
+    { type: "button", className: "btn btn-secondary btn-block plot-details-summary-edit-btn", onclick: () => navigate("trial-details") },
+    "Edit Plot Details"
+  );
+
+  const detailsPanel = h(
+    "section",
+    { className: "card plot-details-summary-panel", style: { display: "none" } },
+    detailRows.length > 0
+      ? [...detailRows, editDetailsLink]
+      : [h("p", { className: "empty-state" }, "No other plot details entered yet."), editDetailsLink]
+  );
+
+  let expanded = false;
+  const chevronEl = h("span", { className: "chooser-row-chevron" }, "›");
+
+  const toggleDetails = debounceGuard(() => {
+    expanded = !expanded;
+    detailsPanel.style.display = expanded ? "" : "none";
+    chevronEl.classList.toggle("chooser-row-chevron-expanded", expanded);
+    headerCard.classList.toggle("summary-header-card-expanded", expanded);
+    detailsPanel.classList.toggle("plot-details-summary-panel-expanded", expanded);
+    headerCard.setAttribute("aria-expanded", String(expanded));
+    headerCard.setAttribute("aria-label", expanded ? "Hide plot details" : "Show plot details");
+  });
+
   const headerCard = h(
     "button",
     {
       type: "button",
       className: "card summary-header-card",
-      "aria-label": "Edit Plot Details",
-      onclick: () => navigate("trial-details"),
+      "aria-label": "Show plot details",
+      "aria-expanded": "false",
+      onclick: toggleDetails,
     },
     [
       brand ? h("img", { className: "summary-header-logo", src: brand.logo, alt: brand.displayName }) : null,
@@ -358,7 +420,7 @@ export function render(container, params) {
         h("h2", { className: "summary-header-name" }, header.cooperatorName.trim() || "Untitled Plot"),
         h("p", { className: "summary-header-subtitle" }, subtitle),
       ]),
-      h("span", { className: "chooser-row-chevron" }, "›"),
+      chevronEl,
     ]
   );
 
@@ -507,6 +569,7 @@ export function render(container, params) {
     h("div", { className: "screen-body" }, [
       adminEditBanner,
       headerCard,
+      detailsPanel,
       segmented,
       summaryCard,
       h("h3", { className: "section-header" }, "Ranked Results"),

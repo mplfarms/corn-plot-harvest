@@ -892,10 +892,20 @@ h3.section-header:first-child {
   margin-left: auto;
   color: var(--text-muted);
   font-size: 1.2rem;
+  display: inline-block;
+  transition: transform 0.15s ease;
 }
 
 .chooser-row-primary .chooser-row-chevron {
   color: rgba(255, 255, 255, 0.85);
+}
+
+/* Rotated to point downward while the panel it controls is expanded
+   (see plotSummary.js's headerCard toggle) — the same "›" glyph used
+   everywhere else for "tap to go somewhere" just rotates in place
+   rather than needing a second glyph for the expanded state. */
+.chooser-row-chevron-expanded {
+  transform: rotate(90deg);
 }
 
 /* ---------- wheel select ---------- */
@@ -1669,9 +1679,10 @@ h3.section-header:first-child {
 }
 
 /* The header card is a <button> (see plotSummary.js) so the whole thing
-   is tappable through to Plot Details — reset the native button chrome
-   .card's own background/border/padding still supplies, since a <button>
-   doesn't inherit width/text-align/font the way a <section> would. */
+   is tappable to expand/collapse the Plot Details recap below it —
+   reset the native button chrome .card's own background/border/padding
+   still supplies, since a <button> doesn't inherit width/text-align/font
+   the way a <section> would. */
 button.summary-header-card {
   width: 100%;
   font: inherit;
@@ -1679,6 +1690,20 @@ button.summary-header-card {
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
+}
+
+/* While expanded, flatten the facing corners of the header card and the
+   details panel below it so the two read as one connected unit (see
+   .plot-details-summary-panel's negative margin-top, which pulls them
+   flush). */
+.summary-header-card-expanded {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.plot-details-summary-panel-expanded {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .summary-header-logo {
@@ -1708,6 +1733,42 @@ button.summary-header-card {
   margin: 2px 0 0;
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+/* Read-only recap of Plot Details, expanded/collapsed by tapping the
+   header card above it (see plotSummary.js) — negative margin-top pulls
+   it flush against the header card above so the two read as one
+   connected unit rather than two separate cards with a gap. */
+.plot-details-summary-panel {
+  margin-top: -8px;
+}
+
+.plot-details-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.plot-details-summary-row:last-of-type {
+  border-bottom: none;
+}
+
+.plot-details-summary-label {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.plot-details-summary-value {
+  text-align: right;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.plot-details-summary-edit-btn {
+  margin-top: 14px;
 }
 
 .summary-stats {
