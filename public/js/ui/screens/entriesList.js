@@ -117,9 +117,23 @@ export function render(container) {
     "+"
   );
 
+  // A plain way back to Plot Summary without adding a hybrid first — the
+  // "+" fab is for adding entries, this is for leaving without one. Extra
+  // bottom margin keeps it from sitting directly under the fab, which
+  // floats fixed over the bottom-right corner of the content.
+  const backBtn = h(
+    "button",
+    {
+      type: "button",
+      className: "btn btn-secondary btn-block entries-back-btn",
+      onclick: () => navigate("plot-summary"),
+    },
+    "Back to Plot Summary"
+  );
+
   const screen = h("div", { className: "screen entries-list-screen" }, [
     topBar,
-    h("div", { className: "screen-body" }, [h("h2", { className: "screen-heading" }, "Hybrid Entries"), listEl]),
+    h("div", { className: "screen-body" }, [h("h2", { className: "screen-heading" }, "Hybrid Entries"), listEl, backBtn]),
     addBtn,
   ]);
 

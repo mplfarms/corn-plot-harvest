@@ -1327,6 +1327,13 @@ h3.section-header:first-child {
   gap: 10px;
 }
 
+/* Extra clearance below the "Back to Plot Summary" button so it doesn't
+   sit flush under the fixed "+" fab, which floats over the bottom-right
+   corner of the content regardless of scroll position. */
+.entries-back-btn {
+  margin-bottom: calc(56px + 12px);
+}
+
 .entry-row {
   display: flex;
   align-items: center;
