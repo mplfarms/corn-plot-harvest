@@ -1,8 +1,8 @@
 // src/ui/screens/plotSummary.js
 //
-// Segmented Dry Yield/Gross/Moisture control, header card, Dry Yield
-// Summary card, Ranked Results list, and a toolbar share menu with the
-// 4 export/share/print/email actions.
+// Segmented Dry Yield/Gross control, header card, Dry Yield Summary
+// card, Ranked Results list, and a toolbar share menu with the 4
+// export/share/print/email actions.
 
 import { h, mount, debounceGuard } from "../dom.js";
 import { getBrand, entriesForBrandView } from "../brand.js";
@@ -30,7 +30,12 @@ import { buildXlsx, createEffectiveLists } from "../../core/xlsxBuilder.js";
 import { getLogoDataUrl } from "../logoCache.js";
 import { downloadBlob, shareOrDownload, openMailto } from "../fileSave.js";
 
-const METRIC_ORDER = [RankingMetric.DRY_YIELD, RankingMetric.GROSS, RankingMetric.MOISTURE];
+// Moisture is deliberately omitted from the segmented control — ranking/
+// sorting the whole list BY moisture wasn't useful in practice; the
+// per-hybrid moisture reading is still shown on each row (see
+// showsMoistureLine below) and still factors into Gross's deduction
+// calculation, it's just no longer its own selectable "view".
+const METRIC_ORDER = [RankingMetric.DRY_YIELD, RankingMetric.GROSS];
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const BOX_PLOT_VIEW_W = 320;
@@ -154,8 +159,8 @@ function computeRanked(entries, metric, header) {
 // Badge color reflects the entry's dry yield vs. the plot mean (green =
 // 10+ bu/ac over, yellow = 10+ bu/ac under, light gray = within 10 bu/ac
 // either way) rather than its rank position — this holds steady across
-// all 3 metric tabs (Dry Yield/Gross/Moisture) since it's describing the
-// entry's yield standing, not the current sort.
+// both metric tabs (Dry Yield/Gross) since it's describing the entry's
+// yield standing, not the current sort.
 function significanceBadgeClass(significance) {
   if (significance === "positive") return "rank-badge rank-badge-sig-positive";
   if (significance === "negative") return "rank-badge rank-badge-sig-negative";

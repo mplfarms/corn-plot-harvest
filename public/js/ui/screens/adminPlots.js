@@ -29,6 +29,14 @@
 // should never be trusted alone; the function itself also re-checks the
 // caller's own isAdmin flag, returning 403 if it isn't set — see
 // netlify/functions/plots.js).
+//
+// Since it's reachable from BOTH of those places, its own Back button
+// returns to whichever one it was actually opened from (see router.js's
+// rememberedOriginFor()) rather than always Home — the Plot Workspace
+// menu's Save Changes/Discard Admin Edit handlers also land back here
+// when an admin-edit session ends, but pass _skipOriginTracking so that
+// internal round-trip doesn't overwrite the real origin recorded when
+// this screen was first opened.
 
 import { h, mount, clear } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
@@ -36,7 +44,7 @@ import { showCustomModal } from "../components/modal.js";
 import * as authStore from "../authStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
-import { navigate } from "../router.js";
+import { navigate, rememberedOriginFor } from "../router.js";
 
 function detailRow(label, value) {
   return h("p", { className: "admin-user-detail-row" }, [h("strong", {}, `${label}: `), value]);
@@ -66,7 +74,10 @@ function openUserDetailModal(u) {
 }
 
 export async function render(container) {
-  const topBar = createTopBar({ title: "All Plots (Admin)", onBack: () => navigate("plot-chooser") });
+  const topBar = createTopBar({
+    title: "All Plots (Admin)",
+    onBack: () => navigate(rememberedOriginFor("admin-plots") || "plot-chooser"),
+  });
   const bodyEl = h("div", { className: "screen-body" }, [h("p", { className: "empty-state" }, "Loading…")]);
   mount(container, h("div", { className: "screen admin-plots-screen" }, [topBar, bodyEl]));
 
@@ -128,6 +139,7 @@ export async function render(container) {
                       adminEditStore.begin({
                         ownerEmail: u.email,
                         ownerName: u.name,
+                        ownerUser: u,
                         allTrials: u.trials,
                         editingTrial: t,
                       });

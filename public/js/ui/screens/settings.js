@@ -1,8 +1,13 @@
 // src/ui/screens/settings.js
 //
-// Settings screen, reachable from the workspace ("Home") menu. Currently
-// holds a single setting: appearance (Light / Dark / System), using the
-// same segmented-control look as plotSummary.js's metric switcher.
+// Settings screen — the gear icon reaching it sits on every screen's top
+// bar (see topBar.js), not just the workspace menu, so its own Back
+// button returns to whichever screen it was actually opened from (see
+// router.js's rememberedOriginFor()) rather than a single hardcoded
+// destination, which used to be wrong any time Settings was reached from
+// somewhere other than the Plot Workspace menu. Currently holds a single
+// setting: appearance (Light / Dark / System), using the same
+// segmented-control look as plotSummary.js's metric switcher.
 
 import { h, mount } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
@@ -15,7 +20,7 @@ import { doubleConfirm } from "../components/doubleConfirm.js";
 import { promptEditUserDetails } from "../components/editUserDetailsModal.js";
 import { showToast } from "../components/toast.js";
 import { APP_VERSION } from "../../version.js";
-import { navigate } from "../router.js";
+import { navigate, rememberedOriginFor } from "../router.js";
 
 const DELETE_ACCOUNT_ENDPOINT = "/.netlify/functions/deleteAccount";
 
@@ -26,9 +31,13 @@ const MODES = [
 ];
 
 export function render(container) {
+  // Falls back to "workspace" — the old, always-true-before destination
+  // — only when nothing's been recorded (a direct deep link or a page
+  // reload landed straight here, with no in-memory record of how).
+  const backTarget = rememberedOriginFor("settings") || "workspace";
   const topBar = createTopBar({
     title: "Settings",
-    onBack: () => navigate("workspace"),
+    onBack: () => navigate(backTarget),
   });
 
   const mode = themeStore.getState().mode;

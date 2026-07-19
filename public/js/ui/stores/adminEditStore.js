@@ -67,16 +67,35 @@ export function getOwnerEmail() {
 }
 
 /**
+ * The plot OWNER's own account details (not the admin doing the
+ * editing) — used by trialDetails.js so a plot's Collected By/Phone/
+ * Email (derived from account details, see BASE_MOISTURE_LOCKED-style
+ * lockedField() there) reflect whoever the plot actually belongs to
+ * while an admin is editing it on their behalf, not the admin's own
+ * info. Sourced from adminPlots.js's scope=all listing (the same
+ * request that already returns every user's firstName/lastName/
+ * mobileNumber — see plots.js's handleGetAll), captured once at begin()
+ * time — this is a point-in-time snapshot like otherTrials above, not a
+ * live subscription, but that's fine here since an admin-edit session is
+ * always short-lived.
+ * @returns {{email: string, name?: string, firstName?: string, lastName?: string, mobileNumber?: string}|null}
+ */
+export function getOwnerUser() {
+  return session ? session.ownerUser : null;
+}
+
+/**
  * Starts an admin-edit session for one specific trial belonging to
  * another user, and loads it into trialStore as the current draft.
  * Snapshots the admin's own current draft so it can be restored
  * untouched once the session ends (see exit() below).
- * @param {{ownerEmail: string, ownerName?: string, allTrials: Object[], editingTrial: Object}} args
+ * @param {{ownerEmail: string, ownerName?: string, ownerUser?: Object, allTrials: Object[], editingTrial: Object}} args
  */
-export function begin({ ownerEmail, ownerName, allTrials, editingTrial }) {
+export function begin({ ownerEmail, ownerName, ownerUser, allTrials, editingTrial }) {
   session = {
     ownerEmail,
     ownerName: ownerName || null,
+    ownerUser: ownerUser || { email: ownerEmail, name: ownerName || null },
     otherTrials: (allTrials || []).filter((t) => t.id !== editingTrial.id),
     editingTrialId: editingTrial.id,
     adminOwnDraftSnapshot: trialStore.getState(),

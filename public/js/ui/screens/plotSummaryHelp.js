@@ -6,7 +6,7 @@
 // already covers this screen at a summary level as part of the whole
 // app; this screen goes deeper on the same handful of things people
 // actually get confused by looking at a results screen for the first
-// time: what the three metric tabs rank by, what Trial Mean/CV mean,
+// time: what the metric tabs rank by, what Trial Mean/CV mean,
 // how to read the box-and-whisker chart, and what the colored rank
 // badges mean. Built with the same <details>/<summary> accordion
 // pattern as help.js (see helpSection() there) for a consistent feel,
@@ -53,14 +53,14 @@ export function render(container) {
 
   const sections = [
     helpSection(
-      "The Dry Yield / Gross / Moisture Tabs",
+      "The Dry Yield / Gross Tabs",
       [
-        p("The three buttons near the top re-rank the whole list by a different number — the hybrids don't change, just the order and which value is shown on the right of each row:"),
+        p("The two buttons near the top re-rank the whole list by a different number — the hybrids don't change, just the order and which value is shown on the right of each row:"),
         ul([
           "Dry Yield — bushels per acre, adjusted to a standard moisture level so every hybrid is compared fairly. Highest first.",
           "Gross — the estimated dollar value per acre (Dry Yield × your Price per Bushel, with a deduction if that entry's moisture came in above your plot's base moisture — see Yield Calculation on Plot Details). Highest first.",
-          "Moisture — the moisture percentage measured at harvest. Lowest (driest) first.",
         ]),
+        p("Every row also shows that hybrid's Moisture reading underneath, no matter which tab you're on — it just isn't something you can re-sort the whole list by."),
         p("Whichever tab is selected, the same rank badge colors apply — see “The Colored Rank Badges” below."),
       ],
       { open: true }
@@ -96,7 +96,7 @@ export function render(container) {
         "Yellow — this hybrid came in 8 or more bu/ac BELOW the plot's average. Worth a second look.",
         "Gray — within 8 bu/ac of the plot's average either way — a fairly typical result for this plot.",
       ]),
-      p("Because this color is based on actual yield versus the plot average — not rank position — a hybrid keeps the same badge color no matter which of the three tabs (Dry Yield/Gross/Moisture) you're viewing. It's always describing the same thing: how that hybrid's Dry Yield compares to the rest of this plot."),
+      p("Because this color is based on actual yield versus the plot average — not rank position — a hybrid keeps the same badge color no matter which tab (Dry Yield or Gross) you're viewing. It's always describing the same thing: how that hybrid's Dry Yield compares to the rest of this plot."),
       p("Below the moisture percentage on each row, any Comments typed in for that hybrid on the Plot Hybrids screen show up here too, so you don't have to go back and forth to see them."),
     ]),
 

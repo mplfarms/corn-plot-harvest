@@ -61,7 +61,9 @@ function helpSection(title, children, opts) {
 export function render(container) {
   const topBar = createTopBar({
     title: "Help",
-    onBack: () => navigate("settings"),
+    // This is a round trip back to wherever Settings was actually opened
+    // from, not a new arrival there — see router.js's rememberedOriginFor().
+    onBack: () => navigate("settings", { _skipOriginTracking: true }),
   });
 
   const intro = h("div", { className: "card help-intro-card" }, [
@@ -84,6 +86,16 @@ export function render(container) {
       ],
       { open: true }
     ),
+
+    helpSection("Adding This App to Your Home Screen", [
+      p("This app works like a regular app once it's added to your home screen — tap the icon and it opens directly, full-screen, no browser address bar. It still works the same either way; this just saves you a step every time."),
+      sub("On an iPhone or iPad (Safari)"),
+      p("Tap the Share button along the bottom of the screen (the square with an arrow pointing up), scroll down the list that pops up, tap “Add to Home Screen,” then tap “Add” in the top right."),
+      p("This only works in Safari — if you're using Chrome or another browser on an iPhone, open this same page in Safari first."),
+      sub("On an Android phone or tablet (Chrome)"),
+      p("Tap the ⋮ menu in the top right of Chrome, then tap “Add to Home screen” (some phones show this as “Install app” instead), then confirm."),
+      p("Either way, you only need to do this once per device. If you ever sign in on a new phone or tablet, just repeat these steps there too."),
+    ]),
 
     helpSection("Finding Your Way Around", [
       p("Every screen has a bar across the top with a few icons:"),
@@ -141,7 +153,7 @@ export function render(container) {
 
     helpSection("Viewing Your Results", [
       p("Tap “Plot Summary & Results” from the Plot Workspace menu to see how every hybrid stacks up."),
-      p("Near the top, three tabs — Dry Yield, Gross, and Moisture — let you re-rank the list by whichever number matters most right now."),
+      p("Near the top, two tabs — Dry Yield and Gross — let you re-rank the list by whichever number matters most right now. Each hybrid's Moisture reading still shows on its row either way."),
       p("Below that: the Trial Mean (the plot's average), CV (a measure of how spread out the results are — lower means more consistent), and how many entries have complete data."),
       p("The small horizontal chart is a box plot — it shows the full spread of yields at a glance: the box is where the middle half of your results fall, the line through it is the median, and the whiskers reach out to your highest and lowest yields."),
       p("If two or more brands are represented with multiple hybrids each, you'll also see an average for each brand."),

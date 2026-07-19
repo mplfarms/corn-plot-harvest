@@ -84,9 +84,15 @@ export function render(container) {
   const entryCount = draft.entries.length;
   const adminEditing = adminEditStore.isActive();
 
+  // Normally reached by "backing out" of Plot Details/Hybrid Entries/
+  // Plot Summary (see router.js's top comment on the hub-and-spoke
+  // model), so Back from here goes all the way Home — except during an
+  // admin-edit session, which instead landed here directly from All
+  // Plots (Admin); Back should return there, not to the ADMIN's own Home
+  // Screen, which has nothing to do with the teammate's plot being edited.
   const topBar = createTopBar({
     title: brand ? brand.displayName : "Workspace",
-    onBack: () => navigate("plot-chooser"),
+    onBack: () => navigate(adminEditing ? "admin-plots" : "plot-chooser"),
     right: syncStatusIcon(container),
   });
 
@@ -136,7 +142,9 @@ export function render(container) {
               return;
             }
             showToast("Saved to their account.", { type: "success" });
-            navigate("admin-plots");
+            // This is a round trip back to wherever All Plots (Admin) was
+            // already opened from, not a new arrival — see router.js.
+            navigate("admin-plots", { _skipOriginTracking: true });
           },
         },
         "Save Changes"
@@ -158,7 +166,8 @@ export function render(container) {
           });
           if (!ok) return;
           adminEditStore.discardAndExit();
-          navigate("admin-plots");
+          // Same round-trip case as Save Changes above.
+          navigate("admin-plots", { _skipOriginTracking: true });
           return;
         }
         const ok = await showConfirm({

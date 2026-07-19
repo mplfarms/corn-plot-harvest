@@ -74,7 +74,9 @@ async function callUpdateProfile(payload) {
 }
 
 export async function render(container) {
-  const topBar = createTopBar({ title: "Manage Users", onBack: () => navigate("settings") });
+  // This is a round trip back to wherever Settings was actually opened
+  // from, not a new arrival there — see router.js's rememberedOriginFor().
+  const topBar = createTopBar({ title: "Manage Users", onBack: () => navigate("settings", { _skipOriginTracking: true }) });
   const bodyEl = h("div", { className: "screen-body" }, [h("p", { className: "empty-state" }, "Loading…")]);
   mount(container, h("div", { className: "screen manage-users-screen" }, [topBar, bodyEl]));
 

@@ -10,6 +10,7 @@
 import { h, mount, clear } from "../dom.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as listsStore from "../stores/listsStore.js";
+import * as authStore from "../authStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
 import * as geoData from "../geoData.js";
 import { createTopBar } from "../components/topBar.js";
@@ -29,6 +30,14 @@ const ZIP_CHIP_LIMIT = 8;
 // than an editable field — Drying Shrink Rate and Price per Bushel still
 // vary per plot, but this one no longer does.
 const BASE_MOISTURE_LOCKED = 15.5;
+
+// Collected By/Phone/Email are likewise locked, derived automatically from
+// whoever's account the plot belongs to rather than typed in by hand —
+// "Collected By" no longer means a collection METHOD (that was the old
+// wheel picker backed by listsStore.CATEGORY.COLLECTED_BY, left in place
+// unused rather than removed, in case it's needed again) but WHO: the
+// person's account name, "Last Name, First Name". See resolveActiveUser()
+// and lastFirstName() below.
 
 const US_STATES = [
   ["AL", "Alabama"], ["AK", "Alaska"], ["AZ", "Arizona"], ["AR", "Arkansas"], ["CA", "California"],
@@ -63,31 +72,37 @@ function textInput({ value, placeholder, oninput, type = "text", inputmode }) {
   });
 }
 
-// Formats a run of digits as a US phone number: "(555) 555-5555", growing
-// the mask as digits are typed rather than waiting for all 10 at once.
-function formatPhoneDisplay(digits) {
-  const d = digits.slice(0, 10);
-  if (d.length === 0) return "";
-  if (d.length < 4) return `(${d}`;
-  if (d.length < 7) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
-  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+// Which account's details Collected By/Phone/Email should be derived
+// from: the plot OWNER's during an admin-edit session (see
+// adminEditStore.getOwnerUser()'s comment — a teammate's plot being
+// edited on their behalf should still show THEIR info, not the admin's),
+// otherwise whoever is actually signed in.
+function resolveActiveUser() {
+  return adminEditStore.isActive() ? adminEditStore.getOwnerUser() : authStore.getUser();
 }
 
-function phoneInput({ value, oninput }) {
-  return h("input", {
-    type: "tel",
-    inputmode: "tel",
-    autocomplete: "tel",
-    className: "text-input",
-    placeholder: "(555) 555-5555",
-    value: formatPhoneDisplay(String(value || "").replace(/\D/g, "")),
-    oninput: (e) => {
-      const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
-      const formatted = formatPhoneDisplay(digits);
-      e.target.value = formatted;
-      oninput(formatted);
-    },
-  });
+// "Last Name, First Name" for a user record, with the same fallback chain
+// already used by adminPlots.js's openUserDetailModal(): firstName/
+// lastName if present, else split the combined `name` field (accounts
+// that predate firstName/lastName), else the email, else "—".
+function lastFirstName(u) {
+  if (!u) return "—";
+  if (u.firstName || u.lastName) {
+    return [u.lastName, u.firstName].filter(Boolean).join(", ") || "—";
+  }
+  const hasSeparateName = u.name && u.name.trim() && u.name !== u.email;
+  if (hasSeparateName) {
+    const parts = u.name.trim().split(/\s+/);
+    return parts.length > 1 ? `${parts.slice(1).join(" ")}, ${parts[0]}` : parts[0];
+  }
+  return u.email || "—";
+}
+
+function lockedField(displayValue) {
+  return h("div", { className: "text-input field-locked" }, [
+    h("span", {}, displayValue),
+    h("span", { className: "field-locked-tag" }, "Locked"),
+  ]);
 }
 
 function textAreaInput({ value, placeholder, oninput }) {
@@ -111,6 +126,20 @@ export function render(container) {
   // below), so nothing should be able to leave it at a stale value.
   if (header.baseMoisturePercent !== BASE_MOISTURE_LOCKED) {
     trialStore.updateHeader({ baseMoisturePercent: BASE_MOISTURE_LOCKED });
+  }
+
+  // Collected By/Phone/Email are likewise auto-corrected on every render
+  // to whatever the current account details resolve to (see
+  // resolveActiveUser() above) — same "keep exports/consumers correct"
+  // reasoning as baseMoisturePercent above. This also means a plot picks
+  // up a name/phone/email change made later in Settings automatically,
+  // the next time this screen is opened.
+  const activeUser = resolveActiveUser();
+  const derivedCollectedBy = lastFirstName(activeUser);
+  const derivedPhone = (activeUser && activeUser.mobileNumber) || "";
+  const derivedEmail = (activeUser && activeUser.email) || "";
+  if (header.collectedBy !== derivedCollectedBy || header.phone !== derivedPhone || header.email !== derivedEmail) {
+    trialStore.updateHeader({ collectedBy: derivedCollectedBy, phone: derivedPhone, email: derivedEmail });
   }
 
   const topBar = createTopBar({
@@ -467,16 +496,10 @@ export function render(container) {
   ]);
 
   // ---- Harvest section ----
-  const collectedByWheel = createExtendableWheelSelect({
-    title: "Collected By",
-    value: header.collectedBy,
-    options: listsStore.items(listsStore.CATEGORY.COLLECTED_BY),
-    onChange: (v) => trialStore.updateHeader({ collectedBy: v }),
-    onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.COLLECTED_BY),
-    addNewPromptTitle: "Add New Collection Method",
-    addNewPromptMessage: "This is added to the list permanently, for this and every future trial.",
-  });
-
+  // Collected By/Phone/Email are locked, derived fields (see
+  // resolveActiveUser()/lastFirstName() above) — no wheel picker or text
+  // input for these anymore; they always reflect whoever's account the
+  // plot belongs to.
   const harvestSection = h("section", { className: "card" }, [
     sectionHeader("Harvest"),
     field(
@@ -486,21 +509,15 @@ export function render(container) {
         onChange: (v) => trialStore.updateHeader({ dateHarvested: v }),
       }).el
     ),
-    field("Collected By", collectedByWheel.el),
-    field("Phone", phoneInput({ value: header.phone, oninput: (v) => trialStore.updateHeader({ phone: v }) })),
-    field("Email", textInput({ value: header.email, oninput: (v) => trialStore.updateHeader({ email: v }), type: "email" })),
+    field("Collected By", lockedField(derivedCollectedBy)),
+    field("Phone", lockedField(derivedPhone || "—")),
+    field("Email", lockedField(derivedEmail || "—")),
   ]);
 
   // ---- Yield Calculation section ----
   const yieldSection = h("section", { className: "card" }, [
     sectionHeader("Yield Calculation"),
-    field(
-      "Base Moisture %",
-      h("div", { className: "text-input field-locked" }, [
-        h("span", {}, `${BASE_MOISTURE_LOCKED}%`),
-        h("span", { className: "field-locked-tag" }, "Locked"),
-      ])
-    ),
+    field("Base Moisture %", lockedField(`${BASE_MOISTURE_LOCKED}%`)),
     field(
       "Drying Shrink Rate",
       textInput({

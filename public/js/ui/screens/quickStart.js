@@ -12,22 +12,29 @@
 // reference.
 //
 // This is the one screen besides "account" itself that router.js's
-// mandatory-sign-in guard exempts — see its comment — so its own Back
-// button has to pick the right destination depending on whether that
-// guard would otherwise have bounced the visitor here: signed-in users
-// came from the Home Screen and return there; a signed-out visitor came
-// straight from the splash screen and returns there instead.
+// mandatory-sign-in guard exempts — see its comment — and it's reachable
+// from three different places (the splash screen, the Home Screen, and
+// Help's "Show Me the Quick Start Guide Instead" button), so its own
+// Back button returns to whichever one it was actually opened from (see
+// router.js's rememberedOriginFor()). The old sign-in-state guess
+// (signed in -> Home, signed out -> splash) is kept only as the fallback
+// for when nothing's been recorded — e.g. a direct deep link/reload.
 
 import { h, mount } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
 import * as authStore from "../authStore.js";
-import { navigate } from "../router.js";
+import { navigate, rememberedOriginFor } from "../router.js";
 
 const STEPS = [
   {
     title: "Sign in",
     text: "Type your email and tap Sign In. No password needed. The first time, it'll ask your name — that just helps your admin tell everyone's plots apart.",
     tip: "You'll notice a “Demo” plot already sitting in Saved Plots — that's a sample with results already filled in, just so you have something to look at. Explore it, edit it, or delete it any time; it's local to this device only.",
+  },
+  {
+    title: "Add it to your Home Screen",
+    text: "On an iPhone or iPad: tap the Share button in Safari (the square with an arrow), then “Add to Home Screen.” On Android: tap the ⋮ menu in Chrome, then “Add to Home screen” (or “Install app”). Either way, an icon appears on your home screen that opens the app directly — no browser bar, no re-typing a web address.",
+    tip: "Tip: see “Adding This App to Your Home Screen” under Settings → Help for the full step-by-step, including what it looks like on Android.",
   },
   {
     title: "Pick your Brand View (if asked)",
@@ -61,10 +68,19 @@ const STEPS = [
   },
 ];
 
+// Spelled out in the intro line below rather than a hardcoded word, so
+// adding/removing a step here can't silently leave that sentence saying
+// the wrong count (as happened when "Add it to your Home Screen" was
+// inserted as step 2 — the intro used to just say "eight steps").
+const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+function spelledOutCount(n) {
+  return COUNT_WORDS[n] || String(n);
+}
+
 export function render(container) {
   const topBar = createTopBar({
     title: "Quick Start Guide",
-    onBack: () => navigate(authStore.getUser() ? "plot-chooser" : "account"),
+    onBack: () => navigate(rememberedOriginFor("quick-start") || (authStore.getUser() ? "plot-chooser" : "account")),
   });
 
   const stepsList = h(
@@ -95,7 +111,7 @@ export function render(container) {
       h(
         "p",
         { className: "field-note" },
-        "Here's the short version — eight steps from opening the app to sharing your first set of results."
+        `Here's the short version — ${spelledOutCount(STEPS.length)} steps from opening the app to sharing your first set of results.`
       ),
       stepsList,
       moreHelpNote,

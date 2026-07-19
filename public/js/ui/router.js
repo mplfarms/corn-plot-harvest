@@ -59,6 +59,38 @@ function currentPath() {
   return m ? m[1] : null;
 }
 
+// Most of the app is a fixed hub-and-spoke hierarchy — Plot Workspace
+// (#/workspace) is the hub, and Plot Details/Hybrid Entries/Plot Summary
+// always return to it on Back. That's intentional, not a bug: those
+// three are usually reached by jumping straight in from somewhere else
+// (Home's "Enter a New Plot", a Saved Plots row, etc.), skipping the hub
+// entirely, and Back is the primary way to actually reach the hub
+// afterward — changing it to "wherever you literally were before" would
+// remove the only way in for a first-time plot. Their hardcoded
+// destinations are left alone.
+//
+// A handful of screens are genuinely reachable from more than one place,
+// though (the Settings gear sits on every top bar; "All Plots (Admin)"
+// has a button on both the Home Screen and the Workspace menu; Quick
+// Start is linked from the splash screen, Home, AND Help) — for THESE,
+// a single hardcoded Back destination is always wrong some of the time.
+// This remembers whichever screen each was actually opened from (in
+// memory only — same lifetime as currentParams above — so a direct deep
+// link or a page reload falls back to each screen's own sensible
+// default; see settings.js/adminPlots.js/quickStart.js's onBack) so
+// their Back button returns there instead.
+const rememberedOrigin = {}; // { settings: 'plot-chooser', 'admin-plots': 'workspace', 'quick-start': 'help' }
+const BACK_SENSITIVE_TARGETS = new Set(["settings", "admin-plots", "quick-start"]);
+
+/**
+ * @param {string} path one of BACK_SENSITIVE_TARGETS
+ * @returns {string|null} whatever screen `path` was actually last opened
+ *   from, or null if nothing's been recorded yet.
+ */
+export function rememberedOriginFor(path) {
+  return rememberedOrigin[path] || null;
+}
+
 function renderCurrent() {
   if (!appContainer) return;
   const path = currentPath() || "account";
@@ -88,9 +120,19 @@ function renderCurrent() {
 
 /**
  * @param {string} path e.g. "plot-chooser"
- * @param {Object} [params]
+ * @param {Object} [params] — pass `_skipOriginTracking: true` for a
+ *   navigation that's really a "return trip" back to a BACK_SENSITIVE_TARGETS
+ *   screen (e.g. Help's own Back button going back to Settings) rather
+ *   than a genuine new arrival there, so it doesn't clobber the
+ *   already-remembered true origin — see help.js/manageUsers.js and
+ *   workspaceMenu.js's Save Changes/Discard Admin Edit handlers.
  */
 export function navigate(path, params) {
+  const from = currentPath();
+  if (BACK_SENSITIVE_TARGETS.has(path) && from && from !== path && !(params && params._skipOriginTracking)) {
+    rememberedOrigin[path] = from;
+  }
+
   currentParams = params || {};
   const nextHash = `#/${path}`;
   if (window.location.hash === nextHash) {
