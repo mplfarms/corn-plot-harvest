@@ -14,6 +14,6 @@
 // parens (it's used to build an internal cache name / can end up in a
 // filename, not shown to the user), so the two stay in lockstep without
 // literally matching character-for-character. Next build after this one
-// is v26.71.
+// is v26.72.
 
-export const APP_VERSION = "v26.70 (Beta)";
+export const APP_VERSION = "v26.71 (Beta)";
