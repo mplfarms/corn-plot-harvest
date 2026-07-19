@@ -136,11 +136,14 @@ export function render(container, params) {
   }
 
   // ---- Brand / Company ----
-  // showLabel: false on every wheel/list-picker row below whose title is
-  // ALSO shown as the field() label above it — showing "Brand / Company"
-  // (etc.) a second time inside the row itself was redundant. Seed
-  // Treatment is the one exception: it has no field() label above it, so
-  // its own in-row title stays (nothing above it to be redundant with).
+  // showLabel: false on every wheel/list-picker row below — each one's
+  // title is now shown once, as a field() label above the row (matching
+  // Brand/Company, Hybrid, and RM's existing look), so repeating it a
+  // second time inside the row itself would be redundant. This also
+  // keeps the spacing between every row in this section consistent —
+  // Seed Treatment used to be the one row with no label above it, which
+  // left it sitting flush against Trait's box with none of the other
+  // rows' breathing room.
   const brandWheel = createExtendableWheelSelect({
     title: "Brand / Company",
     value: entry.brand,
@@ -194,6 +197,7 @@ export function render(container, params) {
     title: "Seed Treatment",
     value: entry.seedTreatment,
     options: listsStore.items(listsStore.CATEGORY.SEED_TREATMENT),
+    showLabel: false,
     onChange: (v) => trialStore.updateEntry(entryId, { seedTreatment: v }),
     onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.SEED_TREATMENT),
     addNewPromptTitle: "Add New Seed Treatment",
@@ -219,15 +223,16 @@ export function render(container, params) {
   applyFirstEntryHybridRmDefault(currentEntry().brand);
   rebuildHybridWheel();
 
+  // Every row in this section is now wrapped the same way — a field()
+  // label above a labelless wheel/list-picker row — so the vertical
+  // spacing (field()'s own 6px label gap + 14px margin-bottom, see
+  // styles.css) is identical between all five, not just some of them.
   const identitySection = h("section", { className: "card" }, [
     sectionHeader("Hybrid Details"),
     field("Brand / Company", brandWheel.el),
     field("Hybrid", hybridWheelHolder),
-    // Trait now gets its own field() label above it too, matching the
-    // spacing/style every other row in this section already has —
-    // previously it was the one row here with no title above it at all.
     field("Trait", traitRow),
-    seedTreatmentRow,
+    field("Seed Treatment", seedTreatmentRow),
     field("Relative Maturity (RM)", rmWheel.el),
   ]);
 

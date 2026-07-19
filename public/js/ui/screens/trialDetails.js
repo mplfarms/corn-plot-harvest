@@ -1,6 +1,7 @@
 // src/ui/screens/trialDetails.js
 //
-// Cooperator / GPS / Planting / Harvest / Yield Calculation sections.
+// Cooperator Details / GPS Location / Planting Details / Harvest Details /
+// Yield Calculation sections.
 // IMPORTANT: this screen does NOT subscribe to trialStore for its own
 // re-render — text inputs mutate the store directly via oninput, but we
 // never rebuild the DOM in response (that would blow away focus/cursor
@@ -161,7 +162,8 @@ export function render(container) {
     title: "State",
     value: header.state,
     options: US_STATES,
-    placeholder: "Select a state",
+    placeholder: "Select",
+    showLabel: false,
     onChange: (v) => {
       currentState = v;
       trialStore.updateHeader({ state: v });
@@ -175,7 +177,8 @@ export function render(container) {
     title: "County",
     value: header.county,
     options: geoData.getCountiesForState(header.state),
-    placeholder: "Select a county",
+    placeholder: "Select",
+    showLabel: false,
     disabled: !header.state,
     disabledReason: "Select a state first",
     onChange: (v) => trialStore.updateHeader({ county: v }),
@@ -293,7 +296,7 @@ export function render(container) {
   });
 
   const cooperatorSection = h("section", { className: "card" }, [
-    sectionHeader("Cooperator"),
+    sectionHeader("Cooperator Details"),
     field("Name", textInput({ value: header.cooperatorName, oninput: (v) => trialStore.updateHeader({ cooperatorName: v }) })),
     field("Address", textInput({ value: header.address, oninput: (v) => trialStore.updateHeader({ address: v }) })),
     field("State", stateWheel.el),
@@ -437,28 +440,42 @@ export function render(container) {
   ]);
 
   // ---- Planting section ----
+  // showLabel: false on every wheel below — its title is already shown
+  // once, as the field() label above the row (see cooperatorSection's
+  // State/County wheels for the same treatment) — and placeholder:
+  // "Select" replaces whatever grayed-out text an empty one used to show
+  // with a single consistent word, rather than repeating the field's own
+  // title a second time in muted text.
   const tillageWheel = createWheelSelect({
     title: "Tillage",
     value: header.tillage,
     options: fixed.tillageOptions,
+    placeholder: "Select",
+    showLabel: false,
     onChange: (v) => trialStore.updateHeader({ tillage: v }),
   });
   const irrigationWheel = createWheelSelect({
     title: "Irrigation",
     value: header.irrigation,
     options: fixed.irrigationOptions,
+    placeholder: "Select",
+    showLabel: false,
     onChange: (v) => trialStore.updateHeader({ irrigation: v }),
   });
   const soilTypeWheel = createWheelSelect({
     title: "Soil Type",
     value: header.soilType,
     options: fixed.soilTypeOptions,
+    placeholder: "Select",
+    showLabel: false,
     onChange: (v) => trialStore.updateHeader({ soilType: v }),
   });
   const previousCropWheel = createWheelSelect({
     title: "Previous Crop",
     value: header.previousCrop,
     options: fixed.previousCropOptions,
+    placeholder: "Select",
+    showLabel: false,
     onChange: (v) => trialStore.updateHeader({ previousCrop: v }),
   });
 
@@ -468,11 +485,13 @@ export function render(container) {
     title: "Planting Population",
     value: header.plantingPopulation || "32000",
     options: populationOptions,
+    placeholder: "Select",
+    showLabel: false,
     onChange: (v) => trialStore.updateHeader({ plantingPopulation: v }),
   });
 
   const plantingSection = h("section", { className: "card" }, [
-    sectionHeader("Planting"),
+    sectionHeader("Planting Details"),
     field(
       "Date Planted",
       createDatePicker({
@@ -501,7 +520,7 @@ export function render(container) {
   // input for these anymore; they always reflect whoever's account the
   // plot belongs to.
   const harvestSection = h("section", { className: "card" }, [
-    sectionHeader("Harvest"),
+    sectionHeader("Harvest Details"),
     field(
       "Date Harvested",
       createDatePicker({
