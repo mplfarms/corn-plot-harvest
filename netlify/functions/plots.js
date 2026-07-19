@@ -18,11 +18,27 @@
 //
 // Endpoints (all under /.netlify/functions/plots):
 //   GET  ?email=&scope=self (default) -> { trials: SavedTrial[] } (caller's own)
-//   GET  ?email=&scope=all            -> { users: [{email, name, trials}] } (admin only)
-//   PUT  body {email, trials: [...]}  -> overwrites the caller's stored trials
+//   GET  ?email=&scope=all            -> { users: [{email, name, firstName, lastName,
+//                                          mobileNumber, isAdmin, trials}] } (admin only) —
+//        one entry per REGISTERED account (from the "users" store), not just
+//        accounts that have synced a plot, so a brand-new user still gets
+//        their own card (with 0 trials) on the All Plots (Admin) screen —
+//        see adminPlots.js. Sorted admin(s)-first, then alphabetically by
+//        last name (sortUsersAdminFirst() in _shared.js).
+//   PUT  body {email, trials: [...]}  -> overwrites `email`'s stored trials
+//   PUT  body {email, trials: [...], adminEmail}
+//        -> same, but on behalf of a DIFFERENT user (email !== adminEmail):
+//           requires adminEmail's own stored record to have isAdmin ===
+//           true (requireAdmin(), server-checked, never trusted from the
+//           client alone — same pattern as scope=all above). Used by the
+//           admin "All Plots" edit flow (see adminEditStore.js) so an
+//           admin can fix up a teammate's plot without ever touching
+//           their own local library. Omitting adminEmail (or setting it
+//           equal to email) is a normal self-save and gets no admin
+//           check — matches every other user's own saves, unchanged.
 
 const { getStore, connectLambda } = require("@netlify/blobs");
-const { json, normalizeEmail, userKey, requireAdmin } = require("./_shared");
+const { json, normalizeEmail, userKey, requireAdmin, sortUsersAdminFirst } = require("./_shared");
 
 async function handleGetSelf(plotsStore, email) {
   const trials = (await plotsStore.get(userKey(email), { type: "json" })) || [];
@@ -33,23 +49,34 @@ async function handleGetAll(usersStore, plotsStore, email) {
   const adminCheck = await requireAdmin(usersStore, email);
   if (!adminCheck.ok) return json(adminCheck.statusCode, { error: adminCheck.error });
 
-  const { blobs } = await plotsStore.list();
-  const users = [];
-  for (const b of blobs) {
-    const [trials, meta] = await Promise.all([
-      plotsStore.get(b.key, { type: "json" }),
-      plotsStore.getMetadata(b.key),
-    ]);
-    users.push({
-      email: (meta && meta.metadata && meta.metadata.email) || b.key.replace(/\.json$/, ""),
-      name: (meta && meta.metadata && meta.metadata.name) || null,
-      trials: trials || [],
-    });
-  }
-  // Alphabetical by name (falling back to email) so the admin view is
-  // stable and scannable rather than in arbitrary blob-listing order.
-  users.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
-  return json(200, { users });
+  // Enumerated from the "users" store (every REGISTERED account) rather
+  // than the "plots" store (only accounts that have ever synced at least
+  // one trial) — a user who's signed in but hasn't saved a plot of their
+  // own yet still gets their own card here, with 0 entries, instead of
+  // silently not appearing at all. Each user's trials are then looked up
+  // from the "plots" store by their own email (defaulting to an empty
+  // array when they have no blob there yet).
+  const { blobs } = await usersStore.list();
+  const users = (
+    await Promise.all(
+      blobs.map(async (b) => {
+        const record = await usersStore.get(b.key, { type: "json" });
+        if (!record) return null;
+        const trials = (await plotsStore.get(userKey(record.email), { type: "json" })) || [];
+        return {
+          email: record.email,
+          name: record.name || record.email,
+          firstName: record.firstName || "",
+          lastName: record.lastName || "",
+          mobileNumber: record.mobileNumber || "",
+          isAdmin: Boolean(record.isAdmin),
+          trials,
+        };
+      })
+    )
+  ).filter(Boolean);
+
+  return json(200, { users: sortUsersAdminFirst(users) });
 }
 
 async function handlePut(usersStore, plotsStore, event) {
@@ -62,6 +89,12 @@ async function handlePut(usersStore, plotsStore, event) {
 
   const email = normalizeEmail(payload.email);
   if (!email) return json(400, { error: "Missing email." });
+
+  const adminEmail = payload.adminEmail ? normalizeEmail(payload.adminEmail) : null;
+  if (adminEmail && adminEmail !== email) {
+    const adminCheck = await requireAdmin(usersStore, adminEmail);
+    if (!adminCheck.ok) return json(adminCheck.statusCode, { error: adminCheck.error });
+  }
 
   const trials = Array.isArray(payload.trials) ? payload.trials : [];
   const userRecord = await usersStore.get(userKey(email), { type: "json" });

@@ -1,7 +1,7 @@
 // netlify/functions/auth.js
 //
 // The entire "sign in" flow for this app: POST {email} — email only, no
-// name, no password, no email verification, and no passcode of any kind
+// password, no email verification, and no passcode of any kind
 // (deliberately simple: this is low-stakes farm data, not anything
 // sensitive). There's no separate sign-up step either — a first-time
 // email creates a new user record, a returning email just logs the
@@ -9,11 +9,18 @@
 // tradeoff this implies (in short: knowing someone's email is enough to
 // sign in as them).
 //
-// "name" is optional and defaults to the email address itself when not
-// supplied (the current sign-in form doesn't ask for one at all) — it's
-// kept as a stored field purely so the admin screens (Manage Users, All
-// Plots) have *something* to head each user's card/section with; when a
-// caller does pass a name it's stored and shown instead.
+// firstName/lastName/mobileNumber/name are all optional and every one of
+// them defaults to whatever's already on file (or, for a brand-new
+// account, to the email address) when not supplied — the plain sign-in
+// call every RETURNING user's device makes is just {email}, with none of
+// these fields, and that call must never blank out an already-stored
+// name or phone number. Only accountScreen.js's one-time "Welcome!"
+// follow-up (see isNewUser below) actually sends firstName/lastName/
+// mobileNumber; a plain `name` (no first/last) is also still accepted for
+// flexibility/backward compatibility. `name` itself is kept as a single
+// combined display field (firstName + " " + lastName when those are set)
+// purely so every existing admin screen and saved-plot badge that already
+// reads `name` keeps working unchanged.
 //
 // The very first account ever created with BOOTSTRAP_ADMIN_EMAIL becomes
 // an admin automatically (and self-heals back to admin on every sign-in,
@@ -23,9 +30,11 @@
 // Users, admin-only) rather than by editing this file again.
 
 const { getStore, connectLambda } = require("@netlify/blobs");
-const { json, normalizeEmail, isValidEmail, userKey } = require("./_shared");
+const { json, normalizeEmail, isValidEmail, userKey, BOOTSTRAP_ADMIN_EMAIL } = require("./_shared");
 
-const BOOTSTRAP_ADMIN_EMAIL = "mplfarms@aol.com";
+function trimmedString(v) {
+  return typeof v === "string" ? v.trim() : "";
+}
 
 exports.handler = async (event) => {
   connectLambda(event);
@@ -43,7 +52,11 @@ exports.handler = async (event) => {
 
   const email = normalizeEmail(payload.email);
   if (!email || !isValidEmail(email)) return json(400, { error: "A valid email is required." });
-  const name = String(payload.name || "").trim() || email;
+
+  const firstNameIn = trimmedString(payload.firstName);
+  const lastNameIn = trimmedString(payload.lastName);
+  const mobileIn = trimmedString(payload.mobileNumber);
+  const nameIn = trimmedString(payload.name);
 
   const store = getStore("users");
   const key = userKey(email);
@@ -51,21 +64,43 @@ exports.handler = async (event) => {
   const isNewUser = !record;
 
   if (!record) {
+    const combinedName = [firstNameIn, lastNameIn].filter(Boolean).join(" ").trim();
     record = {
-      name,
+      name: nameIn || combinedName || email,
+      firstName: firstNameIn,
+      lastName: lastNameIn,
+      mobileNumber: mobileIn,
       email,
       isAdmin: email === BOOTSTRAP_ADMIN_EMAIL,
       createdAt: new Date().toISOString(),
     };
   } else {
-    record.name = name;
+    // Only touch fields this call actually supplied — a bare {email}
+    // sign-in (every normal returning login) must leave an
+    // already-stored name/first/last/phone untouched rather than
+    // resetting it back to the email address.
+    if (firstNameIn || lastNameIn) {
+      record.firstName = firstNameIn || record.firstName || "";
+      record.lastName = lastNameIn || record.lastName || "";
+      record.name = [record.firstName, record.lastName].filter(Boolean).join(" ").trim() || record.name || email;
+    } else if (nameIn) {
+      record.name = nameIn;
+    }
+    if (mobileIn) record.mobileNumber = mobileIn;
+    // Backfill fields that predate this schema (legacy accounts created
+    // before firstName/lastName/mobileNumber existed) so every record
+    // has consistent, always-a-string fields for the client to read.
+    if (typeof record.firstName !== "string") record.firstName = "";
+    if (typeof record.lastName !== "string") record.lastName = "";
+    if (typeof record.mobileNumber !== "string") record.mobileNumber = "";
     if (email === BOOTSTRAP_ADMIN_EMAIL) record.isAdmin = true;
   }
 
   await store.setJSON(key, record);
-  // isNewUser lets the client know to prompt for a name right after this
-  // first sign-in (see accountScreen.js) — the account itself is already
-  // created at this point (with name defaulted to the email), so a
-  // cancelled/skipped prompt still leaves a fully working account.
+  // isNewUser lets the client know to prompt for First Name/Last
+  // Name/Mobile Number right after this first sign-in (see
+  // accountScreen.js) — the account itself is already created at this
+  // point (with name defaulted to the email), so a cancelled/skipped
+  // prompt still leaves a fully working account.
   return json(200, { user: record, isNewUser });
 };

@@ -19,6 +19,13 @@
 // oversight — see the "Cloud sync setup" section of README.md for the
 // full picture before changing this further.
 
+// The one account that's always guaranteed to exist and stay an admin
+// (see auth.js's self-healing isAdmin logic) — also the fixed recipient
+// every self-deleted account's plots transfer to (see deleteAccount.js).
+// Centralized here, rather than duplicated as a local literal in both
+// auth.js and deleteAccount.js, so the two can never drift apart.
+const BOOTSTRAP_ADMIN_EMAIL = "mplfarms@aol.com";
+
 function json(statusCode, body) {
   return {
     statusCode,
@@ -62,4 +69,46 @@ async function requireAdmin(usersStore, email) {
   return { ok: true, user: record };
 }
 
-module.exports = { json, normalizeEmail, isValidEmail, userKey, requireAdmin };
+/**
+ * Derives a "last name" to sort by for a stored user record. Prefers the
+ * explicit lastName field (see auth.js); falls back to the last
+ * whitespace-separated token of the legacy single `name` field for
+ * accounts created before firstName/lastName existed, and finally to the
+ * email itself if there's no name on file at all.
+ * @param {{lastName?: string, name?: string, email?: string}} record
+ * @returns {string}
+ */
+function lastNameFor(record) {
+  if (record.lastName) return record.lastName;
+  const source = String(record.name || record.email || "").trim();
+  if (!source) return "";
+  const parts = source.split(/\s+/);
+  return parts.length > 1 ? parts[parts.length - 1] : source;
+}
+
+/**
+ * Shared ordering rule for every admin-facing list of users (All Plots,
+ * Manage Users): admin(s) always first, then everyone else alphabetically
+ * by last name (case-insensitive, see lastNameFor() above) — so a team's
+ * roster reads the same way on both screens rather than each inventing
+ * its own order.
+ * @param {Array<{isAdmin?: boolean}>} users
+ * @returns {Array} a new, sorted array (does not mutate the input)
+ */
+function sortUsersAdminFirst(users) {
+  return users.slice().sort((a, b) => {
+    if (Boolean(a.isAdmin) !== Boolean(b.isAdmin)) return a.isAdmin ? -1 : 1;
+    return lastNameFor(a).toLowerCase().localeCompare(lastNameFor(b).toLowerCase());
+  });
+}
+
+module.exports = {
+  json,
+  normalizeEmail,
+  isValidEmail,
+  userKey,
+  requireAdmin,
+  BOOTSTRAP_ADMIN_EMAIL,
+  lastNameFor,
+  sortUsersAdminFirst,
+};
