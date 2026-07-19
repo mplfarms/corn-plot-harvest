@@ -9,6 +9,7 @@
 import * as listsStore from "./ui/stores/listsStore.js";
 import * as brandStore from "./ui/stores/brandStore.js";
 import * as authStore from "./ui/authStore.js";
+import * as libraryStore from "./ui/stores/libraryStore.js";
 import "./ui/stores/themeStore.js"; // self-applies persisted theme mode on load
 import "./ui/stores/cloudSyncStore.js"; // wires up push/pull subscriptions on load
 import { initRouter } from "./ui/router.js";
@@ -23,6 +24,10 @@ if ("serviceWorker" in navigator) {
 
 async function start() {
   authStore.init();
+  // Local to this device, independent of sign-in — see
+  // libraryStore.ensureDemoPlot()'s comment for the "reappears after an
+  // update, but not before you delete it" rule.
+  libraryStore.ensureDemoPlot();
   await listsStore.ensureLoaded();
 
   if (!window.location.hash) {

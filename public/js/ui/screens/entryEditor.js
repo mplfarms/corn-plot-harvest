@@ -211,7 +211,7 @@ export function render(container, params) {
   rebuildHybridWheel();
 
   const identitySection = h("section", { className: "card" }, [
-    sectionHeader("Identity"),
+    sectionHeader("Hybrid Details"),
     field("Brand / Company", brandWheel.el),
     field("Hybrid", hybridWheelHolder),
     traitRow,
@@ -263,7 +263,7 @@ export function render(container, params) {
     sectionHeader("Comments"),
     h("textarea", {
       className: "text-input text-area",
-      placeholder: "Notes about this entry…",
+      placeholder: "Enter notes about entry here. Examples: Sprayer Blight, Animal Damage, Row Missing, etc…",
       oninput: (e) => trialStore.updateEntry(entryId, { comments: e.target.value }),
     }, entry.comments || ""),
     h(

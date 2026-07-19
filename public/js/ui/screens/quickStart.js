@@ -27,6 +27,7 @@ const STEPS = [
   {
     title: "Sign in",
     text: "Type your email and tap Sign In. No password needed. The first time, it'll ask your name — that just helps your admin tell everyone's plots apart.",
+    tip: "You'll notice a “Demo” plot already sitting in Saved Plots — that's a sample with results already filled in, just so you have something to look at. Explore it, edit it, or delete it any time; it's local to this device only.",
   },
   {
     title: "Pick your Brand View (if asked)",

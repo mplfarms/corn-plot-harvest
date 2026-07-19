@@ -9,9 +9,12 @@
 import { createPubSub, debounce, readJson, writeJson } from "./pubsub.js";
 import * as trialStore from "./trialStore.js";
 import * as adminEditStore from "./adminEditStore.js";
+import { DEMO_TRIAL_ID, createDemoTrial } from "../../core/demoPlot.js";
+import { APP_VERSION } from "../../version.js";
 
 const KEY = "cph.savedTrials";
 const AUTOSAVE_DEBOUNCE_MS = 500;
+const DEMO_SEED_VERSION_KEY = "cph.demoPlotSeededVersion";
 
 const pubsub = createPubSub();
 
@@ -39,6 +42,10 @@ export function subscribe(fn) {
 
 /**
  * Upserts a SavedTrial-shaped record (by id), stamping lastModified now.
+ * Carries forward any extra fields already on the existing record (e.g.
+ * transferredFrom — see adminUsers.js's handleMerge()/deleteAccount.js —
+ * or isDemo — see demoPlot.js) that aren't passed in here, so editing a
+ * trial's header/entries never silently strips flags set elsewhere.
  * @param {string} id
  * @param {import('../../core/models.js').TrialHeader} header
  * @param {import('../../core/models.js').PlotEntry[]} entries
@@ -46,7 +53,14 @@ export function subscribe(fn) {
 export function upsert(id, header, entries) {
   const lastModified = new Date().toISOString();
   const idx = state.trials.findIndex((t) => t.id === id);
-  const record = { id, header: { ...header }, entries: entries.map((e) => ({ ...e })), lastModified };
+  const existing = idx >= 0 ? state.trials[idx] : null;
+  const record = {
+    ...existing,
+    id,
+    header: { ...header },
+    entries: entries.map((e) => ({ ...e })),
+    lastModified,
+  };
   const next = state.trials.slice();
   if (idx >= 0) {
     next[idx] = record;
@@ -54,6 +68,27 @@ export function upsert(id, header, entries) {
     next.push(record);
   }
   set(next);
+}
+
+/**
+ * Seeds the sample "Demo Plot" (see demoPlot.js) into this device's
+ * library if it isn't already there. Runs once per app version, not
+ * once ever — so deleting it dismisses it for the rest of this version,
+ * but it comes back the next time the app updates, giving people a
+ * fresh look at it (e.g. after new features ship) rather than making it
+ * gone for good the first time someone clears it out of curiosity. Safe
+ * to call more than once per boot; it no-ops once this version's seed
+ * has already run. Call once at startup — see main.js.
+ */
+export function ensureDemoPlot() {
+  const seededVersion = readJson(DEMO_SEED_VERSION_KEY, null);
+  if (seededVersion === APP_VERSION) return;
+  const alreadyPresent = state.trials.some((t) => t.id === DEMO_TRIAL_ID);
+  if (!alreadyPresent) {
+    const demo = createDemoTrial();
+    set([...state.trials, { ...demo, lastModified: new Date().toISOString() }]);
+  }
+  writeJson(DEMO_SEED_VERSION_KEY, APP_VERSION);
 }
 
 /**

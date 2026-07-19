@@ -142,10 +142,16 @@ export async function pushNow() {
   if (!authStore.getUser()) return;
   setStatus(SyncStatus.SYNCING);
   try {
+    // The sample Demo Plot (see demoPlot.js) is deliberately local-only
+    // sample data — it must never reach the cloud, show up in All Plots
+    // (Admin), or count in an export, even while the user is editing it
+    // for practice. libraryStore.upsert() carries the isDemo flag
+    // forward across edits specifically so this filter keeps working.
+    const trials = libraryStore.getState().trials.filter((t) => !t.isDemo);
     const res = await authedFetch({
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trials: libraryStore.getState().trials }),
+      body: JSON.stringify({ trials }),
     });
     if (!res || !res.ok) {
       setStatus(SyncStatus.ERROR);

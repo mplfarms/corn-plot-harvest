@@ -180,7 +180,7 @@ export function render(container, params) {
   const header = draft.header;
   const entries = draft.entries;
   // Relabeled view of entries used only for this screen and its PDF
-  // export (Plot Entries editing and the XLSX export use the real,
+  // export (Hybrid Entries editing and the XLSX export use the real,
   // unrelabeled `entries` above) — see entriesForBrandView() for the
   // Midwest Seed Genetics <-> NC+ mirrored relabeling rule.
   const displayEntries = entriesForBrandView(entries, brand);
@@ -475,7 +475,7 @@ export function render(container, params) {
     );
   });
 
-  // ---- Bottom action: back to Plot Entries to keep editing ----
+  // ---- Bottom action: back to Hybrid Entries to keep editing ----
   const editPlotBtn = h(
     "button",
     {

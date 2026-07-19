@@ -1442,6 +1442,22 @@ h3.section-header:first-child {
   white-space: nowrap;
 }
 
+/* The sample Demo Plot's badge on Saved Plots (see demoPlot.js) — a
+   neutral gray, deliberately distinct from the gold "Current" badge and
+   the green "From {name}" transferred badge, so it reads as
+   informational rather than a status to act on. */
+.badge-demo {
+  background: #6b7280;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .saved-plots-search {
   margin-bottom: 4px;
 }

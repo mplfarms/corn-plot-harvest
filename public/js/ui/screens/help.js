@@ -115,12 +115,12 @@ export function render(container) {
       sub("Harvest"),
       p("Who collected the data (Collected By), their Phone and Email, and the Date Harvested."),
       sub("Yield Calculation"),
-      p("Drying Shrink Rate and Price per Bushel — these are used to calculate the dollar value of each hybrid's yield. Base moisture is fixed at 15.5%, the standard basis for corn, so there's nothing to set there. Trial Notes at the bottom is just free space for anything else worth writing down about this plot."),
+      p("Drying Shrink Rate and Price per Bushel — these are used to calculate the dollar value of each hybrid's yield. Base moisture is fixed at 15.5%, the standard basis for corn, so there's nothing to set there. Plot Notes at the bottom is just free space for anything else worth writing down about this plot."),
     ]),
 
     helpSection("Adding Your Hybrids", [
       p("From the Plot Workspace menu, tap “Enter Plot Hybrids” to see the list of hybrids in this plot. Tap the + button (bottom right) to add one."),
-      sub("Identity"),
+      sub("Hybrid Details"),
       p("Brand/Company, Hybrid, Trait, Seed Treatment, and Relative Maturity (RM) — these describe which product this entry is."),
       sub("Yield Measurements"),
       p("There are two different ways to get a Dry Yield number onto an entry — use whichever one fits how you actually collected your data. You never need to do both."),
@@ -164,6 +164,7 @@ export function render(container) {
       p("Every plot you've entered a cooperator name for is saved automatically — there's no separate “Save” step to remember. Find them all by tapping “Saved Plots” from the Home Screen or Plot Workspace menu."),
       p("Use the search box at the top to find a plot by cooperator name, state, or year. A gold “Current” badge marks whichever plot is open in your workspace right now. Tap any row to open it; tap the 🗑 icon to permanently delete one from your device."),
       p("If a saved plot shows a “From {name}” badge, it means it originally belonged to a teammate — either an admin merged their account into yours, or they deleted their own account and their plots came to your farm's admin (see “For Admins” below). It's yours to manage from here just like any other saved plot."),
+      p("You'll also see one plot with a gray “Demo” badge — a sample plot pre-loaded on this device so you always have something to look at on Plot Summary. Feel free to edit it for practice; it stays local to this device and never syncs, shows up on All Plots (Admin), or counts in an export. Delete it whenever you like — it'll come back automatically the next time the app updates."),
     ]),
 
     helpSection("Staying in Sync Across Devices", [

@@ -13,6 +13,11 @@
 // silently blending into whoever's library it landed in — deliberately
 // NOT re-sorted into its own group, so the list stays in its normal
 // most-recently-touched order regardless of where each plot came from.
+//
+// The sample Demo Plot (see demoPlot.js, seeded automatically by
+// libraryStore.ensureDemoPlot()) shows a "Demo" badge for the same
+// reason — never mistaken for a real cooperator's plot — and deletes
+// the same way any other plot does (it just comes back next update).
 
 import { h, mount, clear } from "../dom.js";
 import * as trialStore from "../stores/trialStore.js";
@@ -80,6 +85,7 @@ export function render(container, params) {
       // identifiable as having belonged to a teammate rather than being
       // silently absorbed into whoever's library it landed in.
       const transferredFrom = trial.transferredFrom;
+      const isDemo = Boolean(trial.isDemo);
 
       const row = h("div", { className: "entry-row" }, [
         h(
@@ -97,6 +103,13 @@ export function render(container, params) {
               h("span", { className: "entry-row-title" }, [
                 trial.header.cooperatorName.trim() || "Untitled Plot",
                 isCurrent ? h("span", { className: "badge-current" }, "Current") : null,
+                isDemo
+                  ? h(
+                      "span",
+                      { className: "badge-demo", title: "A sample plot for practice — safe to edit or delete." },
+                      "Demo"
+                    )
+                  : null,
                 transferredFrom
                   ? h(
                       "span",
@@ -118,8 +131,10 @@ export function render(container, params) {
               "aria-label": "Delete saved plot",
               onclick: async () => {
                 const ok = await showConfirm({
-                  title: "Delete Saved Plot?",
-                  message: `This permanently removes "${trial.header.cooperatorName.trim() || "Untitled Plot"}" from your library.`,
+                  title: isDemo ? "Delete Demo Plot?" : "Delete Saved Plot?",
+                  message: isDemo
+                    ? "This removes the sample Demo Plot from this device. It'll come back automatically the next time the app updates."
+                    : `This permanently removes "${trial.header.cooperatorName.trim() || "Untitled Plot"}" from your library.`,
                   confirmLabel: "Delete",
                   destructive: true,
                 });

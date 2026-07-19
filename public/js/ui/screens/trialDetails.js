@@ -523,7 +523,14 @@ export function render(container) {
         },
       })
     ),
-    field("Trial Notes", textAreaInput({ value: header.trialNotes, oninput: (v) => trialStore.updateHeader({ trialNotes: v }) })),
+    field(
+      "Plot Notes",
+      textAreaInput({
+        value: header.trialNotes,
+        placeholder: "Enter notes about this plot here. Examples include: Hail Damage, Flooded, Severe Wind, etc…",
+        oninput: (v) => trialStore.updateHeader({ trialNotes: v }),
+      })
+    ),
     h(
       "p",
       { className: "field-note" },

@@ -21,7 +21,7 @@ export function render(container) {
   const entries = draft.entries;
 
   const topBar = createTopBar({
-    title: "Plot Entries",
+    title: "Hybrid Entries",
     onBack: () => navigate("workspace"),
     backLabel: "Menu",
   });
@@ -119,7 +119,7 @@ export function render(container) {
 
   const screen = h("div", { className: "screen entries-list-screen" }, [
     topBar,
-    h("div", { className: "screen-body" }, [h("h2", { className: "screen-heading" }, "Plot Entries"), listEl]),
+    h("div", { className: "screen-body" }, [h("h2", { className: "screen-heading" }, "Hybrid Entries"), listEl]),
     addBtn,
   ]);
 
