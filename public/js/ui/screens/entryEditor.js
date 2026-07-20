@@ -310,17 +310,27 @@ export function render(container, params) {
       {
         type: "button",
         className: "btn btn-primary",
-        onclick: () => {
+        onclick: async (e) => {
           // A plot's Form ID (see core/formId.js) is reserved right here,
           // the moment "Save Plot" is actually tapped — by explicit
           // request, NOT the instant Plot Details is opened, so simply
-          // browsing/backing out of a plot never burns a number. This is
-          // fire-and-forget (never blocks navigating to Plot Summary,
-          // matching this app's offline-first design — see
-          // formIdAssign.js's top comment); plotSummary.js makes its own
-          // follow-up attempt before actually building an export, as a
-          // safety net in case this one hasn't finished yet.
-          ensureFormIdAssigned();
+          // browsing/backing out of a plot never burns a number.
+          // Deliberately AWAITED (not fire-and-forget) before navigating —
+          // Plot Summary reads the header once at mount time and doesn't
+          // live-subscribe to the store, so if this fired-and-forgot the
+          // way it originally did, Plot Summary would frequently render
+          // BEFORE the reservation actually landed and show no Form ID at
+          // all until the next visit. ensureFormIdAssigned() never throws
+          // (offline just resolves false — see its top comment), so this
+          // never blocks Save Plot from working, it just makes the wait
+          // visible with a brief "Saving…" state instead of hiding it.
+          // Plot Summary's own resolveHeaderForExport() and its
+          // self-healing re-render (see plotSummary.js) remain as a
+          // safety net for anything that still slips through (a very
+          // slow connection, or an older plot reached some other way).
+          e.target.disabled = true;
+          e.target.textContent = "Saving…";
+          await ensureFormIdAssigned().catch(() => {});
           navigate("plot-summary");
         },
       },

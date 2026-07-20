@@ -78,7 +78,7 @@ const LOGO_MAX_WIDTH = 100;
 function plotDetailsFields(header) {
   return [
     ["Cooperator", header.cooperatorName],
-    ["Address", header.address],
+    ["Cooperator Address", header.address],
     ["City", header.city],
     ["County", header.county],
     ["Zip", header.zip],
@@ -550,9 +550,15 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
 }
 
 /**
+ * Once a Form ID is assigned, the PDF's filename is just the code itself
+ * — "APP00001.pdf" — matching the xlsx export exactly (see
+ * xlsxBuilder.js's exportFilename()), per explicit request. Falls back
+ * to the original State_Year_Cooperator_Results.pdf scheme for a plot
+ * that doesn't have a Form ID yet, same as exportFilename()'s own fallback.
  * @param {import('./models.js').TrialHeader} header
  * @returns {string}
  */
 export function pdfFilename(header) {
+  if (header.formId) return `${header.formId}.pdf`;
   return exportFilename(header).replace(/\.xlsx$/, "_Results.pdf");
 }

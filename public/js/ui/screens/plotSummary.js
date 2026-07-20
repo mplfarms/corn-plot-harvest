@@ -403,7 +403,12 @@ export function render(container, params) {
   // expanded panel is the actual way in to change anything (works the
   // same during an admin edit as the existing "Edit This Plot" button
   // below does — see its comment).
-  const subtitle = `${filenameYear(header)} • ${header.state || "—"} • ${header.county || "—"}`;
+  // Form ID (see core/formId.js) shown as a trailing "• APP00001" once
+  // assigned — omitted entirely (not even a placeholder dash) for a plot
+  // that doesn't have one yet, same as everywhere else this shows up.
+  const subtitle = `${filenameYear(header)} • ${header.state || "—"} • ${header.county || "—"}${
+    header.formId ? ` • ${header.formId}` : ""
+  }`;
 
   function detailRow(label, value) {
     if (!value) return null;
@@ -637,4 +642,21 @@ export function render(container, params) {
   ]);
 
   mount(container, screen);
+
+  // Self-heals a plot that reaches Plot Summary without a Form ID yet —
+  // an older plot saved before this feature existed (see the "assign to
+  // all existing plots" backfill in netlify/functions/backfillFormIds.js,
+  // which should catch most of these up front), or the rarer case of a
+  // very slow connection where even entryEditor.js's awaited Save Plot
+  // reservation hasn't landed yet. Fire-and-forget, exactly like every
+  // other formIdAssign.js call site — never blocks anything on screen —
+  // but if it succeeds AND this screen is still the one showing (the
+  // user hasn't already navigated elsewhere while it was in flight,
+  // checked via container.isConnected), re-render once so the newly
+  // assigned ID actually appears without requiring a manual refresh.
+  if (!header.formId) {
+    ensureFormIdAssigned().then((assigned) => {
+      if (assigned && container.isConnected) render(container, params);
+    });
+  }
 }

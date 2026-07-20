@@ -41,6 +41,7 @@
 import { h, mount, clear } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
 import { showCustomModal } from "../components/modal.js";
+import { showToast } from "../components/toast.js";
 import * as authStore from "../authStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
@@ -73,6 +74,50 @@ function openUserDetailModal(u) {
   showCustomModal({ title: "User Details", bodyNode: body });
 }
 
+/**
+ * One-time (safely repeatable) admin action — see
+ * netlify/functions/backfillFormIds.js's top comment — that assigns a
+ * Form ID to every existing plot, across every user, that doesn't
+ * already have one. Only ever needs to actually DO anything once (the
+ * button stays available afterward purely as a "catch anything that
+ * slipped through" sanity sweep — running it again on a fully-backfilled
+ * system just reports 0 assigned).
+ * @param {HTMLButtonElement} btn
+ * @param {() => void} onDone re-renders the screen after a successful run
+ *   so the newly assigned IDs show up on each plot row without a manual reload.
+ */
+async function runBackfillFormIds(btn, onDone) {
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Assigning…";
+  try {
+    const creds = authStore.getCredentials();
+    if (!creds) throw new Error("Not signed in.");
+    const res = await fetch("/.netlify/functions/backfillFormIds", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: creds.email }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Server returned ${res.status}`);
+
+    const { assignedCount, updatedUserCount, totalTrialCount } = body;
+    showToast(
+      assignedCount > 0
+        ? `Assigned ${assignedCount} new Form ID${assignedCount === 1 ? "" : "s"} across ${updatedUserCount} user${
+            updatedUserCount === 1 ? "" : "s"
+          } (${totalTrialCount} plots checked).`
+        : `Every plot already has a Form ID — nothing to assign (${totalTrialCount} plots checked).`,
+      { type: "success" }
+    );
+    onDone();
+  } catch (e) {
+    showToast(`Couldn't assign Form IDs: ${e.message}`, { type: "error" });
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
 export async function render(container) {
   const topBar = createTopBar({
     title: "All Plots (Admin)",
@@ -97,6 +142,17 @@ export async function render(container) {
 
     clear(bodyEl);
     bodyEl.appendChild(h("h2", { className: "screen-heading" }, "All Plots (Admin)"));
+
+    const backfillBtn = h(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-secondary btn-block",
+        onclick: (e) => runBackfillFormIds(e.target, () => render(container)),
+      },
+      "Assign Form IDs to All Plots"
+    );
+    bodyEl.appendChild(backfillBtn);
 
     if (!users || users.length === 0) {
       bodyEl.appendChild(h("p", { className: "empty-state" }, "No cloud-synced plots yet."));
@@ -151,7 +207,9 @@ export async function render(container) {
                     h(
                       "span",
                       { className: "brand-average-value" },
-                      `${t.entries.length} ${t.entries.length === 1 ? "entry" : "entries"} ›`
+                      `${t.header.formId ? `${t.header.formId} • ` : ""}${t.entries.length} ${
+                        t.entries.length === 1 ? "entry" : "entries"
+                      } ›`
                     ),
                   ]
                 ),
