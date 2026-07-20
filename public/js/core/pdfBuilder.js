@@ -14,7 +14,7 @@ import {
   SIGNIFICANCE_THRESHOLD_BU_AC,
   brandAveragesForDisplay,
 } from "./yieldCalculator.js";
-import { filenameYear, harvestedYear } from "./models.js";
+import { filenameYear, harvestedYear, formatHeaderDate, gpsCellText } from "./models.js";
 import { exportFilename } from "./xlsxBuilder.js";
 
 // Same 3-color rule as the Plot Summary screen's rank badges (see
@@ -66,6 +66,36 @@ const LOGO_RESERVED_WIDTH = 110;
 const LOGO_MAX_HEIGHT = 40;
 const LOGO_MAX_WIDTH = 100;
 
+// The optional compact "Plot Details" header block — see the
+// "Include Plot Details" prompt in plotSummary.js's handleExportPdf()/
+// handlePrint(). Same field set as the Plot Summary screen's own
+// expandable details recap (see detailRows in plotSummary.js) so the two
+// stay consistent; blank fields are skipped here too, same as there.
+/**
+ * @param {import('./models.js').TrialHeader} header
+ * @returns {Array<[string, string]>}
+ */
+function plotDetailsFields(header) {
+  return [
+    ["Cooperator", header.cooperatorName],
+    ["Address", header.address],
+    ["City", header.city],
+    ["County", header.county],
+    ["Zip", header.zip],
+    ["GPS", gpsCellText(header)],
+    ["Date Planted", formatHeaderDate(header.datePlanted)],
+    ["Date Harvested", formatHeaderDate(header.dateHarvested)],
+    ["Tillage", header.tillage],
+    ["Irrigation", header.irrigation],
+    ["Soil Type", header.soilType],
+    ["Previous Crop", header.previousCrop],
+    ["Planting Population", header.plantingPopulation],
+    ["Collected By", header.collectedBy],
+    ["Phone", header.phone],
+    ["Email", header.email],
+  ].filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "");
+}
+
 let warnedMissingJsPdf = false;
 
 /**
@@ -97,10 +127,11 @@ function getJsPdfCtor() {
  *   allEntries: import('./models.js').PlotEntry[],
  *   brand: {displayName: string},
  *   logoDataUrl: string|null,
+ *   includePlotDetails?: boolean,
  * }} args
  * @returns {Promise<Blob>}
  */
-export async function buildPdf({ header, results, metric, allEntries, brand, logoDataUrl }) {
+export async function buildPdf({ header, results, metric, allEntries, brand, logoDataUrl, includePlotDetails = false }) {
   const JsPDF = getJsPdfCtor();
   const doc = new JsPDF({ unit: "pt", format: "letter", orientation: "portrait" });
 
@@ -172,6 +203,64 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     drawLogo();
 
     y = Math.max(y, MARGIN + LOGO_MAX_HEIGHT + 6);
+  }
+
+  // Optional compact "Plot Details" block — only drawn when the user
+  // answers "Yes" to the "Include Plot Details" prompt (see
+  // plotSummary.js). Deliberately terse: a bold gray section label, then
+  // a 2-column grid of "Label: value" pairs at 8pt (each value clipped to
+  // one line — this is a quick reference, not a full recap), so it adds
+  // real content without eating much of the page the way a full copy of
+  // the Plot Details screen would. Only ever called once, right after the
+  // title/subtitle on page 1 — startNewPage() never calls this, so it
+  // never repeats on later pages.
+  function drawPlotDetailsHeader() {
+    const fields = plotDetailsFields(header);
+    if (fields.length === 0) return;
+
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(MARGIN, y, MARGIN + tableWidth, y);
+    y += 10;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(90, 90, 90);
+    doc.text("Plot Details", MARGIN, y + 9 * 0.8);
+    doc.setTextColor(0, 0, 0);
+    y += 9 * 1.15 + 4;
+
+    const colWidth = tableWidth / 2;
+    const rowHeight = 8 * 1.6;
+    let col = 0;
+    let rowStartY = y;
+
+    doc.setFontSize(8);
+    for (const [label, rawValue] of fields) {
+      const x = MARGIN + col * colWidth;
+      const labelText = `${label}: `;
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(90, 90, 90);
+      doc.text(labelText, x, rowStartY + 8 * 0.8);
+      const labelWidth = doc.getTextWidth(labelText);
+
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(26, 26, 25);
+      const maxValueWidth = Math.max(colWidth - labelWidth - 8, 20);
+      const valueLines = doc.splitTextToSize(String(rawValue), maxValueWidth);
+      doc.text(valueLines[0], x + labelWidth, rowStartY + 8 * 0.8);
+
+      col += 1;
+      if (col > 1) {
+        col = 0;
+        rowStartY += rowHeight;
+      }
+    }
+    if (col === 1) rowStartY += rowHeight;
+
+    doc.setTextColor(0, 0, 0);
+    y = rowStartY + 6;
   }
 
   // Ranking-bubble color legend — same 3-color rule and label text as the
@@ -380,6 +469,7 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
   }
 
   drawTitleAndSubtitle();
+  if (includePlotDetails) drawPlotDetailsHeader();
   drawSummaryBlock();
   drawTableHeader();
 

@@ -30,13 +30,14 @@
  * @property {number} pricePerBushel
  * @property {string} trialNotes
  * @property {string} formId A short, permanent reference number for this
- *   exact plot — e.g. "5001", or "5001a" if "5001" was somehow already
- *   taken (see netlify/functions/formId.js's duplicate-suffix logic).
- *   Reserved from a single global server-side counter (starting at
- *   5000, shared across every user — see ui/formIdAssign.js) the first
- *   time this screen is opened for a plot that doesn't have one yet,
- *   and reused forever after — "" until assigned. Shown on Plot Details
- *   and used as the .xlsx export's filename / the PDF+print footer's
+ *   exact plot — e.g. "APP00001", or "APP00001a" if "APP00001" was
+ *   somehow already taken (see netlify/functions/formId.js's
+ *   duplicate-suffix logic). Reserved from a single global server-side
+ *   counter (starting at APP00001, shared across every user — see
+ *   ui/formIdAssign.js) the moment the user taps "Save Plot" on the
+ *   Entry Editor (never just from opening/browsing Plot Details), and
+ *   reused forever after — "" until assigned. Shown on Plot Details and
+ *   used as the .xlsx export's filename / the PDF+print footer's
  *   "Form ID" label.
  */
 

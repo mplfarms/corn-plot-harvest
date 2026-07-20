@@ -14,7 +14,6 @@ import * as listsStore from "../stores/listsStore.js";
 import * as authStore from "../authStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
 import * as geoData from "../geoData.js";
-import { ensureFormIdAssigned } from "../formIdAssign.js";
 import { createTopBar } from "../components/topBar.js";
 import { createWheelSelect, createExtendableWheelSelect } from "../components/wheelSelect.js";
 import { createDatePicker } from "../components/datePicker.js";
@@ -83,7 +82,20 @@ function textInput({ value, placeholder, oninput, type = "text", inputmode }) {
 // still being typed/edited by hand. Anything past 10 digits is dropped
 // rather than wrapping into an extension — this app has no field for one.
 function formatPhoneNumber(raw) {
-  const digits = String(raw || "").replace(/\D/g, "").slice(0, 10);
+  let digits = String(raw || "").replace(/\D/g, "");
+  // Chrome's (and some other browsers') autofill commonly prepends the US
+  // country code "1" ahead of the real 10-digit number when it fills this
+  // field from a saved contact — without stripping it, the result would
+  // be an 11-digit number that renders as something like
+  // "(155) 555-5555" instead of the correct "(555) 555-5555". Only strip
+  // it when it's clearly a country-code prefix (exactly 11 digits,
+  // leading "1") — a genuine 10-digit number starting with "1" on its
+  // own can't happen (US area codes never start with 1), so this can't
+  // misfire and eat a real digit.
+  if (digits.length === 11 && digits[0] === "1") {
+    digits = digits.slice(1);
+  }
+  digits = digits.slice(0, 10);
   if (!digits) return "";
   if (digits.length < 4) return `(${digits}`;
   if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
@@ -338,28 +350,24 @@ export function render(container) {
   });
 
   // Form ID — a short, permanent reference number for this exact plot
-  // (see core/formId.js's top comment). Reserved once, the first time
-  // this screen is opened for a plot that doesn't have one yet, and
-  // reused forever after. This screen never rebuilds its own DOM (see
-  // the file-level note at the top), so once the reservation resolves
-  // this note is patched in place rather than triggering a re-render.
+  // (see core/formId.js's top comment). NOT reserved from here anymore —
+  // by explicit request, a Form ID is only ever generated the moment the
+  // user taps "Save Plot" on the Entry Editor (see ensureFormIdAssigned()
+  // there), so simply opening/browsing Plot Details never burns a number.
+  // This just displays whatever the current draft already has (if
+  // anything) — see below for the plain "not yet assigned" case.
   const formIdNote = h(
     "p",
     { className: "field-note trial-details-form-id-note" },
-    header.formId ? `Form ID: ${header.formId}` : "Form ID: assigning…"
+    header.formId ? `Form ID: ${header.formId}` : "Form ID: will be assigned when you save this plot"
   );
-  ensureFormIdAssigned().then(() => {
-    const latest = trialStore.getState().header;
-    formIdNote.textContent = latest.formId
-      ? `Form ID: ${latest.formId}`
-      : "Form ID: will be assigned once you're back online";
-  });
 
   const cooperatorSection = h("section", { className: "card" }, [
     sectionHeader("Cooperator Details"),
     formIdNote,
     field("Name", textInput({ value: header.cooperatorName, oninput: (v) => trialStore.updateHeader({ cooperatorName: v }) })),
-    field("Address", textInput({ value: header.address, oninput: (v) => trialStore.updateHeader({ address: v }) })),
+    field("Cooperator Address", textInput({ value: header.address, oninput: (v) => trialStore.updateHeader({ address: v }) })),
+    h("p", { className: "field-note trial-details-address-note" }, "Leave blank if not known."),
     field("State", stateWheel.el),
     field("County", countyWheel.el),
     field("City", cityInput),

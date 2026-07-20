@@ -6,17 +6,24 @@
 // header (see models.js and core/formId.js's top comment for the full
 // design).
 //
-// Called from trialDetails.js as soon as Plot Details is opened for a
-// plot that doesn't have a Form ID yet (no longer gated on State/County
-// being set — unlike the earlier FIPS-based design, a Form ID carries no
-// location information at all, so there's nothing to wait on).
+// Called from exactly two places:
+//   1. entryEditor.js's "Save Plot" button — the real trigger, by
+//      explicit request: a Form ID is only ever generated once the user
+//      actually taps Save, never just from opening/browsing Plot
+//      Details. Fire-and-forget there (never blocks navigating to Plot
+//      Summary).
+//   2. plotSummary.js's export/print handlers, as a safety net — in
+//      case that first attempt hasn't finished yet (or never got a
+//      chance to run, e.g. a plot saved before this feature existed).
+//      Awaited there, since the exported file needs the real value.
 //
 // Deliberately never throws and never blocks anything: this app is
 // built to keep working offline in the field (see geoData.js's top
 // comment), so a plot that can't reach the server yet simply doesn't
-// have a Form ID shown yet — xlsxBuilder.js/pdfBuilder.js both fall back
-// to their pre-Form-ID filename/footer behavior when a header has none,
-// and trialDetails.js shows a plain "not yet assigned" note instead.
+// have a Form ID yet — xlsxBuilder.js/pdfBuilder.js both fall back to
+// their pre-Form-ID filename/footer behavior when a header has none, and
+// trialDetails.js shows a plain "will be assigned when you save this
+// plot" note instead.
 
 import * as trialStore from "./stores/trialStore.js";
 import * as authStore from "./authStore.js";

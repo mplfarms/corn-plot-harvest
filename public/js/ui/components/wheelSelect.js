@@ -132,27 +132,87 @@ function createWheelSelectBase(opts) {
   function buildPanel() {
     const scrollEl = h("div", { className: "wheel-scroll", role: "listbox", tabindex: "0" });
 
+    // Type-to-jump: for any list long enough that scrolling through it by
+    // hand is a chore (the exact "over ten items" cutoff requested),
+    // typing a letter while the list is open scrolls straight to (and
+    // focuses) the first option starting with what's been typed —
+    // pressing the SAME letter again jumps to the next match after that
+    // one (standard native <select> behavior); typing a DIFFERENT letter
+    // right after narrows to a fresh multi-character prefix instead of
+    // starting over. optionEls is built in lockstep with currentOptions
+    // below so the two stay index-aligned.
+    const typeaheadEnabled = currentOptions.length > 10;
+    const optionEls = [];
+    let typeaheadBuffer = "";
+    let typeaheadTimer = null;
+
+    function jumpToTypeahead(char) {
+      const isRepeatSameChar = typeaheadBuffer.length > 0 && typeaheadBuffer.split("").every((c) => c === char);
+      typeaheadBuffer = isRepeatSameChar ? typeaheadBuffer + char : char;
+      clearTimeout(typeaheadTimer);
+      // Resets to "start a fresh search" after a short pause, same as a
+      // native <select>'s type-ahead — this is what lets typing "Wa"
+      // quickly narrow to "Washington" while typing "W" ... (pause) ...
+      // "a" instead searches for "a" on its own.
+      typeaheadTimer = setTimeout(() => {
+        typeaheadBuffer = "";
+      }, 700);
+
+      const searchTerm = isRepeatSameChar ? char : typeaheadBuffer;
+      const n = optionEls.length;
+      if (n === 0) return;
+
+      let startIndex = 0;
+      if (isRepeatSameChar) {
+        const activeIndex = optionEls.indexOf(document.activeElement);
+        startIndex = activeIndex >= 0 ? activeIndex + 1 : 0;
+      }
+
+      for (let i = 0; i < n; i++) {
+        const idx = (startIndex + i) % n;
+        if (currentOptions[idx].label.toLowerCase().startsWith(searchTerm)) {
+          optionEls[idx].scrollIntoView({ block: "nearest", behavior: "auto" });
+          optionEls[idx].focus();
+          return;
+        }
+      }
+    }
+
+    if (typeaheadEnabled) {
+      scrollEl.addEventListener("keydown", (e) => {
+        // Single printable character, no modifier held — anything else
+        // (Enter, Space, Tab, arrow keys, Ctrl/Cmd combos, ...) passes
+        // through untouched to the option's own onkeydown/native
+        // scrolling below.
+        if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+        const char = e.key.toLowerCase();
+        if (!/[a-z0-9]/.test(char)) return;
+        e.preventDefault();
+        jumpToTypeahead(char);
+      });
+    }
+
     for (const opt of currentOptions) {
       const isSelected = opt.value === currentValue;
-      scrollEl.appendChild(
-        h(
-          "div",
-          {
-            className: "wheel-option" + (isSelected ? " wheel-option-selected" : ""),
-            role: "option",
-            "aria-selected": isSelected ? "true" : "false",
-            tabindex: "0",
-            onclick: guard(() => commit(opt.value)),
-            onkeydown: (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                commit(opt.value);
-              }
-            },
+      const optionEl = h(
+        "div",
+        {
+          className: "wheel-option" + (isSelected ? " wheel-option-selected" : ""),
+          role: "option",
+          "aria-selected": isSelected ? "true" : "false",
+          tabindex: "0",
+          onclick: guard(() => commit(opt.value)),
+          onkeydown: (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              commit(opt.value);
+            }
           },
-          opt.label
-        )
+        },
+        opt.label
       );
+      optionEls.push(optionEl);
+      scrollEl.appendChild(optionEl);
     }
 
     if (extendable) {

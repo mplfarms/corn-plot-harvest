@@ -13,7 +13,7 @@ import * as adminEditStore from "../stores/adminEditStore.js";
 import { ensureFormIdAssigned } from "../formIdAssign.js";
 import { createTopBar } from "../components/topBar.js";
 import { showToast } from "../components/toast.js";
-import { showCustomModal } from "../components/modal.js";
+import { showCustomModal, showConfirm } from "../components/modal.js";
 import { navigate, rememberedOriginFor } from "../router.js";
 import { filenameYear, formatHeaderDate, gpsCellText } from "../../core/models.js";
 import {
@@ -250,10 +250,33 @@ export function render(container, params) {
     return trialStore.getState().header;
   }
 
-  async function buildRankedPdfBlob(freshHeader) {
+  // Asked every time the user exports/prints a PDF (per explicit request
+  // — this is a one-off choice for that specific PDF, not a saved
+  // preference), right before it's built. "No" (the default/cancel
+  // button too — see showConfirm's overlay-click-to-cancel behavior)
+  // leaves the PDF exactly as it always was; "Yes" adds the compact
+  // header block built by pdfBuilder.js's drawPlotDetailsHeader().
+  function promptIncludePlotDetails() {
+    return showConfirm({
+      title: "Include Plot Details",
+      message: "Add a compact Plot Details header to this PDF?",
+      confirmLabel: "Yes",
+      cancelLabel: "No",
+    });
+  }
+
+  async function buildRankedPdfBlob(freshHeader, includePlotDetails) {
     const results = computeRanked(displayEntries, metric, freshHeader);
     const logoDataUrl = await getLogoDataUrl(brand).catch(() => null);
-    return buildPdf({ header: freshHeader, results, metric, allEntries: displayEntries, brand, logoDataUrl });
+    return buildPdf({
+      header: freshHeader,
+      results,
+      metric,
+      allEntries: displayEntries,
+      brand,
+      logoDataUrl,
+      includePlotDetails,
+    });
   }
 
   async function buildFullXlsxBlob(freshHeader) {
@@ -263,8 +286,9 @@ export function render(container, params) {
 
   async function handleExportPdf() {
     try {
+      const includePlotDetails = await promptIncludePlotDetails();
       const freshHeader = await resolveHeaderForExport();
-      const blob = await buildRankedPdfBlob(freshHeader);
+      const blob = await buildRankedPdfBlob(freshHeader, includePlotDetails);
       await shareOrDownload(blob, pdfFilename(freshHeader), "application/pdf");
     } catch (e) {
       showToast(`Couldn't export the PDF: ${e.message}`, { type: "error" });
@@ -283,8 +307,9 @@ export function render(container, params) {
 
   async function handlePrint() {
     try {
+      const includePlotDetails = await promptIncludePlotDetails();
       const freshHeader = await resolveHeaderForExport();
-      const blob = await buildRankedPdfBlob(freshHeader);
+      const blob = await buildRankedPdfBlob(freshHeader, includePlotDetails);
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank");
       if (win) {

@@ -19,6 +19,7 @@ import { openSearchListPicker } from "../components/searchListPicker.js";
 import { navigate } from "../router.js";
 import { entryDisplayTitle } from "../../core/models.js";
 import { calculatedDryYield } from "../../core/yieldCalculator.js";
+import { ensureFormIdAssigned } from "../formIdAssign.js";
 
 function sectionHeader(title) {
   return h("h3", { className: "section-header" }, title);
@@ -309,7 +310,19 @@ export function render(container, params) {
       {
         type: "button",
         className: "btn btn-primary",
-        onclick: () => navigate("plot-summary"),
+        onclick: () => {
+          // A plot's Form ID (see core/formId.js) is reserved right here,
+          // the moment "Save Plot" is actually tapped — by explicit
+          // request, NOT the instant Plot Details is opened, so simply
+          // browsing/backing out of a plot never burns a number. This is
+          // fire-and-forget (never blocks navigating to Plot Summary,
+          // matching this app's offline-first design — see
+          // formIdAssign.js's top comment); plotSummary.js makes its own
+          // follow-up attempt before actually building an export, as a
+          // safety net in case this one hasn't finished yet.
+          ensureFormIdAssigned();
+          navigate("plot-summary");
+        },
       },
       "Save Plot"
     ),
