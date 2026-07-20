@@ -72,20 +72,29 @@ export function upsert(id, header, entries) {
 
 /**
  * Seeds the sample "Demo Plot" (see demoPlot.js) into this device's
- * library if it isn't already there. Runs once per app version, not
- * once ever — so deleting it dismisses it for the rest of this version,
- * but it comes back the next time the app updates, giving people a
- * fresh look at it (e.g. after new features ship) rather than making it
- * gone for good the first time someone clears it out of curiosity. Safe
- * to call more than once per boot; it no-ops once this version's seed
- * has already run. Call once at startup — see main.js.
+ * library, refreshing it to the latest sample content on every app
+ * version. Runs once per app version, not once ever: whether the user
+ * deleted it, never touched it, or edited it for practice, the next
+ * time the app updates to a new version this replaces it with
+ * createDemoTrial()'s current content — so everyone sees the latest
+ * sample data (e.g. after the demo plot itself changes), not just new
+ * installs or people who happened to have deleted theirs. This is a
+ * deliberate tradeoff: any practice edits a user made to the demo plot
+ * are overwritten in the process, since it's meant purely as a sample/
+ * reference rather than real data worth preserving. Safe to call more
+ * than once per boot; it no-ops once this version's seed has already
+ * run. Call once at startup — see main.js.
  */
 export function ensureDemoPlot() {
   const seededVersion = readJson(DEMO_SEED_VERSION_KEY, null);
   if (seededVersion === APP_VERSION) return;
-  const alreadyPresent = state.trials.some((t) => t.id === DEMO_TRIAL_ID);
-  if (!alreadyPresent) {
-    const demo = createDemoTrial();
+  const demo = createDemoTrial();
+  const idx = state.trials.findIndex((t) => t.id === DEMO_TRIAL_ID);
+  if (idx >= 0) {
+    const next = state.trials.slice();
+    next[idx] = { ...demo, lastModified: new Date().toISOString() };
+    set(next);
+  } else {
     set([...state.trials, { ...demo, lastModified: new Date().toISOString() }]);
   }
   writeJson(DEMO_SEED_VERSION_KEY, APP_VERSION);

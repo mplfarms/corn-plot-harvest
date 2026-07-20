@@ -22,8 +22,13 @@
 // for practice, right up until they delete it.
 //
 // Fixed id (not a random uuid) is the whole mechanism behind "delete it
-// whenever you want, and it comes back next time the app updates" — see
-// ensureDemoPlot()'s comment for exactly how that works.
+// whenever you want, and it comes back next time the app updates" — and,
+// as of the version that added this line, also the mechanism behind
+// "every device gets refreshed to this file's current sample content on
+// the next app update, even if they never deleted their old demo plot."
+// See ensureDemoPlot()'s comment for exactly how that works, including
+// the tradeoff that a version bump overwrites any practice edits a user
+// made to their demo plot.
 
 import { createPlotEntry } from "./models.js";
 

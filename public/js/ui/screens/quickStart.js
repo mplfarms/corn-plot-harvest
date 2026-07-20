@@ -29,7 +29,7 @@ const STEPS = [
   {
     title: "Sign in",
     text: "Type your email and tap Sign In. No password needed. The first time, it'll ask your name — that just helps your admin tell everyone's plots apart.",
-    tip: "You'll notice a “Demo” plot already sitting in Saved Plots — that's a sample with results already filled in, just so you have something to look at. Explore it, edit it, or delete it any time; it's local to this device only.",
+    tip: "You'll notice a “Demo” plot already sitting in Saved Plots — that's a sample with results already filled in, just so you have something to look at. Explore it, edit it, or delete it any time; it's local to this device only. Every time the app updates, it reappears with fresh sample data — you can always delete it again if you don't want it around.",
   },
   {
     title: "Add it to your Home Screen",

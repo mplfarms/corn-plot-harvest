@@ -487,12 +487,13 @@ h3.section-header:first-child {
    (#0c2336 — see .launch-form-body .btn-primary below), rather than an
    unrelated color, so the page and the shield read as one consistent
    "Republic blue" rather than a plain white page with a blue logo
-   dropped on top. Darkened twice by explicit request since first
-   introduced — most recently by ~25% (each stop's RGB channels × 0.75)
-   — still comfortably legible against the dark navy (#16241c) text/links
-   that sit directly on it. */
+   dropped on top. Darkened three times by explicit request since first
+   introduced — most recently by another ~25% (each stop's RGB channels
+   × 0.75 again, on top of the prior darkening) — still comfortably
+   legible against the dark navy (#16241c) text/links that sit directly
+   on it. */
 .launch-screen {
-  background: linear-gradient(160deg, #94a0b0 0%, #627e9d 100%);
+  background: linear-gradient(160deg, #6f7884 0%, #4a5f76 100%);
   color: #16241c;
   justify-content: flex-start;
   padding-top: env(safe-area-inset-top);
