@@ -28,6 +28,7 @@
 import * as trialStore from "./stores/trialStore.js";
 import * as authStore from "./authStore.js";
 import { isFormIdAssigned } from "../core/formId.js";
+import { showToast } from "./components/toast.js";
 
 // Dedupes overlapping calls (e.g. the screen re-mounting quickly, or a
 // second caller awaiting this while the first request is still
@@ -86,4 +87,30 @@ async function doEnsure() {
 
   trialStore.updateHeader({ formId: payload.formId });
   return true;
+}
+
+/**
+ * Same as ensureFormIdAssigned(), but surfaces an error toast on failure
+ * — for explicit, user-initiated attempts only (the "Save Plot" button
+ * and the "Assign Plot ID" manual-retry buttons on Plot Details/Plot
+ * Summary), never for a silent background attempt like Plot Summary's
+ * own self-heal-on-render. A user who just tapped something expects to
+ * know if it didn't work; a passive background retry that fails
+ * shouldn't nag someone standing in a field with no signal every time
+ * they open a screen.
+ *
+ * Deliberately silent (no toast) when navigator.onLine is false — an
+ * offline failure is expected and already communicated by every other
+ * "will be assigned when..." fallback text in this app; the toast is
+ * reserved for "we tried and the server said no" cases, which is what's
+ * actually worth a user's attention (and worth them reporting back, if
+ * it keeps happening on a strong connection).
+ * @returns {Promise<boolean>}
+ */
+export async function ensureFormIdAssignedWithFeedback() {
+  const assigned = await ensureFormIdAssigned();
+  if (!assigned && typeof navigator !== "undefined" && navigator.onLine !== false) {
+    showToast("Couldn't assign a Plot ID — check your connection and try again.", { type: "error" });
+  }
+  return assigned;
 }

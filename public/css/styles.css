@@ -347,6 +347,29 @@ h3.section-header:first-child {
   line-height: 1.4;
 }
 
+/* Plot Details' Form ID note doubles as a manual retry button while
+   unassigned (see trialDetails.js) — reset every bit of default <button>
+   chrome so it still reads as plain, tappable note text rather than a
+   boxed browser button, matching every other .field-note on this screen. */
+.trial-details-form-id-retry-btn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 4px 0 0;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.trial-details-form-id-retry-btn:disabled {
+  cursor: default;
+  text-decoration: none;
+  opacity: 0.7;
+}
+
 .text-input {
   width: 100%;
   min-height: 44px;

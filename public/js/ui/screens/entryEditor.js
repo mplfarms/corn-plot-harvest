@@ -19,7 +19,7 @@ import { openSearchListPicker } from "../components/searchListPicker.js";
 import { navigate } from "../router.js";
 import { entryDisplayTitle } from "../../core/models.js";
 import { calculatedDryYield } from "../../core/yieldCalculator.js";
-import { ensureFormIdAssigned } from "../formIdAssign.js";
+import { ensureFormIdAssignedWithFeedback } from "../formIdAssign.js";
 
 function sectionHeader(title) {
   return h("h3", { className: "section-header" }, title);
@@ -320,17 +320,20 @@ export function render(container, params) {
           // live-subscribe to the store, so if this fired-and-forgot the
           // way it originally did, Plot Summary would frequently render
           // BEFORE the reservation actually landed and show no Form ID at
-          // all until the next visit. ensureFormIdAssigned() never throws
-          // (offline just resolves false — see its top comment), so this
-          // never blocks Save Plot from working, it just makes the wait
-          // visible with a brief "Saving…" state instead of hiding it.
-          // Plot Summary's own resolveHeaderForExport() and its
-          // self-healing re-render (see plotSummary.js) remain as a
-          // safety net for anything that still slips through (a very
-          // slow connection, or an older plot reached some other way).
+          // all until the next visit. ensureFormIdAssignedWithFeedback()
+          // never throws (offline just resolves false — see its top
+          // comment), so this never blocks Save Plot from working, it
+          // just makes the wait visible with a brief "Saving…" state
+          // instead of hiding it, and — unlike a silent background
+          // attempt — surfaces an error toast if it genuinely fails while
+          // online, so a real server-side problem is visible instead of
+          // just quietly never showing up. Plot Summary's own
+          // resolveHeaderForExport(), its self-healing re-render, and its
+          // own manual "Assign Plot ID" retry button (see plotSummary.js)
+          // all remain as further safety nets/backstops.
           e.target.disabled = true;
           e.target.textContent = "Saving…";
-          await ensureFormIdAssigned().catch(() => {});
+          await ensureFormIdAssignedWithFeedback().catch(() => {});
           navigate("plot-summary");
         },
       },

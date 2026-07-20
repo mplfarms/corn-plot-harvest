@@ -10,7 +10,7 @@ import * as brandStore from "../stores/brandStore.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as listsStore from "../stores/listsStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
-import { ensureFormIdAssigned } from "../formIdAssign.js";
+import { ensureFormIdAssigned, ensureFormIdAssignedWithFeedback } from "../formIdAssign.js";
 import { createTopBar } from "../components/topBar.js";
 import { showToast } from "../components/toast.js";
 import { showCustomModal, showConfirm } from "../components/modal.js";
@@ -491,6 +491,32 @@ export function render(container, params) {
       ])
     : null;
 
+  // Manual "Assign Plot ID" retry — a visible, explicit backstop for the
+  // silent self-heal below (see the bottom of this render() function).
+  // Not nested inside headerCard itself: headerCard IS a <button> (it
+  // toggles the details recap), and a <button> can never contain another
+  // <button> — browsers silently reparent nested ones out, breaking
+  // clicks — so this has to be its own separate row instead. Only ever
+  // rendered when there's genuinely no Form ID yet; disappears the
+  // moment one's actually assigned (via this button's own re-render, the
+  // self-heal's re-render, or just reopening this screen later).
+  const formIdRetryBtn = !header.formId
+    ? h(
+        "button",
+        {
+          type: "button",
+          className: "btn btn-secondary btn-block summary-formid-retry-btn",
+          onclick: async (e) => {
+            e.target.disabled = true;
+            e.target.textContent = "Assigning Plot ID…";
+            await ensureFormIdAssignedWithFeedback();
+            render(container, params);
+          },
+        },
+        "Assign Plot ID"
+      )
+    : null;
+
   // ---- Segmented control ----
   const segmented = h(
     "div",
@@ -630,6 +656,7 @@ export function render(container, params) {
     h("div", { className: "screen-body" }, [
       adminEditBanner,
       headerCard,
+      formIdRetryBtn,
       detailsPanel,
       segmented,
       summaryCard,
@@ -648,12 +675,17 @@ export function render(container, params) {
   // all existing plots" backfill in netlify/functions/backfillFormIds.js,
   // which should catch most of these up front), or the rarer case of a
   // very slow connection where even entryEditor.js's awaited Save Plot
-  // reservation hasn't landed yet. Fire-and-forget, exactly like every
-  // other formIdAssign.js call site — never blocks anything on screen —
-  // but if it succeeds AND this screen is still the one showing (the
-  // user hasn't already navigated elsewhere while it was in flight,
-  // checked via container.isConnected), re-render once so the newly
-  // assigned ID actually appears without requiring a manual refresh.
+  // reservation hasn't landed yet. Deliberately SILENT (no error toast,
+  // unlike the "Assign Plot ID" button above) — this is a passive,
+  // opportunistic background attempt, not something the user actually
+  // asked for, so a failure here (e.g. genuinely no signal) shouldn't
+  // interrupt them; the visible retry button is what's there for anyone
+  // who wants to know WHY it isn't showing up. Fire-and-forget, exactly
+  // like every other formIdAssign.js call site — never blocks anything
+  // on screen — but if it succeeds AND this screen is still the one
+  // showing (the user hasn't already navigated elsewhere while it was in
+  // flight, checked via container.isConnected), re-render once so the
+  // newly assigned ID actually appears without requiring a manual refresh.
   if (!header.formId) {
     ensureFormIdAssigned().then((assigned) => {
       if (assigned && container.isConnected) render(container, params);

@@ -20,6 +20,7 @@ import { createDatePicker } from "../components/datePicker.js";
 import { openSearchListPicker } from "../components/searchListPicker.js";
 import { navigate } from "../router.js";
 import { fetchSoilTypeForCoordinates } from "../../core/soilLookup.js";
+import { ensureFormIdAssignedWithFeedback } from "../formIdAssign.js";
 
 // Above this many ZIP matches for a city, an inline row of tappable
 // chips gets unwieldy (some large cities have dozens of ZIPs, including
@@ -350,17 +351,42 @@ export function render(container) {
   });
 
   // Form ID — a short, permanent reference number for this exact plot
-  // (see core/formId.js's top comment). NOT reserved from here anymore —
-  // by explicit request, a Form ID is only ever generated the moment the
+  // (see core/formId.js's top comment). NOT reserved automatically from
+  // here — by default, a Form ID is only ever generated the moment the
   // user taps "Save Plot" on the Entry Editor (see ensureFormIdAssigned()
-  // there), so simply opening/browsing Plot Details never burns a number.
-  // This just displays whatever the current draft already has (if
-  // anything) — see below for the plain "not yet assigned" case.
-  const formIdNote = h(
-    "p",
-    { className: "field-note trial-details-form-id-note" },
-    header.formId ? `Form ID: ${header.formId}` : "Form ID: will be assigned when you save this plot"
-  );
+  // there), so simply opening/browsing Plot Details never burns a number
+  // on its own. Once assigned, this is a plain, static note. Until then,
+  // it doubles as a manual "tap to try now" retry button — a visible
+  // backstop for a plot that WAS already saved (so its number should
+  // exist) but still shows nothing, most likely because the earlier
+  // background attempt hit a connection/server problem that failed
+  // silently. Tapping it uses ensureFormIdAssignedWithFeedback() (not the
+  // plain, silent ensureFormIdAssigned()) specifically because this is an
+  // explicit user action — an explicit tap that fails should say so,
+  // rather than just quietly doing nothing again.
+  const formIdNote = header.formId
+    ? h("p", { className: "field-note trial-details-form-id-note" }, `Form ID: ${header.formId}`)
+    : h(
+        "button",
+        {
+          type: "button",
+          className: "field-note trial-details-form-id-note trial-details-form-id-retry-btn",
+          onclick: async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            btn.textContent = "Form ID: assigning…";
+            const ok = await ensureFormIdAssignedWithFeedback();
+            if (ok) {
+              const latest = trialStore.getState().header;
+              btn.textContent = `Form ID: ${latest.formId}`;
+            } else {
+              btn.disabled = false;
+              btn.textContent = "Form ID: will be assigned when you save this plot (tap to try now)";
+            }
+          },
+        },
+        "Form ID: will be assigned when you save this plot (tap to try now)"
+      );
 
   const cooperatorSection = h("section", { className: "card" }, [
     sectionHeader("Cooperator Details"),
