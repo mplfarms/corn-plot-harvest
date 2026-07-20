@@ -12,6 +12,7 @@ import * as authStore from "./ui/authStore.js";
 import * as libraryStore from "./ui/stores/libraryStore.js";
 import "./ui/stores/themeStore.js"; // self-applies persisted theme mode on load
 import "./ui/stores/cloudSyncStore.js"; // wires up push/pull subscriptions on load
+import { initUpdateBanner } from "./ui/components/updateBanner.js";
 import { initRouter } from "./ui/router.js";
 
 if ("serviceWorker" in navigator) {
@@ -21,6 +22,14 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
+// Registered up front (not gated behind the "load" event above) — it
+// only reads navigator.serviceWorker.controller and adds an event
+// listener, neither of which needs the registration call above to have
+// resolved yet, and capturing "did this page already have a controller
+// at load" as early as possible is exactly the point (see the module's
+// own comment on why that timing matters).
+initUpdateBanner();
 
 async function start() {
   authStore.init();

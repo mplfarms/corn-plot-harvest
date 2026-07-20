@@ -18,7 +18,19 @@
 // libraryStore.ensureDemoPlot()) shows a "Demo" badge for the same
 // reason — never mistaken for a real cooperator's plot — and deletes
 // the same way any other plot does (it just comes back next update).
-
+//
+// Deleting a whole saved plot is more consequential than deleting a
+// single hybrid entry (entriesList.js), so every path to delete one —
+// the trash icon, a touch-device swipe-left, or a desktop right-click —
+// funnels through the same confirmAndDeleteTrial() below, which always
+// asks first via showConfirm() rather than deleting immediately. Swipe
+// reveals a red "Delete" panel (same visual pattern as entriesList.js's
+// swipe-to-delete); right-click skips straight to the confirmation,
+// matching the "right-click for a delete/context action" most desktop
+// users already expect, and calls e.preventDefault() so the browser's
+// own context menu doesn't also pop up. All three are additive — the
+// trash icon is never removed, since not every device has touch or a
+// mouse with a right button.
 import { h, mount, clear } from "../dom.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
@@ -26,6 +38,12 @@ import { createTopBar } from "../components/topBar.js";
 import { showConfirm } from "../components/modal.js";
 import { navigate } from "../router.js";
 import { filenameYear } from "../../core/models.js";
+
+// How far a row slides left to reveal the swipe-delete action, in px —
+// matches .entry-row-swipe-delete's width in styles.css (the same
+// constant/CSS entriesList.js uses, since both screens share the same
+// swipe-to-delete markup and styling).
+const SWIPE_REVEAL_PX = 84;
 
 function matchesQuery(trial, query) {
   if (!query) return true;
@@ -60,8 +78,21 @@ export function render(container, params) {
 
   const listEl = h("div", { className: "entries-list" });
 
+  // Only one row's swipe-delete action should be revealed at a time —
+  // opening a second row (or tapping/scrolling away) snaps any other
+  // open row shut first. Reset fresh on every renderList() call since
+  // the whole list is rebuilt anyway.
+  let openRow = null; // { trialId, rowEl } | null
+
+  function closeOpenRow() {
+    if (!openRow) return;
+    openRow.rowEl.style.transform = "translateX(0)";
+    openRow = null;
+  }
+
   function renderList() {
     clear(listEl);
+    openRow = null;
     const trials = libraryStore
       .getState()
       .trials.filter((t) => matchesQuery(t, query))
@@ -87,13 +118,36 @@ export function render(container, params) {
       const transferredFrom = trial.transferredFrom;
       const isDemo = Boolean(trial.isDemo);
 
-      const row = h("div", { className: "entry-row" }, [
+      // Shared by every path to delete this row — trash icon, swipe
+      // panel, and right-click — so all three "ask" the same way and
+      // there's only one place that actually calls deleteTrial().
+      async function confirmAndDeleteTrial() {
+        const ok = await showConfirm({
+          title: isDemo ? "Delete Demo Plot?" : "Delete Saved Plot?",
+          message: isDemo
+            ? "This removes the sample Demo Plot from this device. It'll come back automatically the next time the app updates."
+            : `This permanently removes "${trial.header.cooperatorName.trim() || "Untitled Plot"}" from your library.`,
+          confirmLabel: "Delete",
+          destructive: true,
+        });
+        if (!ok) return;
+        libraryStore.deleteTrial(trial.id);
+        renderList();
+      }
+
+      const rowEl = h("div", { className: "entry-row" }, [
         h(
           "button",
           {
             type: "button",
             className: "entry-row-main",
             onclick: () => {
+              // A tap while this row is swiped open just closes it back
+              // up — same convention as entriesList.js's swipe-to-delete.
+              if (openRow && openRow.trialId === trial.id) {
+                closeOpenRow();
+                return;
+              }
               trialStore.loadTrial(trial);
               navigate("plot-summary");
             },
@@ -129,26 +183,48 @@ export function render(container, params) {
               type: "button",
               className: "icon-btn icon-btn-danger",
               "aria-label": "Delete saved plot",
-              onclick: async () => {
-                const ok = await showConfirm({
-                  title: isDemo ? "Delete Demo Plot?" : "Delete Saved Plot?",
-                  message: isDemo
-                    ? "This removes the sample Demo Plot from this device. It'll come back automatically the next time the app updates."
-                    : `This permanently removes "${trial.header.cooperatorName.trim() || "Untitled Plot"}" from your library.`,
-                  confirmLabel: "Delete",
-                  destructive: true,
-                });
-                if (!ok) return;
-                libraryStore.deleteTrial(trial.id);
-                renderList();
-              },
+              onclick: confirmAndDeleteTrial,
             },
             "🗑"
           ),
         ]),
       ]);
 
-      listEl.appendChild(row);
+      // Desktop right-click: skip straight to the same confirmation
+      // (see confirmAndDeleteTrial() above) instead of revealing a
+      // swipe panel that a mouse can't produce. preventDefault() so the
+      // browser's own context menu doesn't also appear.
+      rowEl.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        confirmAndDeleteTrial();
+      });
+
+      const deletePanel = h("div", { className: "entry-row-swipe-delete" }, [
+        h(
+          "button",
+          {
+            type: "button",
+            className: "entry-row-swipe-delete-btn",
+            "aria-label": `Delete ${trial.header.cooperatorName.trim() || "Untitled Plot"}`,
+            onclick: confirmAndDeleteTrial,
+          },
+          "Delete"
+        ),
+      ]);
+
+      const swipeWrap = h("div", { className: "entry-row-swipe-wrap" }, [deletePanel, rowEl]);
+
+      attachSwipeToDelete(rowEl, {
+        onOpen: () => {
+          if (openRow && openRow.rowEl !== rowEl) closeOpenRow();
+          openRow = { trialId: trial.id, rowEl };
+        },
+        onClose: () => {
+          if (openRow && openRow.rowEl === rowEl) openRow = null;
+        },
+      });
+
+      listEl.appendChild(swipeWrap);
     }
   }
 
@@ -160,4 +236,85 @@ export function render(container, params) {
   ]);
 
   mount(container, screen);
+}
+
+// Touch-only swipe-left-to-delete — the same mechanics as
+// entriesList.js's attachTouchGestures(), minus its long-press-to-reorder
+// half (there's nothing to reorder here; Saved Plots is always sorted by
+// lastModified, not a user-defined order). Raw addEventListener (not the
+// h() "on*" shorthand) because touchmove needs { passive: false } to be
+// able to preventDefault() the page's own vertical scroll while a
+// horizontal swipe is in progress.
+function attachSwipeToDelete(rowEl, { onOpen, onClose }) {
+  let startX = 0;
+  let startY = 0;
+  let baseX = 0; // translateX at the start of this drag (0 closed, -SWIPE_REVEAL_PX open)
+  let dragging = false;
+  let horizontal = null; // null = undecided yet, true/false once swipe direction is resolved
+  let isOpen = false;
+
+  function currentTranslateX() {
+    const match = /translateX\((-?\d+(?:\.\d+)?)px\)/.exec(rowEl.style.transform || "");
+    return match ? parseFloat(match[1]) : 0;
+  }
+
+  rowEl.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      baseX = currentTranslateX();
+      dragging = true;
+      horizontal = null;
+      rowEl.style.transition = "none";
+    },
+    { passive: true }
+  );
+
+  rowEl.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!dragging) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+
+      if (horizontal === null) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return; // too small to tell yet
+        horizontal = Math.abs(dx) > Math.abs(dy);
+        if (!horizontal) {
+          // A vertical drag: a normal scroll attempt, not a swipe.
+          dragging = false;
+          return;
+        }
+      }
+      e.preventDefault(); // this is a horizontal drag — don't also scroll the page
+      const next = Math.min(0, Math.max(-SWIPE_REVEAL_PX, baseX + dx));
+      rowEl.style.transform = `translateX(${next}px)`;
+    },
+    { passive: false }
+  );
+
+  function finishDrag() {
+    if (!dragging) return;
+    dragging = false;
+    rowEl.style.transition = "";
+    const x = currentTranslateX();
+    if (x <= -SWIPE_REVEAL_PX / 2) {
+      rowEl.style.transform = `translateX(-${SWIPE_REVEAL_PX}px)`;
+      if (!isOpen) {
+        isOpen = true;
+        onOpen();
+      }
+    } else {
+      rowEl.style.transform = "translateX(0)";
+      if (isOpen) {
+        isOpen = false;
+        onClose();
+      }
+    }
+  }
+
+  rowEl.addEventListener("touchend", finishDrag, { passive: true });
+  rowEl.addEventListener("touchcancel", finishDrag, { passive: true });
 }

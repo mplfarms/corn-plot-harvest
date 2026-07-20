@@ -1320,6 +1320,37 @@ h3.section-header:first-child {
   font-size: 0.9rem;
 }
 
+/* ---------- service worker update banner ---------- */
+
+/* Same gold/dark-text "pay attention" pair as .badge-current, rather
+   than the app's usual green chrome or the toast's near-black — this is
+   the one banner in the app that's worth standing out from everything
+   else on screen, since it sits above every screen indefinitely (not a
+   few seconds like a toast) until the person acts on it. Fixed above
+   even the top bar (z-index higher than .modal-overlay/.toast-container
+   — see updateBanner.js's comment on why this can't just wait quietly)
+   so it's visible and tappable from any screen at any time. */
+.update-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background: var(--highlight);
+  color: #16241c;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
 /* ---------- entries / saved plots lists ---------- */
 
 .entries-list {

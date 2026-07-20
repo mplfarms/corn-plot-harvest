@@ -6,7 +6,7 @@
 // app shell is precached on install; old-versioned caches are purged on
 // activate.
 
-const CACHE_VERSION = "v26.76-beta";
+const CACHE_VERSION = "v26.79-beta";
 const CACHE_NAME = `corn-plot-harvest-${CACHE_VERSION}`;
 
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
@@ -40,6 +40,7 @@ const PRECACHE_URLS = [
   "/js/ui/components/searchListPicker.js",
   "/js/ui/components/toast.js",
   "/js/ui/components/topBar.js",
+  "/js/ui/components/updateBanner.js",
   "/js/ui/components/wheelSelect.js",
 
   "/js/ui/screens/accountScreen.js",
@@ -103,7 +104,33 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      await cache.addAll(PRECACHE_URLS);
+
+      // Deliberately NOT cache.addAll(PRECACHE_URLS) — that convenience
+      // method fetches with the browser's DEFAULT (HTTP-cache-respecting)
+      // caching mode under the hood. Since every URL here keeps the same
+      // path release over release (no content hashing) and _headers only
+      // forces no-cache on index.html/sw.js, a plain fetch() during
+      // install can silently hand back a STALE previously-cached copy of
+      // an unchanged-URL file straight from the browser's own HTTP cache
+      // — even though this brand-new service worker is actively
+      // installing specifically because the server has a newer build.
+      // That produces exactly the bug this comment is here to prevent:
+      // some files (whichever the browser happened to still have fresh
+      // HTTP-cache entries for) silently stay on old code after an
+      // update, while others (freshly fetched) update normally — so the
+      // version footer can show the new build number while some other
+      // module underneath is still running old logic. { cache: "reload" }
+      // forces every one of these fetches to bypass the HTTP cache and
+      // go to the network, guaranteeing the whole app shell updates
+      // atomically together on every new service worker install.
+      await Promise.all(
+        PRECACHE_URLS.map(async (url) => {
+          const response = await fetch(url, { cache: "reload" });
+          if (response.ok) {
+            await cache.put(url, response);
+          }
+        })
+      );
 
       // Best-effort: cache jsPDF too, so the app works fully offline after
       // the first successful load. This sandbox has no network access, so
