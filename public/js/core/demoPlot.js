@@ -5,9 +5,11 @@
 // a fully filled-out example plot so a brand new user (or someone
 // exploring after an update) has something to look at on Plot Summary
 // right away: the CV/box-and-whisker chart, the colored rank badges,
-// and an Average By Brand grouping (two brands here have 2 hybrids
+// and an Average By Brand grouping (several brands here have 2+ hybrids
 // each, on purpose, so that feature has something to show too — see
-// plotSummaryHelp.js).
+// plotSummaryHelp.js). 12 entries, Relative Maturity spanning 97-112
+// days, so the chart/ranked list has a realistic amount of spread to
+// look at rather than just a handful of similar-maturity hybrids.
 //
 // Deliberately marked isDemo: true so:
 //   - cloudSyncStore.js's pushNow() never sends it to the cloud — it's
@@ -83,7 +85,7 @@ export function createDemoTrial() {
         brand: "Midwest Seed Genetics",
         hybrid: "83-31 VT2PRIB",
         trait: "VT2P",
-        relativeMaturity: "113",
+        relativeMaturity: "109",
         seedTreatment: "Standard",
         sampleNetWeightLbs: "45.1",
         moisturePercent: "17.8",
@@ -94,6 +96,35 @@ export function createDemoTrial() {
         manualDryYield: "210",
       }),
       entry({
+        brand: "Midwest Seed Genetics",
+        hybrid: "79-14 VT2PRIB",
+        trait: "VT2P",
+        relativeMaturity: "103",
+        seedTreatment: "Standard",
+        sampleNetWeightLbs: "46.5",
+        moisturePercent: "18.4",
+        testWeight: "57.0",
+        stripLengthFeet: "300",
+        numberOfRows: "4",
+        widthInches: "30",
+        manualDryYield: "221",
+      }),
+      entry({
+        brand: "Midwest Seed Genetics",
+        hybrid: "76-08 VT2PRIB",
+        trait: "VT2P",
+        relativeMaturity: "97",
+        seedTreatment: "Standard",
+        sampleNetWeightLbs: "43.0",
+        moisturePercent: "15.0",
+        testWeight: "58.2",
+        stripLengthFeet: "300",
+        numberOfRows: "4",
+        widthInches: "30",
+        manualDryYield: "198",
+        comments: "Earliest hybrid in the plot — dried down fast.",
+      }),
+      entry({
         // Deliberately NOT "NC+ Hybrids" here — entriesForBrandView()
         // (brand.js) folds that sister brand into whichever Brand View
         // is currently selected (they share the same underlying
@@ -102,7 +133,7 @@ export function createDemoTrial() {
         brand: "Armor Seed",
         hybrid: "84-14 VT2PRIB",
         trait: "VT2P",
-        relativeMaturity: "114",
+        relativeMaturity: "111",
         seedTreatment: "None",
         sampleNetWeightLbs: "44.0",
         moisturePercent: "15.9",
@@ -111,6 +142,20 @@ export function createDemoTrial() {
         numberOfRows: "4",
         widthInches: "30",
         manualDryYield: "205",
+      }),
+      entry({
+        brand: "Armor Seed",
+        hybrid: "81-06 VT2PRIB",
+        trait: "VT2P",
+        relativeMaturity: "101",
+        seedTreatment: "None",
+        sampleNetWeightLbs: "41.5",
+        moisturePercent: "17.1",
+        testWeight: "56.4",
+        stripLengthFeet: "300",
+        numberOfRows: "4",
+        widthInches: "30",
+        manualDryYield: "189",
       }),
       entry({
         brand: "Agrigold",
@@ -130,7 +175,7 @@ export function createDemoTrial() {
         brand: "Agrigold",
         hybrid: "79-01 VT2PRIB",
         trait: "VT2P",
-        relativeMaturity: "109",
+        relativeMaturity: "104",
         seedTreatment: "Poncho/VoTivo",
         sampleNetWeightLbs: "38.5",
         moisturePercent: "21.0",
@@ -140,6 +185,62 @@ export function createDemoTrial() {
         widthInches: "30",
         manualDryYield: "180",
         comments: "Wetter at harvest — held back for extra dry-down.",
+      }),
+      entry({
+        brand: "Pioneer",
+        hybrid: "P1197AM",
+        trait: "AM",
+        relativeMaturity: "106",
+        seedTreatment: "Standard",
+        sampleNetWeightLbs: "47.0",
+        moisturePercent: "16.8",
+        testWeight: "57.9",
+        stripLengthFeet: "300",
+        numberOfRows: "4",
+        widthInches: "30",
+        manualDryYield: "228",
+      }),
+      entry({
+        brand: "Pioneer",
+        hybrid: "P0994AM",
+        trait: "AM",
+        relativeMaturity: "99",
+        seedTreatment: "Standard",
+        sampleNetWeightLbs: "40.2",
+        moisturePercent: "14.6",
+        testWeight: "58.5",
+        stripLengthFeet: "300",
+        numberOfRows: "4",
+        widthInches: "30",
+        manualDryYield: "192",
+      }),
+      entry({
+        brand: "Dekalb",
+        hybrid: "DKC65-95",
+        trait: "VT2P",
+        relativeMaturity: "110",
+        seedTreatment: "Standard",
+        sampleNetWeightLbs: "46.0",
+        moisturePercent: "18.0",
+        testWeight: "56.6",
+        stripLengthFeet: "300",
+        numberOfRows: "4",
+        widthInches: "30",
+        manualDryYield: "215",
+      }),
+      entry({
+        brand: "Dekalb",
+        hybrid: "DKC60-05",
+        trait: "VT2P",
+        relativeMaturity: "100",
+        seedTreatment: "Standard",
+        sampleNetWeightLbs: "39.8",
+        moisturePercent: "15.5",
+        testWeight: "57.7",
+        stripLengthFeet: "300",
+        numberOfRows: "4",
+        widthInches: "30",
+        manualDryYield: "188",
       }),
     ],
   };

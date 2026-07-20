@@ -137,7 +137,9 @@ export function removeEntry(entryId) {
 }
 
 /**
- * Moves the entry at `index` up (-1) or down (+1) in the list.
+ * Moves the entry at `index` up (-1) or down (+1) in the list. Superseded
+ * by reorderEntry() below for the Hybrid Entries list's drag-to-reorder
+ * gesture, but left in place unused rather than removed.
  * @param {number} index
  * @param {number} direction -1 or +1
  */
@@ -148,6 +150,27 @@ export function moveEntry(index, direction) {
   const tmp = entries[index];
   entries[index] = entries[target];
   entries[target] = tmp;
+  set({ ...state, entries });
+}
+
+/**
+ * Moves the entry at `fromIndex` directly to `toIndex`, shifting
+ * everything between the two positions over by one — used by the Hybrid
+ * Entries list's long-press/click-and-drag reordering (entriesList.js),
+ * which figures out the final drop position itself rather than moving
+ * one step at a time. Entries between the two positions keep their
+ * relative order; e.g. moving index 0 to index 2 in [A, B, C, D] yields
+ * [B, C, A, D] — A "pushes past" B and C, which each shift back by one.
+ * @param {number} fromIndex
+ * @param {number} toIndex
+ */
+export function reorderEntry(fromIndex, toIndex) {
+  const entries = state.entries.slice();
+  if (fromIndex < 0 || fromIndex >= entries.length) return;
+  const clampedTo = Math.max(0, Math.min(entries.length - 1, toIndex));
+  if (clampedTo === fromIndex) return;
+  const [moved] = entries.splice(fromIndex, 1);
+  entries.splice(clampedTo, 0, moved);
   set({ ...state, entries });
 }
 

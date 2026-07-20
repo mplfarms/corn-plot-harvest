@@ -1335,6 +1335,19 @@ h3.section-header:first-child {
   border-radius: 12px;
 }
 
+/* Applied to a row's swipe-wrap for as long as it's being long-press- or
+   click-dragged to a new position (see entriesList.js's startDrag()).
+   overflow reverts to visible so the lift shadow below isn't clipped by
+   the same wrap that normally hides the swipe-delete panel — a drag and
+   an open swipe panel never happen at the same time (starting a drag
+   closes any open swipe first), so there's nothing left to clip anyway. */
+.entry-row-swipe-wrap.entry-row-dragging {
+  overflow: visible;
+  z-index: 5;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+  border-radius: 12px;
+}
+
 .entry-row {
   position: relative;
   z-index: 1;
