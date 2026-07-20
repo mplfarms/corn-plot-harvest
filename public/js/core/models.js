@@ -29,6 +29,19 @@
  * @property {number} dryingShrinkRate
  * @property {number} pricePerBushel
  * @property {string} trialNotes
+ * @property {string} formNumberYear 2-digit harvest year, locked in the
+ *   first time this plot is exported/printed (see core/formNumber.js) —
+ *   "" until then.
+ * @property {string} formNumberInitials 2-letter Last+First initials of
+ *   whoever was signed in at that first export — locked alongside
+ *   formNumberYear, "" until assigned.
+ * @property {string} formNumberSeq zero-padded sequence number, unique
+ *   per Year+Initials pair across every user (reserved server-side —
+ *   see netlify/functions/formNumber.js) — locked alongside the two
+ *   fields above, "" until assigned. Together these three locked fields
+ *   plus the plot's CURRENT State/County (recomputed fresh on every
+ *   export, not locked) make up the "Form Number" — see
+ *   core/formNumber.js's top comment for the full design.
  */
 
 /**
@@ -91,6 +104,9 @@ export function createTrialHeader() {
     dryingShrinkRate: 0.06,
     pricePerBushel: 3.5,
     trialNotes: "",
+    formNumberYear: "",
+    formNumberInitials: "",
+    formNumberSeq: "",
   };
 }
 

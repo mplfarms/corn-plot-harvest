@@ -9,6 +9,7 @@ import { cellInline, cellNum, formatNumber, parseNumber } from "./xmlHelpers.js"
 import { formatHeaderDate, gpsCellText, filenameYear } from "./models.js";
 import { loadTemplateParts, CONTENT_TYPES, ROOT_RELS, WORKBOOK_XML, WORKBOOK_RELS, SHEET1_RELS, coreProperties, APP_PROPERTIES } from "./xlsxTemplateParts.js";
 import { ZipWriter } from "./zipWriter.js";
+import { assembleFormNumber } from "./formNumber.js";
 
 // Mirrors the Swift `Style` enum's numeric style indices (into styles.xml).
 const Style = {
@@ -424,10 +425,24 @@ function sanitizeFilenamePart(s) {
 }
 
 /**
+ * Filename base is the plot's Form Number (see core/formNumber.js) once
+ * one's been assigned — e.g. "26IA067LM01.xlsx" — since that's now the
+ * canonical, globally-unique identifier for this exact form. Falls back
+ * to the original State_Year_Cooperator scheme for a plot that doesn't
+ * have a Form Number yet (offline on its very first export, or exported
+ * before this feature existed and hasn't been re-opened since) so
+ * exporting never blocks on server connectivity — see
+ * ui/formNumberAssign.js's top comment.
  * @param {import('./models.js').TrialHeader} header
+ * @param {string|null} [countyFipsCode] 3-digit County FIPS string for
+ *   header.county, resolved by the caller via geoData.getCountyFips()
+ *   (core/ files don't import ui/ modules) — omit/null if unknown.
  * @returns {string}
  */
-export function exportFilename(header) {
+export function exportFilename(header, countyFipsCode) {
+  const formNumber = assembleFormNumber(header, countyFipsCode || null);
+  if (formNumber) return `${formNumber}.xlsx`;
+
   const state = sanitizeFilenamePart(header.state || "State");
   const year = String(filenameYear(header));
   const coop = sanitizeFilenamePart(header.cooperatorName || "Cooperator");
@@ -459,9 +474,10 @@ export function createEffectiveLists(lists) {
  * @param {import('./models.js').TrialHeader} header
  * @param {import('./models.js').PlotEntry[]} entries
  * @param {ReturnType<typeof createEffectiveLists>} effectiveLists
+ * @param {string|null} [countyFipsCode] see exportFilename()
  * @returns {Promise<{blob: Blob, filename: string}>}
  */
-export async function buildXlsx(header, entries, effectiveLists) {
+export async function buildXlsx(header, entries, effectiveLists, countyFipsCode) {
   const templateParts = await loadTemplateParts();
   const lists = effectiveLists;
 
@@ -518,6 +534,6 @@ export async function buildXlsx(header, entries, effectiveLists) {
 
   const sheet2 = buildListsSheet(lists);
   const blob = assembleWorkbook(sheet1, sheet2, templateParts);
-  const filename = exportFilename(header);
+  const filename = exportFilename(header, countyFipsCode);
   return { blob, filename };
 }

@@ -43,7 +43,12 @@ function helpSection(title, children, opts) {
 export function render(container) {
   const topBar = createTopBar({
     title: "Reading Your Results",
-    onBack: () => navigate("plot-summary"),
+    // A round trip back to wherever Plot Summary was actually opened
+    // from (Workspace menu, a Saved Plots row, etc.) — not a new arrival
+    // there — so this doesn't clobber the real remembered origin with
+    // "plot-summary-help" every time someone taps the "i" icon and comes
+    // straight back. See router.js's top comment.
+    onBack: () => navigate("plot-summary", { _skipOriginTracking: true }),
     backLabel: "Plot Summary",
   });
 

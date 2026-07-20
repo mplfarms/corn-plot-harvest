@@ -10,10 +10,12 @@ import * as brandStore from "../stores/brandStore.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as listsStore from "../stores/listsStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
+import * as geoData from "../geoData.js";
+import { ensureFormNumberAssigned } from "../formNumberAssign.js";
 import { createTopBar } from "../components/topBar.js";
 import { showToast } from "../components/toast.js";
 import { showCustomModal } from "../components/modal.js";
-import { navigate } from "../router.js";
+import { navigate, rememberedOriginFor } from "../router.js";
 import { filenameYear, formatHeaderDate, gpsCellText } from "../../core/models.js";
 import {
   RankingMetric,
@@ -235,21 +237,39 @@ export function render(container, params) {
     });
   }
 
-  async function buildRankedPdfBlob() {
-    const results = computeRanked(displayEntries, metric, header);
-    const logoDataUrl = await getLogoDataUrl(brand).catch(() => null);
-    return buildPdf({ header, results, metric, allEntries: displayEntries, brand, logoDataUrl });
+  // Resolves the freshest possible header (in case a background Form
+  // Number assignment — see formNumberAssign.js — finished after this
+  // screen last rendered) and that header's County FIPS code, making one
+  // last attempt to lock in a Form Number right now if this plot
+  // somehow doesn't have one yet (an older plot from before this
+  // feature existed, or the background attempt on Plot Details never
+  // got a chance to run/succeed). Never throws — a plot that still can't
+  // reach the server here exports/prints using the pre-Form-Number
+  // fallback filename and simply omits the footer label, rather than
+  // blocking the export — see formNumberAssign.js's top comment.
+  async function resolveHeaderForExport() {
+    await ensureFormNumberAssigned().catch(() => {});
+    const freshHeader = trialStore.getState().header;
+    const countyFipsCode = geoData.getCountyFips(freshHeader.state, freshHeader.county);
+    return { header: freshHeader, countyFipsCode };
   }
 
-  async function buildFullXlsxBlob() {
+  async function buildRankedPdfBlob(freshHeader, countyFipsCode) {
+    const results = computeRanked(displayEntries, metric, freshHeader);
+    const logoDataUrl = await getLogoDataUrl(brand).catch(() => null);
+    return buildPdf({ header: freshHeader, results, metric, allEntries: displayEntries, brand, logoDataUrl, countyFipsCode });
+  }
+
+  async function buildFullXlsxBlob(freshHeader, countyFipsCode) {
     const effectiveLists = createEffectiveLists(listsStore.getEffectiveLists());
-    return buildXlsx(header, entries, effectiveLists);
+    return buildXlsx(freshHeader, entries, effectiveLists, countyFipsCode);
   }
 
   async function handleExportPdf() {
     try {
-      const blob = await buildRankedPdfBlob();
-      await shareOrDownload(blob, pdfFilename(header), "application/pdf");
+      const { header: freshHeader, countyFipsCode } = await resolveHeaderForExport();
+      const blob = await buildRankedPdfBlob(freshHeader, countyFipsCode);
+      await shareOrDownload(blob, pdfFilename(freshHeader, countyFipsCode), "application/pdf");
     } catch (e) {
       showToast(`Couldn't export the PDF: ${e.message}`, { type: "error" });
     }
@@ -257,7 +277,8 @@ export function render(container, params) {
 
   async function handleExportXlsx() {
     try {
-      const { blob, filename } = await buildFullXlsxBlob();
+      const { header: freshHeader, countyFipsCode } = await resolveHeaderForExport();
+      const { blob, filename } = await buildFullXlsxBlob(freshHeader, countyFipsCode);
       await shareOrDownload(blob, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     } catch (e) {
       showToast(`Couldn't export the XLSX: ${e.message}`, { type: "error" });
@@ -266,7 +287,8 @@ export function render(container, params) {
 
   async function handlePrint() {
     try {
-      const blob = await buildRankedPdfBlob();
+      const { header: freshHeader, countyFipsCode } = await resolveHeaderForExport();
+      const blob = await buildRankedPdfBlob(freshHeader, countyFipsCode);
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank");
       if (win) {
@@ -293,7 +315,8 @@ export function render(container, params) {
 
   async function handleEmailXlsx() {
     try {
-      const { blob, filename } = await buildFullXlsxBlob();
+      const { header: freshHeader, countyFipsCode } = await resolveHeaderForExport();
+      const { blob, filename } = await buildFullXlsxBlob(freshHeader, countyFipsCode);
       const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
       const file = new File([blob], filename, { type: mime });
       if (navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
@@ -308,7 +331,7 @@ export function render(container, params) {
       openMailto(
         brand.operationsEmail,
         `Corn Plot Harvest — ${filename}`,
-        `Attached is the trial outline for ${header.cooperatorName || "this plot"}.\n\n(Your file downloaded separately — attach it manually in this email.)`
+        `Attached is the trial outline for ${freshHeader.cooperatorName || "this plot"}.\n\n(Your file downloaded separately — attach it manually in this email.)`
       );
       showToast("Your file downloaded — attach it manually in the email that just opened.", { type: "info" });
     } catch (e) {
@@ -334,10 +357,17 @@ export function render(container, params) {
     h("span", { className: "top-bar-btn-help-badge" }, "i")
   );
 
+  // Reached from more than one place (the Workspace menu, a Saved Plots
+  // row, the Demo Plot, "Return to Plot Summary" on Hybrid Entries,
+  // "Save Plot" on the entry editor) — by explicit request, Back always
+  // returns to whichever one was actually used to get here, rather than
+  // a single hardcoded destination. Falls back to "workspace" only when
+  // nothing's been recorded yet (a direct deep link or a page reload —
+  // see router.js's rememberedOriginFor()).
   const topBar = createTopBar({
     title: "Plot Summary",
-    onBack: () => navigate("workspace"),
-    backLabel: "Menu",
+    onBack: () => navigate(rememberedOriginFor("plot-summary") || "workspace"),
+    backLabel: "Back",
     right: helpBtn,
   });
 

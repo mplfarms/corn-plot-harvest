@@ -14,6 +14,7 @@ import * as listsStore from "../stores/listsStore.js";
 import * as authStore from "../authStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
 import * as geoData from "../geoData.js";
+import { kickOffFormNumberAssignment } from "../formNumberAssign.js";
 import { createTopBar } from "../components/topBar.js";
 import { createWheelSelect, createExtendableWheelSelect } from "../components/wheelSelect.js";
 import { createDatePicker } from "../components/datePicker.js";
@@ -211,6 +212,10 @@ export function render(container) {
       refreshCountyOptions();
       lastCityLookup = null;
       if (cityInput.value.trim() !== "") runCityZipLookup();
+      // See formNumberAssign.js's top comment — a no-op unless County is
+      // also already set (and unless this plot doesn't already have a
+      // Form Number locked in).
+      kickOffFormNumberAssignment();
     },
   });
 
@@ -222,7 +227,12 @@ export function render(container) {
     showLabel: false,
     disabled: !header.state,
     disabledReason: "Select a state first",
-    onChange: (v) => trialStore.updateHeader({ county: v }),
+    onChange: (v) => {
+      trialStore.updateHeader({ county: v });
+      // Background FIPS lookup + Form Number reservation — see
+      // formNumberAssign.js's top comment.
+      kickOffFormNumberAssignment();
+    },
     onAddNew: (raw) => raw,
     addNewPromptMessage: "Enter the county name.",
   });
