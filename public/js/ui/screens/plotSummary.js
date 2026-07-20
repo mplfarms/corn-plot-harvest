@@ -10,8 +10,7 @@ import * as brandStore from "../stores/brandStore.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as listsStore from "../stores/listsStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
-import * as geoData from "../geoData.js";
-import { ensureFormNumberAssigned } from "../formNumberAssign.js";
+import { ensureFormIdAssigned } from "../formIdAssign.js";
 import { createTopBar } from "../components/topBar.js";
 import { showToast } from "../components/toast.js";
 import { showCustomModal } from "../components/modal.js";
@@ -237,39 +236,36 @@ export function render(container, params) {
     });
   }
 
-  // Resolves the freshest possible header (in case a background Form
-  // Number assignment — see formNumberAssign.js — finished after this
-  // screen last rendered) and that header's County FIPS code, making one
-  // last attempt to lock in a Form Number right now if this plot
-  // somehow doesn't have one yet (an older plot from before this
-  // feature existed, or the background attempt on Plot Details never
-  // got a chance to run/succeed). Never throws — a plot that still can't
-  // reach the server here exports/prints using the pre-Form-Number
-  // fallback filename and simply omits the footer label, rather than
-  // blocking the export — see formNumberAssign.js's top comment.
+  // Resolves the freshest possible header (in case a background Form ID
+  // assignment — see formIdAssign.js — finished after this screen last
+  // rendered), making one last attempt to lock one in right now if this
+  // plot somehow doesn't have one yet (an older plot from before this
+  // feature existed, or the attempt on Plot Details never got a chance
+  // to run/succeed). Never throws — a plot that still can't reach the
+  // server here exports/prints using the pre-Form-ID fallback filename
+  // and simply omits the footer label, rather than blocking the export
+  // — see formIdAssign.js's top comment.
   async function resolveHeaderForExport() {
-    await ensureFormNumberAssigned().catch(() => {});
-    const freshHeader = trialStore.getState().header;
-    const countyFipsCode = geoData.getCountyFips(freshHeader.state, freshHeader.county);
-    return { header: freshHeader, countyFipsCode };
+    await ensureFormIdAssigned().catch(() => {});
+    return trialStore.getState().header;
   }
 
-  async function buildRankedPdfBlob(freshHeader, countyFipsCode) {
+  async function buildRankedPdfBlob(freshHeader) {
     const results = computeRanked(displayEntries, metric, freshHeader);
     const logoDataUrl = await getLogoDataUrl(brand).catch(() => null);
-    return buildPdf({ header: freshHeader, results, metric, allEntries: displayEntries, brand, logoDataUrl, countyFipsCode });
+    return buildPdf({ header: freshHeader, results, metric, allEntries: displayEntries, brand, logoDataUrl });
   }
 
-  async function buildFullXlsxBlob(freshHeader, countyFipsCode) {
+  async function buildFullXlsxBlob(freshHeader) {
     const effectiveLists = createEffectiveLists(listsStore.getEffectiveLists());
-    return buildXlsx(freshHeader, entries, effectiveLists, countyFipsCode);
+    return buildXlsx(freshHeader, entries, effectiveLists);
   }
 
   async function handleExportPdf() {
     try {
-      const { header: freshHeader, countyFipsCode } = await resolveHeaderForExport();
-      const blob = await buildRankedPdfBlob(freshHeader, countyFipsCode);
-      await shareOrDownload(blob, pdfFilename(freshHeader, countyFipsCode), "application/pdf");
+      const freshHeader = await resolveHeaderForExport();
+      const blob = await buildRankedPdfBlob(freshHeader);
+      await shareOrDownload(blob, pdfFilename(freshHeader), "application/pdf");
     } catch (e) {
       showToast(`Couldn't export the PDF: ${e.message}`, { type: "error" });
     }
@@ -277,8 +273,8 @@ export function render(container, params) {
 
   async function handleExportXlsx() {
     try {
-      const { header: freshHeader, countyFipsCode } = await resolveHeaderForExport();
-      const { blob, filename } = await buildFullXlsxBlob(freshHeader, countyFipsCode);
+      const freshHeader = await resolveHeaderForExport();
+      const { blob, filename } = await buildFullXlsxBlob(freshHeader);
       await shareOrDownload(blob, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     } catch (e) {
       showToast(`Couldn't export the XLSX: ${e.message}`, { type: "error" });
@@ -287,8 +283,8 @@ export function render(container, params) {
 
   async function handlePrint() {
     try {
-      const { header: freshHeader, countyFipsCode } = await resolveHeaderForExport();
-      const blob = await buildRankedPdfBlob(freshHeader, countyFipsCode);
+      const freshHeader = await resolveHeaderForExport();
+      const blob = await buildRankedPdfBlob(freshHeader);
       const url = URL.createObjectURL(blob);
       const win = window.open(url, "_blank");
       if (win) {
@@ -315,8 +311,8 @@ export function render(container, params) {
 
   async function handleEmailXlsx() {
     try {
-      const { header: freshHeader, countyFipsCode } = await resolveHeaderForExport();
-      const { blob, filename } = await buildFullXlsxBlob(freshHeader, countyFipsCode);
+      const freshHeader = await resolveHeaderForExport();
+      const { blob, filename } = await buildFullXlsxBlob(freshHeader);
       const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
       const file = new File([blob], filename, { type: mime });
       if (navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {

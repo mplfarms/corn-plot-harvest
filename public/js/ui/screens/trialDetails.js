@@ -14,7 +14,7 @@ import * as listsStore from "../stores/listsStore.js";
 import * as authStore from "../authStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
 import * as geoData from "../geoData.js";
-import { kickOffFormNumberAssignment } from "../formNumberAssign.js";
+import { ensureFormIdAssigned } from "../formIdAssign.js";
 import { createTopBar } from "../components/topBar.js";
 import { createWheelSelect, createExtendableWheelSelect } from "../components/wheelSelect.js";
 import { createDatePicker } from "../components/datePicker.js";
@@ -212,10 +212,6 @@ export function render(container) {
       refreshCountyOptions();
       lastCityLookup = null;
       if (cityInput.value.trim() !== "") runCityZipLookup();
-      // See formNumberAssign.js's top comment — a no-op unless County is
-      // also already set (and unless this plot doesn't already have a
-      // Form Number locked in).
-      kickOffFormNumberAssignment();
     },
   });
 
@@ -227,12 +223,7 @@ export function render(container) {
     showLabel: false,
     disabled: !header.state,
     disabledReason: "Select a state first",
-    onChange: (v) => {
-      trialStore.updateHeader({ county: v });
-      // Background FIPS lookup + Form Number reservation — see
-      // formNumberAssign.js's top comment.
-      kickOffFormNumberAssignment();
-    },
+    onChange: (v) => trialStore.updateHeader({ county: v }),
     onAddNew: (raw) => raw,
     addNewPromptMessage: "Enter the county name.",
   });
@@ -346,8 +337,27 @@ export function render(container) {
     if (cityInput.value.trim() !== "") runCityZipLookup();
   });
 
+  // Form ID — a short, permanent reference number for this exact plot
+  // (see core/formId.js's top comment). Reserved once, the first time
+  // this screen is opened for a plot that doesn't have one yet, and
+  // reused forever after. This screen never rebuilds its own DOM (see
+  // the file-level note at the top), so once the reservation resolves
+  // this note is patched in place rather than triggering a re-render.
+  const formIdNote = h(
+    "p",
+    { className: "field-note trial-details-form-id-note" },
+    header.formId ? `Form ID: ${header.formId}` : "Form ID: assigning…"
+  );
+  ensureFormIdAssigned().then(() => {
+    const latest = trialStore.getState().header;
+    formIdNote.textContent = latest.formId
+      ? `Form ID: ${latest.formId}`
+      : "Form ID: will be assigned once you're back online";
+  });
+
   const cooperatorSection = h("section", { className: "card" }, [
     sectionHeader("Cooperator Details"),
+    formIdNote,
     field("Name", textInput({ value: header.cooperatorName, oninput: (v) => trialStore.updateHeader({ cooperatorName: v }) })),
     field("Address", textInput({ value: header.address, oninput: (v) => trialStore.updateHeader({ address: v }) })),
     field("State", stateWheel.el),

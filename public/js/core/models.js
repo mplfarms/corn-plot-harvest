@@ -29,19 +29,15 @@
  * @property {number} dryingShrinkRate
  * @property {number} pricePerBushel
  * @property {string} trialNotes
- * @property {string} formNumberYear 2-digit harvest year, locked in the
- *   first time this plot is exported/printed (see core/formNumber.js) —
- *   "" until then.
- * @property {string} formNumberInitials 2-letter Last+First initials of
- *   whoever was signed in at that first export — locked alongside
- *   formNumberYear, "" until assigned.
- * @property {string} formNumberSeq zero-padded sequence number, unique
- *   per Year+Initials pair across every user (reserved server-side —
- *   see netlify/functions/formNumber.js) — locked alongside the two
- *   fields above, "" until assigned. Together these three locked fields
- *   plus the plot's CURRENT State/County (recomputed fresh on every
- *   export, not locked) make up the "Form Number" — see
- *   core/formNumber.js's top comment for the full design.
+ * @property {string} formId A short, permanent reference number for this
+ *   exact plot — e.g. "5001", or "5001a" if "5001" was somehow already
+ *   taken (see netlify/functions/formId.js's duplicate-suffix logic).
+ *   Reserved from a single global server-side counter (starting at
+ *   5000, shared across every user — see ui/formIdAssign.js) the first
+ *   time this screen is opened for a plot that doesn't have one yet,
+ *   and reused forever after — "" until assigned. Shown on Plot Details
+ *   and used as the .xlsx export's filename / the PDF+print footer's
+ *   "Form ID" label.
  */
 
 /**
@@ -104,9 +100,7 @@ export function createTrialHeader() {
     dryingShrinkRate: 0.06,
     pricePerBushel: 3.5,
     trialNotes: "",
-    formNumberYear: "",
-    formNumberInitials: "",
-    formNumberSeq: "",
+    formId: "",
   };
 }
 
