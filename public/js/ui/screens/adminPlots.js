@@ -37,12 +37,24 @@
 // when an admin-edit session ends, but pass _skipOriginTracking so that
 // internal round-trip doesn't overwrite the real origin recorded when
 // this screen was first opened.
+//
+// Also hosts the "Upload Hybrid Catalog" button — the only place the
+// shared Company/Hybrid/Trait/RM reference data (see catalogStore.js /
+// hybridCatalogImport.js / companyMatch.js / netlify/functions/
+// hybridCatalog.js) can be updated. Admin-only for the same reason
+// every other cross-user/shared-data action on this screen is: it
+// affects every signed-in device's pickers, not just the uploader's own.
 
 import { h, mount, clear } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
 import { showCustomModal } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
 import * as authStore from "../authStore.js";
+import * as listsStore from "../stores/listsStore.js";
+import * as catalogStore from "../stores/catalogStore.js";
+import { canonicalizeCompanyName } from "../../core/companyMatch.js";
+import { rowsFromAOA, parseCsvToAOA } from "../../core/hybridCatalogImport.js";
+import { loadXlsxLib } from "../xlsxLibLoader.js";
 import * as libraryStore from "../stores/libraryStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
 import { navigate, rememberedOriginFor } from "../router.js";
@@ -118,6 +130,128 @@ async function runBackfillFormIds(btn, onDone) {
   }
 }
 
+/**
+ * @param {File} file
+ * @returns {Promise<ArrayBuffer>}
+ */
+function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("couldn't read the file"));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+/**
+ * @param {File} file
+ * @returns {Promise<string>}
+ */
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("couldn't read the file"));
+    reader.readAsText(file);
+  });
+}
+
+/**
+ * Reads an uploaded Hybrid Catalog file (.xlsx/.xls via a lazy-loaded
+ * SheetJS, or .csv via a small hand-rolled parser — see
+ * hybridCatalogImport.js) into a plain grid (array of arrays, header
+ * row first) ready for rowsFromAOA().
+ * @param {File} file
+ * @returns {Promise<Array<Array<any>>>}
+ */
+async function parseUploadedFileToAOA(file) {
+  const name = (file.name || "").toLowerCase();
+  if (name.endsWith(".csv")) {
+    const text = await readFileAsText(file);
+    return parseCsvToAOA(text);
+  }
+  if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+    const XLSX = await loadXlsxLib();
+    const buffer = await readFileAsArrayBuffer(file);
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  }
+  throw new Error("Unsupported file type — please upload a .xlsx or .csv file.");
+}
+
+/**
+ * @returns {string} a one-line summary of the currently loaded Hybrid
+ *   Catalog for display on this screen (see catalogStore.js).
+ */
+function hybridCatalogStatusText() {
+  const { rows, updatedAt } = catalogStore.getState();
+  if (!rows || rows.length === 0) return "No Hybrid Catalog uploaded yet.";
+  const companyCount = new Set(rows.map((r) => r.company.toLowerCase())).size;
+  const dateStr = updatedAt ? new Date(updatedAt).toLocaleDateString() : "unknown date";
+  return `${rows.length} hybrids across ${companyCount} brands — last updated ${dateStr}.`;
+}
+
+/**
+ * Parses, canonicalizes, and uploads a Hybrid Catalog file — see this
+ * file's "Hybrid Catalog" section in render() for the button/input that
+ * triggers this. Company names are matched against the app's CURRENT
+ * company list (before this upload) via companyMatch.js so an "obvious
+ * duplicate" spelling (e.g. "AgriGold" vs an existing "Agrigold") is
+ * folded into the existing entry rather than creating a visual
+ * duplicate in the Brand/Company picker — a genuinely new company name
+ * passes through unchanged and is simply added, per explicit request.
+ * @param {File} file
+ * @param {HTMLButtonElement} btn
+ * @param {(text: string) => void} setStatusText
+ */
+async function runHybridCatalogUpload(file, btn, setStatusText) {
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Uploading…";
+  try {
+    const creds = authStore.getCredentials();
+    if (!creds) throw new Error("Not signed in.");
+
+    const aoa = await parseUploadedFileToAOA(file);
+    const { rows: rawRows, skippedCount, headerError } = rowsFromAOA(aoa);
+    if (headerError) throw new Error(headerError);
+    if (rawRows.length === 0) throw new Error("No usable rows found in the file.");
+
+    const knownCompanies = listsStore.items(listsStore.CATEGORY.BRAND_COMPANY);
+    const seenNewCompanies = new Set();
+    const rows = rawRows.map((r) => {
+      const canonical = canonicalizeCompanyName(r.company, knownCompanies);
+      const isKnown = knownCompanies.some((k) => k.toLowerCase() === canonical.toLowerCase());
+      if (!isKnown) seenNewCompanies.add(canonical.toLowerCase());
+      return { ...r, company: canonical };
+    });
+
+    const res = await fetch("/.netlify/functions/hybridCatalog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: creds.email, rows }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Server returned ${res.status}`);
+
+    catalogStore.setCatalog(rows, body.updatedAt);
+    setStatusText(hybridCatalogStatusText());
+
+    const newBrandNote = seenNewCompanies.size > 0 ? `, ${seenNewCompanies.size} new brand${seenNewCompanies.size === 1 ? "" : "s"} added` : "";
+    const skippedNote = skippedCount > 0 ? ` (${skippedCount} row${skippedCount === 1 ? "" : "s"} skipped — missing data)` : "";
+    showToast(
+      `Hybrid Catalog updated: ${body.rowCount} hybrids across ${body.companyCount} brands${newBrandNote}.${skippedNote}`,
+      { type: "success" }
+    );
+  } catch (e) {
+    showToast(`Couldn't upload Hybrid Catalog: ${e.message}`, { type: "error" });
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
 export async function render(container) {
   const topBar = createTopBar({
     title: "All Plots (Admin)",
@@ -153,6 +287,47 @@ export async function render(container) {
       "Assign Form IDs to All Plots"
     );
     bodyEl.appendChild(backfillBtn);
+
+    // ---- Hybrid Catalog upload (see hybridCatalogImport.js /
+    // companyMatch.js / catalogStore.js / netlify/functions/
+    // hybridCatalog.js) — lets an admin update the shared Company /
+    // Hybrid / Trait / RM reference data behind entryEditor.js's
+    // cascading pickers at any time, without a new app build.
+    await catalogStore.ensureLoaded();
+    const catalogStatusEl = h("p", { className: "field-note" }, hybridCatalogStatusText());
+    const catalogFileInput = h("input", {
+      type: "file",
+      accept: ".xlsx,.xls,.csv",
+      className: "hidden",
+      onchange: async (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = ""; // allow re-selecting the same filename on a retry
+        if (!file) return;
+        await runHybridCatalogUpload(file, catalogUploadBtn, (text) => {
+          catalogStatusEl.textContent = text;
+        });
+      },
+    });
+    const catalogUploadBtn = h(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-secondary btn-block",
+        onclick: () => catalogFileInput.click(),
+      },
+      "Upload Hybrid Catalog"
+    );
+    bodyEl.appendChild(
+      // Deliberately NOT className: "card" — see styles.css's comment on
+      // .admin-hybrid-catalog-section for why (this screen's own
+      // e2e test counts ".card" elements as "one per registered user").
+      h("section", { className: "admin-hybrid-catalog-section" }, [
+        h("h3", { className: "section-header" }, "Hybrid Catalog"),
+        catalogStatusEl,
+        catalogUploadBtn,
+        catalogFileInput,
+      ])
+    );
 
     if (!users || users.length === 0) {
       bodyEl.appendChild(h("p", { className: "empty-state" }, "No cloud-synced plots yet."));

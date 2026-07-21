@@ -290,7 +290,13 @@ a {
 
 /* ---------- cards / sections ---------- */
 
-.card {
+/* .admin-hybrid-catalog-section (adminPlots.js's Hybrid Catalog upload
+   section) shares this exact look but is deliberately NOT just another
+   .card — e2e_admin_plots_header_and_details.mjs counts ".card"
+   elements to confirm "one card per registered user," and this section
+   isn't a per-user card. */
+.card,
+.admin-hybrid-catalog-section {
   background: var(--card-bg);
   border-radius: 14px;
   padding: 16px;

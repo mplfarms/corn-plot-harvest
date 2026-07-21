@@ -7,6 +7,7 @@
 // the router.
 
 import * as listsStore from "./ui/stores/listsStore.js";
+import * as catalogStore from "./ui/stores/catalogStore.js";
 import * as brandStore from "./ui/stores/brandStore.js";
 import * as authStore from "./ui/authStore.js";
 import * as libraryStore from "./ui/stores/libraryStore.js";
@@ -37,7 +38,11 @@ async function start() {
   // libraryStore.ensureDemoPlot()'s comment for the "reappears after an
   // update, but not before you delete it" rule.
   libraryStore.ensureDemoPlot();
-  await listsStore.ensureLoaded();
+  // Both fall back to their own local cache / defaults on failure and
+  // never throw (see each store's ensureLoaded() top comment) — run
+  // together rather than one-after-the-other since neither depends on
+  // the other's result.
+  await Promise.all([listsStore.ensureLoaded(), catalogStore.ensureLoaded()]);
 
   if (!window.location.hash) {
     // Signing in is mandatory now (see accountScreen.js / router.js) —

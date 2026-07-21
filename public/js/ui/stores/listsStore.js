@@ -4,8 +4,19 @@
 // user-added custom items (cph.customLists in localStorage). Categories:
 // "brandCompany", "hybrid", "trait", "seedTreatment". Hybrids are also
 // scoped per-brand via hybridItems(forBrand).
+//
+// BRAND_COMPANY and hybridItems(forBrand) ALSO merge in the admin-
+// uploaded Hybrid Catalog (see catalogStore.js / hybridCatalog.js) —
+// so a company/hybrid from a spreadsheet upload shows up in these
+// pickers exactly like a hand-typed custom entry does, just sourced
+// from the shared catalog instead of cph.customLists. Trait/RM
+// cascading FROM a catalog hybrid selection (auto-fill/narrow) is
+// handled in entryEditor.js itself, not here — this module only
+// answers "what are the valid options," not "what should happen when
+// one is picked."
 
 import { createPubSub, readJson, writeJson } from "./pubsub.js";
+import * as catalogStore from "./catalogStore.js";
 
 const CUSTOM_KEY = "cph.customLists";
 const DEFAULTS_URL = "/DefaultLists.json";
@@ -61,6 +72,29 @@ let state = {
 
 let loadPromise = null;
 
+/**
+ * Case-insensitive de-dupe, keeping the FIRST spelling seen for a given
+ * value — used wherever the Hybrid Catalog (see catalogStore.js) is
+ * merged into an existing list, since a catalog upload's company names
+ * are already canonicalized against this app's existing spellings at
+ * upload time (see companyMatch.js) but a belt-and-suspenders check
+ * here means a stray near-duplicate can never show up twice in a
+ * picker regardless.
+ * @param {string[]} values
+ * @returns {string[]}
+ */
+function dedupeCaseInsensitive(values) {
+  const seen = new Set();
+  const out = [];
+  for (const v of values) {
+    const key = v.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(v);
+  }
+  return out;
+}
+
 export function getState() {
   return state;
 }
@@ -107,7 +141,7 @@ export function items(category) {
   const c = state.custom;
   switch (category) {
     case CATEGORY.BRAND_COMPANY:
-      return [...d.companies, ...c.companies];
+      return dedupeCaseInsensitive([...d.companies, ...c.companies, ...catalogStore.companies()]);
     case CATEGORY.HYBRID: {
       const allCustomHybrids = Object.values(c.hybridsByBrand).flat();
       return [...d.hybrids, ...allCustomHybrids];
@@ -145,7 +179,8 @@ export function hybridItems(forBrand) {
   const hyphenOnly = HYBRID_HYPHEN_ONLY_BRANDS.some((b) => b.toLowerCase() === brand.toLowerCase());
   if (hyphenOnly) base = base.filter((h) => h.includes("-"));
   const custom = c.hybridsByBrand[brand] || c.hybridsByBrand[forBrand] || [];
-  return [...base, ...custom];
+  const fromCatalog = catalogStore.hybridsForCompany(brand);
+  return dedupeCaseInsensitive([...base, ...custom, ...fromCatalog]);
 }
 
 /**

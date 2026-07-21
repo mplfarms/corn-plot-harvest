@@ -9,6 +9,23 @@
 // blow away focus). The Hybrid wheel is the one exception: it is
 // re-created (small, isolated DOM patch) whenever the Brand changes,
 // since its option list and "+Add New" copy depend on the Brand value.
+// The Trait row is re-created the same way whenever the Hybrid or Brand
+// changes, for the same reason — see the Hybrid Catalog cascading
+// section below.
+//
+// Hybrid Catalog cascading (see catalogStore.js / companyMatch.js /
+// netlify/functions/hybridCatalog.js): when the selected Hybrid is one
+// of the admin-uploaded catalog's entries for the current Brand,
+// picking it auto-fills Relative Maturity, and auto-fills Trait too if
+// that hybrid has exactly one catalog trait package — or narrows the
+// Trait picker down to just that hybrid's available package(s) if it
+// has more than one. A Hybrid with no catalog match (hand-typed/custom,
+// or a brand with no catalog data at all) leaves RM alone and shows the
+// full, unrestricted Trait list, exactly like before this feature
+// existed. Every one of these is still just a starting point, never a
+// lock: RM stays a normal spinnable wheel, and Trait's "+Add New" can
+// always add something outside the narrowed list — nothing here
+// prevents entering values manually when a plot isn't on the lists.
 
 import { h, mount, clear } from "../dom.js";
 import * as trialStore from "../stores/trialStore.js";
@@ -20,6 +37,7 @@ import { navigate } from "../router.js";
 import { entryDisplayTitle } from "../../core/models.js";
 import { calculatedDryYield } from "../../core/yieldCalculator.js";
 import { ensureFormIdAssignedWithFeedback } from "../formIdAssign.js";
+import * as catalogStore from "../stores/catalogStore.js";
 
 function sectionHeader(title) {
   return h("h3", { className: "section-header" }, title);
@@ -154,11 +172,82 @@ export function render(container, params) {
       trialStore.updateEntry(entryId, { brand: v });
       applyFirstEntryHybridRmDefault(v);
       rebuildHybridWheel();
+      refreshTraitOptionsForCurrentHybrid();
     },
     onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.BRAND_COMPANY),
     addNewPromptTitle: "Add New Brand / Company",
     addNewPromptMessage: "This is added to the list permanently, for this and every future trial.",
   });
+
+  // ---- RM (locked, 75-120) ----
+  // Declared up here (rather than in its previous spot below Trait) so
+  // the Hybrid wheel's onChange, defined next, can call rmWheel.setValue()
+  // when a catalog Hybrid pick auto-fills RM.
+  const rmOptions = [];
+  for (let n = 75; n <= 120; n++) rmOptions.push(String(n));
+  const rmWheel = createWheelSelect({
+    title: "Relative Maturity (RM)",
+    value: entry.relativeMaturity,
+    options: rmOptions,
+    showLabel: false,
+    onChange: (v) => trialStore.updateEntry(entryId, { relativeMaturity: v }),
+  });
+
+  // ---- Trait (depends on Hybrid; rebuilt in place, same pattern as the
+  // Hybrid wheel below) ----
+  const traitRowHolder = h("div", { className: "field-wrapper" });
+
+  function rebuildTraitRow(options) {
+    const row = listPickerRow({
+      title: "Trait",
+      value: currentEntry().trait,
+      options: options && options.length ? options : listsStore.items(listsStore.CATEGORY.TRAIT),
+      showLabel: false,
+      onChange: (v) => trialStore.updateEntry(entryId, { trait: v }),
+      onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.TRAIT),
+      addNewPromptTitle: "Add New Trait",
+      addNewPromptMessage: "This is added to the list permanently, for this and every future trial.",
+    });
+    clear(traitRowHolder);
+    traitRowHolder.appendChild(row);
+  }
+
+  // Refreshes ONLY the Trait row's option list to match whatever Hybrid
+  // is currently selected — never touches the stored Trait/RM values.
+  // Called on Brand change (the old Hybrid value may or may not still
+  // be valid under the new Brand's catalog) and once up front for a
+  // pre-existing entry being reopened, so its Trait picker already
+  // shows the right narrowed list without the user having to re-pick
+  // the Hybrid first.
+  function refreshTraitOptionsForCurrentHybrid() {
+    const brand = currentEntry().brand || "";
+    const hybrid = currentEntry().hybrid || "";
+    const traits = catalogStore.traitsForHybrid(brand, hybrid);
+    rebuildTraitRow(traits);
+  }
+
+  // Applied on an explicit Hybrid pick only (not a Brand change) — a
+  // deliberate user action to select THIS hybrid is what earns it an
+  // automatic RM/Trait fill; see this file's top comment.
+  function applyCatalogHybridDefaults(brand, hybridValue) {
+    const rm = catalogStore.rmForHybrid(brand, hybridValue);
+    if (rm !== null) {
+      trialStore.updateEntry(entryId, { relativeMaturity: String(rm) });
+      rmWheel.setValue(String(rm));
+    }
+    const traits = catalogStore.traitsForHybrid(brand, hybridValue);
+    if (traits.length === 1) {
+      trialStore.updateEntry(entryId, { trait: traits[0] });
+    } else if (traits.length > 1 && !traits.includes(currentEntry().trait)) {
+      // Switching TO a multi-trait hybrid whose package list doesn't
+      // include whatever Trait was left over from a previous Hybrid
+      // pick — clear it rather than silently keeping a mismatched
+      // value the narrowed list doesn't even offer, so the picker
+      // visibly prompts a fresh pick from the (now-narrowed) options.
+      trialStore.updateEntry(entryId, { trait: "" });
+    }
+    rebuildTraitRow(traits);
+  }
 
   // ---- Hybrid (depends on Brand; rebuilt in place when Brand changes) ----
   const hybridWheelHolder = h("div", { className: "field-wrapper" });
@@ -173,7 +262,10 @@ export function render(container, params) {
       disabled: isBlank,
       disabledReason: "Select a Brand / Company first to choose a Hybrid.",
       showLabel: false,
-      onChange: (v) => trialStore.updateEntry(entryId, { hybrid: v }),
+      onChange: (v) => {
+        trialStore.updateEntry(entryId, { hybrid: v });
+        applyCatalogHybridDefaults(brand, v);
+      },
       onAddNew: (raw) => listsStore.addCustomHybrid(raw, brand),
       addNewPromptTitle: "Add New Hybrid",
       addNewPromptMessage: `This is added under ${brand} permanently, for this and every future trial — it will only show up when ${brand} is the selected Brand / Company.`,
@@ -181,18 +273,6 @@ export function render(container, params) {
     clear(hybridWheelHolder);
     hybridWheelHolder.appendChild(wheel.el);
   }
-
-  // ---- Trait / Seed Treatment ----
-  const traitRow = listPickerRow({
-    title: "Trait",
-    value: entry.trait,
-    options: listsStore.items(listsStore.CATEGORY.TRAIT),
-    showLabel: false,
-    onChange: (v) => trialStore.updateEntry(entryId, { trait: v }),
-    onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.TRAIT),
-    addNewPromptTitle: "Add New Trait",
-    addNewPromptMessage: "This is added to the list permanently, for this and every future trial.",
-  });
 
   const seedTreatmentRow = listPickerRow({
     title: "Seed Treatment",
@@ -205,17 +285,6 @@ export function render(container, params) {
     addNewPromptMessage: "This is added to the list permanently, for this and every future trial.",
   });
 
-  // ---- RM (locked, 75-120) ----
-  const rmOptions = [];
-  for (let n = 75; n <= 120; n++) rmOptions.push(String(n));
-  const rmWheel = createWheelSelect({
-    title: "Relative Maturity (RM)",
-    value: entry.relativeMaturity,
-    options: rmOptions,
-    showLabel: false,
-    onChange: (v) => trialStore.updateEntry(entryId, { relativeMaturity: v }),
-  });
-
   // Brand is pre-filled by trialStore for a freshly created entry (see
   // addEntryCarryingMeasurements()), so this has to run once up front —
   // not just from brandWheel's onChange — or the very first entry in a
@@ -223,6 +292,11 @@ export function render(container, params) {
   // user happened to touch the Brand wheel themselves.
   applyFirstEntryHybridRmDefault(currentEntry().brand);
   rebuildHybridWheel();
+  // Matches the Trait picker's narrowed options to whatever Hybrid this
+  // entry already has (a no-op for a brand new blank entry) — see this
+  // function's own comment for why an existing entry needs this run up
+  // front too, not just on the next Brand/Hybrid change.
+  refreshTraitOptionsForCurrentHybrid();
 
   // Every row in this section is now wrapped the same way — a field()
   // label above a labelless wheel/list-picker row — so the vertical
@@ -232,7 +306,7 @@ export function render(container, params) {
     sectionHeader("Hybrid Details"),
     field("Brand / Company", brandWheel.el),
     field("Hybrid", hybridWheelHolder),
-    field("Trait", traitRow),
+    field("Trait", traitRowHolder),
     field("Seed Treatment", seedTreatmentRow),
     field("Relative Maturity (RM)", rmWheel.el),
   ]);
