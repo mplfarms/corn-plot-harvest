@@ -36,6 +36,14 @@ import { showToast } from "./components/toast.js";
 // the current draft at a time.
 let inFlight = null;
 
+// Set by doEnsure() every time it resolves false, so
+// ensureFormIdAssignedWithFeedback() can surface WHY it failed — "Server
+// returned 404" reads very differently than "no network connection", and
+// telling them apart is exactly what made the actual bug (the
+// backfillFormIds/formId functions never having deployed) diagnosable at
+// all, instead of everything just looking like generic bad field signal.
+let lastFailureReason = "";
+
 /**
  * @returns {Promise<boolean>} true if the current draft's header has (or
  *   now has) a Form ID assigned; false if it still doesn't (not signed
@@ -54,7 +62,10 @@ async function doEnsure() {
   if (isFormIdAssigned(header)) return true;
 
   const creds = authStore.getCredentials();
-  if (!creds) return false;
+  if (!creds) {
+    lastFailureReason = "not signed in";
+    return false;
+  }
 
   let res;
   try {
@@ -64,19 +75,34 @@ async function doEnsure() {
       body: JSON.stringify({ email: creds.email }),
     });
   } catch (e) {
+    lastFailureReason = "no network connection";
     return false;
   }
 
-  if (!res.ok) return false;
+  if (!res.ok) {
+    // A 404 here specifically means the formId function itself isn't
+    // deployed (Netlify has nothing registered at that path) — a real
+    // deployment problem, not a flaky connection — same distinction the
+    // "Assign Form IDs to All Plots" button's error already surfaces
+    // (see adminPlots.js's runBackfillFormIds()). Any other status is
+    // most likely the function running but erroring server-side (e.g.
+    // 502 from a Netlify Blobs setup problem — see README.md).
+    lastFailureReason = `server returned ${res.status}`;
+    return false;
+  }
 
   let payload;
   try {
     payload = await res.json();
   } catch (e) {
+    lastFailureReason = "server sent back an unreadable response";
     return false;
   }
 
-  if (!payload || !payload.formId) return false;
+  if (!payload || !payload.formId) {
+    lastFailureReason = "server didn't return a Plot ID";
+    return false;
+  }
 
   // Re-check right before writing — a slower-to-resolve call could
   // otherwise stomp a Form ID some other in-flight call already
@@ -110,7 +136,8 @@ async function doEnsure() {
 export async function ensureFormIdAssignedWithFeedback() {
   const assigned = await ensureFormIdAssigned();
   if (!assigned && typeof navigator !== "undefined" && navigator.onLine !== false) {
-    showToast("Couldn't assign a Plot ID — check your connection and try again.", { type: "error" });
+    const detail = lastFailureReason ? ` (${lastFailureReason})` : "";
+    showToast(`Couldn't assign a Plot ID${detail} — check your connection and try again.`, { type: "error" });
   }
   return assigned;
 }
