@@ -1,12 +1,21 @@
 // src/ui/screens/entryEditor.js
 //
-// Brand/Hybrid extendable wheels, Trait/Seed Treatment searchable list
-// pickers, locked RM wheel, numeric measurement fields, a live
-// calculated-or-overridden Dry Yield field, and Comments.
+// Brand/Company, Hybrid, Trait, and Seed Treatment are all searchable
+// list pickers now (tap the field, a modal opens with the keyboard
+// already up and the list filtering live as you type — see
+// searchListPicker.js) rather than the older tap-to-expand "wheel"
+// style. Brand/Company and Hybrid used to be wheels with a keydown-only
+// type-ahead shortcut, but that shortcut needs a physical keyboard to
+// even trigger — no on-screen text box means no virtual keyboard pops up
+// on a touchscreen phone, which is most of how this app actually gets
+// used in the field. RM is the one field deliberately left as a wheel:
+// it's a short, fixed 75-120 range where scrolling/spinning is already
+// fast, and it's meant to feel like a locked, precise dial rather than
+// something you search for.
 //
 // Like trialDetails.js, this screen builds its DOM once per render()
 // call and never rebuilds itself in response to its own typing (would
-// blow away focus). The Hybrid wheel is the one exception: it is
+// blow away focus). The Hybrid row is the one exception: it is
 // re-created (small, isolated DOM patch) whenever the Brand changes,
 // since its option list and "+Add New" copy depend on the Brand value.
 // The Trait row is re-created the same way whenever the Hybrid or Brand
@@ -31,7 +40,7 @@ import { h, mount, clear } from "../dom.js";
 import * as trialStore from "../stores/trialStore.js";
 import * as listsStore from "../stores/listsStore.js";
 import { createTopBar } from "../components/topBar.js";
-import { createWheelSelect, createExtendableWheelSelect } from "../components/wheelSelect.js";
+import { createWheelSelect } from "../components/wheelSelect.js";
 import { openSearchListPicker } from "../components/searchListPicker.js";
 import { navigate } from "../router.js";
 import { entryDisplayTitle } from "../../core/models.js";
@@ -58,7 +67,21 @@ function textInput({ value, placeholder, oninput, type = "text", inputmode }) {
   });
 }
 
-function listPickerRow({ title, value, options, onChange, onAddNew, addNewPromptTitle, addNewPromptMessage, showLabel = true }) {
+function listPickerRow({
+  title,
+  value,
+  options,
+  onChange,
+  onAddNew,
+  addNewPromptTitle,
+  addNewPromptMessage,
+  showLabel = true,
+  // Mirrors wheelSelect.js's disabled/disabledReason — used by the
+  // Hybrid row (see rebuildHybridWheel() below) while no Brand / Company
+  // is selected yet, same behavior as when Hybrid was a wheel.
+  disabled = false,
+  disabledReason = "",
+}) {
   let currentValue = value;
   let currentOptions = options.slice();
 
@@ -73,7 +96,9 @@ function listPickerRow({ title, value, options, onChange, onAddNew, addNewPrompt
     {
       type: "button",
       className: "wheel-row-header",
+      disabled: disabled,
       onclick: () => {
+        if (disabled) return;
         openSearchListPicker({
           title,
           value: currentValue,
@@ -99,7 +124,10 @@ function listPickerRow({ title, value, options, onChange, onAddNew, addNewPrompt
     [showLabel ? h("span", { className: "wheel-row-label" }, title) : null, valueEl, h("span", { className: "wheel-chevron" }, "›")]
   );
 
-  return h("div", { className: "wheel-row" }, btn);
+  return h("div", { className: "wheel-row" + (disabled ? " wheel-row-disabled" : "") }, [
+    btn,
+    disabled && disabledReason ? h("p", { className: "wheel-disabled-reason" }, disabledReason) : null,
+  ]);
 }
 
 export function render(container, params) {
@@ -163,7 +191,7 @@ export function render(container, params) {
   // Seed Treatment used to be the one row with no label above it, which
   // left it sitting flush against Trait's box with none of the other
   // rows' breathing room.
-  const brandWheel = createExtendableWheelSelect({
+  const brandRow = listPickerRow({
     title: "Brand / Company",
     value: entry.brand,
     options: listsStore.items(listsStore.CATEGORY.BRAND_COMPANY),
@@ -255,7 +283,7 @@ export function render(container, params) {
   function rebuildHybridWheel() {
     const brand = currentEntry().brand || "";
     const isBlank = brand.trim() === "";
-    const wheel = createExtendableWheelSelect({
+    const row = listPickerRow({
       title: "Hybrid",
       value: currentEntry().hybrid,
       options: listsStore.hybridItems(brand),
@@ -271,7 +299,7 @@ export function render(container, params) {
       addNewPromptMessage: `This is added under ${brand} permanently, for this and every future trial — it will only show up when ${brand} is the selected Brand / Company.`,
     });
     clear(hybridWheelHolder);
-    hybridWheelHolder.appendChild(wheel.el);
+    hybridWheelHolder.appendChild(row);
   }
 
   const seedTreatmentRow = listPickerRow({
@@ -287,9 +315,9 @@ export function render(container, params) {
 
   // Brand is pre-filled by trialStore for a freshly created entry (see
   // addEntryCarryingMeasurements()), so this has to run once up front —
-  // not just from brandWheel's onChange — or the very first entry in a
+  // not just from brandRow's onChange — or the very first entry in a
   // new plot would never get its Hybrid/RM default applied unless the
-  // user happened to touch the Brand wheel themselves.
+  // user happened to touch the Brand / Company field themselves.
   applyFirstEntryHybridRmDefault(currentEntry().brand);
   rebuildHybridWheel();
   // Matches the Trait picker's narrowed options to whatever Hybrid this
@@ -304,7 +332,7 @@ export function render(container, params) {
   // styles.css) is identical between all five, not just some of them.
   const identitySection = h("section", { className: "card" }, [
     sectionHeader("Hybrid Details"),
-    field("Brand / Company", brandWheel.el),
+    field("Brand / Company", brandRow),
     field("Hybrid", hybridWheelHolder),
     field("Trait", traitRowHolder),
     field("Seed Treatment", seedTreatmentRow),
