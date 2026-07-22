@@ -11,8 +11,8 @@ import * as catalogStore from "./ui/stores/catalogStore.js";
 import * as brandStore from "./ui/stores/brandStore.js";
 import * as authStore from "./ui/authStore.js";
 import * as libraryStore from "./ui/stores/libraryStore.js";
+import * as cloudSyncStore from "./ui/stores/cloudSyncStore.js";
 import "./ui/stores/themeStore.js"; // self-applies persisted theme mode on load
-import "./ui/stores/cloudSyncStore.js"; // wires up push/pull subscriptions on load
 import { initUpdateBanner } from "./ui/components/updateBanner.js";
 import { initRouter } from "./ui/router.js";
 
@@ -34,6 +34,21 @@ initUpdateBanner();
 
 async function start() {
   authStore.init();
+  // Reconcile this device's local library with the cloud BEFORE
+  // anything else gets a chance to mutate it and trigger an automatic
+  // push (see libraryStore.ensureDemoPlot() right below, which touches
+  // the library on every app version bump) — see cloudSyncStore.js's
+  // top comment for the real production incident this order fixes: a
+  // push overwrites the user's entire cloud copy, so it must never fire
+  // from local data that hasn't been given a chance to catch up with
+  // the cloud first. Awaited, not fire-and-forget, specifically so
+  // ensureDemoPlot() can never run before this completes. authStore.init()
+  // being a no-op above means this is also the ONLY place a normal
+  // returning (already-signed-in) session ever re-pulls from the cloud —
+  // previously that only happened on a brand-new sign-in. Never throws
+  // (see pullAndMerge()'s own comment) and no-ops instantly when signed
+  // out, so this can't block or break startup either way.
+  await cloudSyncStore.pullAndMerge();
   // Local to this device, independent of sign-in — see
   // libraryStore.ensureDemoPlot()'s comment for the "reappears after an
   // update, but not before you delete it" rule.
