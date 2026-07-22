@@ -14,9 +14,18 @@
 // handled in entryEditor.js itself, not here — this module only
 // answers "what are the valid options," not "what should happen when
 // one is picked."
+//
+// BRAND_COMPANY is additionally reordered (see COMPANY_PRIORITY_ORDER /
+// orderCompaniesForBrandView below) so the picker always leads with the
+// currently-selected Brand View's own catalog name, then a requested
+// fixed sequence of the most-used companies, with everything else
+// (custom-added companies, brand-new catalog uploads not in that fixed
+// list) falling after, in whatever order it already had.
 
 import { createPubSub, readJson, writeJson } from "./pubsub.js";
 import * as catalogStore from "./catalogStore.js";
+import * as brandStore from "./brandStore.js";
+import { getBrand } from "../brand.js";
 
 const CUSTOM_KEY = "cph.customLists";
 const DEFAULTS_URL = "/DefaultLists.json";
@@ -34,6 +43,89 @@ export const CATEGORY = {
 // the noisy non-RM-coded entries filtered out (see hybridItems() below) —
 // other hybridDefaultBrands (e.g. Crow's) are left as-is.
 const HYBRID_HYPHEN_ONLY_BRANDS = ["Midwest Seed Genetics", "NC+ Hybrids"];
+
+// Requested fixed display order for the Brand / Company picker: whichever
+// Brand View is currently selected (Midwest Seed Genetics or NC+ Hybrids)
+// always comes first, then this list, in this order. Anything not in
+// either place (a custom-added company, a brand-new catalog upload not on
+// this list, etc.) falls after all of it, in whatever order it already
+// had. Kept as one flat list (not split per Brand View) since the list
+// itself doesn't change based on which brand is selected — only whether
+// Midwest or NC+ Hybrids is prepended ahead of it.
+const COMPANY_PRIORITY_ORDER = [
+  "Dekalb",
+  "Pioneer",
+  "Golden Harvest",
+  "Channel",
+  "Agrigold",
+  "LG Seed",
+  "Brevant Seeds",
+  "Hoegemeyer",
+  "Becks",
+  "Dyna-Gro",
+  "Mustang Seeds",
+  "NuTech Seed",
+  "Croplan",
+  "Innvictis",
+  "Republic",
+  "Dairyland Seed",
+  "Rob See Co",
+  "Crow's",
+  "AgVenture",
+  "Wyffels",
+  "Latham Hi-Tech Seeds",
+  "NK Brand",
+  "Stine",
+  "Thunder Seed",
+  "Jacobsen Seeds",
+  "Legend Seeds",
+  "Champion Seed",
+  "Ohlde",
+  "Integra",
+  "Prairie Valley",
+  "AP Select",
+  "Renk Seed",
+  "Peterson Farms Seed",
+  "Legacy Seeds",
+  "Enestvedt",
+  "FS InVISION",
+  "Frontiersman",
+  "Super Crost",
+  "Hefty Seed",
+  "Enogen",
+];
+
+/**
+ * Sorts `companies` so the currently-selected Brand View's catalog name
+ * comes first, then COMPANY_PRIORITY_ORDER's fixed sequence, then
+ * everything else in its original relative order (a stable sort — see
+ * MDN, Array.prototype.sort has been guaranteed stable since ES2019).
+ * Matching is case-insensitive so it still works regardless of exactly
+ * how a name was capitalized when it was added (default list, custom
+ * entry, or catalog upload).
+ * @param {string[]} companies
+ * @returns {string[]}
+ */
+function orderCompaniesForBrandView(companies) {
+  const selected = getBrand(brandStore.getState().selectedBrand);
+  const priorityNames = [selected ? selected.catalogBrandName : null, ...COMPANY_PRIORITY_ORDER].filter(
+    Boolean
+  );
+  const priorityIndex = new Map();
+  priorityNames.forEach((name, i) => {
+    const key = name.toLowerCase();
+    if (!priorityIndex.has(key)) priorityIndex.set(key, i);
+  });
+  return companies
+    .map((name, originalIndex) => ({ name, originalIndex }))
+    .sort((a, b) => {
+      const ai = priorityIndex.has(a.name.toLowerCase()) ? priorityIndex.get(a.name.toLowerCase()) : Infinity;
+      const bi = priorityIndex.has(b.name.toLowerCase()) ? priorityIndex.get(b.name.toLowerCase()) : Infinity;
+      if (ai !== bi) return ai - bi;
+      return a.originalIndex - b.originalIndex;
+    })
+    .map((entry) => entry.name);
+}
 
 const pubsub = createPubSub();
 
@@ -141,7 +233,9 @@ export function items(category) {
   const c = state.custom;
   switch (category) {
     case CATEGORY.BRAND_COMPANY:
-      return dedupeCaseInsensitive([...d.companies, ...c.companies, ...catalogStore.companies()]);
+      return orderCompaniesForBrandView(
+        dedupeCaseInsensitive([...d.companies, ...c.companies, ...catalogStore.companies()])
+      );
     case CATEGORY.HYBRID: {
       const allCustomHybrids = Object.values(c.hybridsByBrand).flat();
       return [...d.hybrids, ...allCustomHybrids];
@@ -211,6 +305,32 @@ export function parseHybridRelativeMaturity(hybridLabel) {
  */
 export function firstHybridWithRm(forBrand, rm) {
   return hybridItems(forBrand).find((h) => parseHybridRelativeMaturity(h) === rm) || null;
+}
+
+/**
+ * Used by trialStore.addEntryCarryingMeasurements() to step a new plot
+ * entry up to the next-maturity product on the just-added entry's Brand
+ * View catalog, instead of repeating the previous entry's exact hybrid —
+ * see that function's comment for why.
+ * @param {string} forBrand
+ * @param {number} afterRm
+ * @returns {string|null} the hybrid (in catalog order) with the lowest
+ *   parsed RM that's still strictly greater than afterRm, or null if
+ *   there isn't one (afterRm is already at/above this brand's highest
+ *   catalog RM, or forBrand has no RM-coded hybrids at all).
+ */
+export function nextHybridAboveRm(forBrand, afterRm) {
+  let best = null;
+  let bestRm = Infinity;
+  for (const h of hybridItems(forBrand)) {
+    const rm = parseHybridRelativeMaturity(h);
+    if (rm === null || rm <= afterRm) continue;
+    if (rm < bestRm) {
+      best = h;
+      bestRm = rm;
+    }
+  }
+  return best;
 }
 
 /**
