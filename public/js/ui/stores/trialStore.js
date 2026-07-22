@@ -9,7 +9,6 @@ import { uuid, createTrialHeader, createPlotEntry } from "../../core/models.js";
 import { createPubSub, debounce, readJson, writeJson } from "./pubsub.js";
 import * as brandStore from "./brandStore.js";
 import { getBrand } from "../brand.js";
-import * as listsStore from "./listsStore.js";
 
 const KEY = "cph.draftTrial";
 const AUTOSAVE_DEBOUNCE_MS = 400;
@@ -75,20 +74,17 @@ export function addEntry(entry) {
 // most recently added entry instead of starting blank.
 const CARRIED_MEASUREMENT_FIELDS = ["stripLengthFeet", "numberOfRows", "widthInches"];
 
-// Hybrid / RM / Trait are carried forward too — not because they're
-// usually identical, but so each of those selection lists opens already
-// scrolled to the previous entry's pick (wheelSelect.js auto-scrolls to
-// whatever the current value is) instead of the top of a long list. The
-// user still has to actively confirm or change it for the new entry.
-//
-// This is the FALLBACK for Hybrid/RM specifically — see
-// addEntryCarryingMeasurements() below, which instead steps Hybrid/RM
-// forward to the next-higher-maturity product on the freshly-defaulted
-// Brand View's own catalog when one exists, and only falls back to
-// plainly repeating the previous entry's values (via this list) when it
-// doesn't (a competitor brand with no default catalog, or already at the
-// top of the RM range). Trait always just carries forward via this list.
-const CARRIED_IDENTITY_FIELDS = ["hybrid", "relativeMaturity", "trait"];
+// Hybrid / Relative Maturity / Trait are deliberately NOT carried
+// forward (per explicit request) — every entry after the first opens
+// with these three blank, so each one gets a fresh, deliberate pick
+// rather than risking a stale value that happened to match the previous
+// entry slipping through unnoticed. (This app previously carried them
+// forward, then briefly auto-advanced Hybrid/RM to the next-higher-
+// maturity catalog product entry-by-entry — both were tried and moved
+// away from in favor of this simpler, explicit-every-time behavior.)
+// Seed Treatment was never carried forward either; see
+// entryEditor.js's placeholder text for it now spelling out that
+// leaving it blank is fine when it's genuinely unknown.
 
 // Brand / Company defaults to whichever app-level brand is currently
 // selected (Midwest Seed Genetics or NC+ Hybrids — see brandStore.js),
@@ -110,44 +106,20 @@ function defaultBrandForNewEntry() {
 /**
  * Adds a new blank entry, defaulting Brand / Company to the app's
  * currently selected brand and prepopulating Strip Length, Number of
- * Rows, and Width from the most recently added entry (if any) — see
- * entryEditor.js for how the very first entry in a plot additionally
- * defaults Hybrid/RM once Brand is set, since it has no previous entry
- * to carry those from.
- *
- * Hybrid / Relative Maturity specifically step forward to the next
- * higher-maturity product on the newly-defaulted Brand View's own
- * catalog (see listsStore.nextHybridAboveRm) rather than repeating the
- * previous entry's exact hybrid — a plot commonly walks up through a
- * home brand's lineup maturity-by-maturity, entry by entry, so this
- * saves re-picking the next one by hand every time. Trait is cleared
- * (not carried forward) whenever Hybrid actually advances this way,
- * since a different product's trait package may not match the previous
- * entry's — the user picks it fresh for the new hybrid. When no
- * higher-RM hybrid exists on that catalog (a competitor brand with no
- * default catalog at all, or the previous entry was already at the top
- * of the RM range), this falls back to plainly carrying Hybrid/RM/Trait
- * forward unchanged, same as before this behavior existed.
+ * Rows, and Width from the most recently added entry (if any). Hybrid,
+ * Relative Maturity, and Trait are deliberately left blank — not carried
+ * forward, not auto-advanced — for every entry after the first, so each
+ * one gets a fresh, deliberate pick; see entryEditor.js for how the very
+ * first entry in a plot additionally defaults Hybrid/RM once Brand is
+ * set (that's the one exception, and it only ever runs once per plot).
  * @returns {import('../../core/models.js').PlotEntry}
  */
 export function addEntryCarryingMeasurements() {
   const prev = state.entries[state.entries.length - 1];
   const entry = createPlotEntry();
-  const brand = defaultBrandForNewEntry();
-  entry.brand = brand;
+  entry.brand = defaultBrandForNewEntry();
   if (prev) {
     for (const key of CARRIED_MEASUREMENT_FIELDS) entry[key] = prev[key];
-    for (const key of CARRIED_IDENTITY_FIELDS) entry[key] = prev[key];
-
-    const prevRm = Number(prev.relativeMaturity);
-    if (brand && Number.isFinite(prevRm)) {
-      const nextHybrid = listsStore.nextHybridAboveRm(brand, prevRm);
-      if (nextHybrid) {
-        entry.hybrid = nextHybrid;
-        entry.relativeMaturity = String(listsStore.parseHybridRelativeMaturity(nextHybrid));
-        entry.trait = "";
-      }
-    }
   }
   return addEntry(entry);
 }

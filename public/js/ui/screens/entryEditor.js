@@ -81,6 +81,10 @@ function listPickerRow({
   // is selected yet, same behavior as when Hybrid was a wheel.
   disabled = false,
   disabledReason = "",
+  // Overridable per field — Seed Treatment uses this to spell out that
+  // leaving it blank is fine (see seedTreatmentRow below); everything
+  // else keeps the plain default.
+  placeholder = "Select…",
 }) {
   let currentValue = value;
   let currentOptions = options.slice();
@@ -88,7 +92,7 @@ function listPickerRow({
   const valueEl = h(
     "span",
     { className: "wheel-row-value" + (currentValue ? "" : " wheel-row-placeholder") },
-    currentValue || "Select…"
+    currentValue || placeholder
   );
 
   const btn = h(
@@ -307,6 +311,12 @@ export function render(container, params) {
     value: entry.seedTreatment,
     options: listsStore.items(listsStore.CATEGORY.SEED_TREATMENT),
     showLabel: false,
+    // Seed Treatment is genuinely often unknown/not tracked at all (unlike
+    // Brand/Hybrid/Trait/RM, which are always knowable even if not on the
+    // preset lists) — the placeholder says so directly rather than the
+    // plain "Select…" every other field uses, so leaving it blank reads
+    // as a deliberate, expected outcome instead of an incomplete entry.
+    placeholder: "Select or leave blank if unknown",
     onChange: (v) => trialStore.updateEntry(entryId, { seedTreatment: v }),
     onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.SEED_TREATMENT),
     addNewPromptTitle: "Add New Seed Treatment",

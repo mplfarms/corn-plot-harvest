@@ -308,32 +308,6 @@ export function firstHybridWithRm(forBrand, rm) {
 }
 
 /**
- * Used by trialStore.addEntryCarryingMeasurements() to step a new plot
- * entry up to the next-maturity product on the just-added entry's Brand
- * View catalog, instead of repeating the previous entry's exact hybrid —
- * see that function's comment for why.
- * @param {string} forBrand
- * @param {number} afterRm
- * @returns {string|null} the hybrid (in catalog order) with the lowest
- *   parsed RM that's still strictly greater than afterRm, or null if
- *   there isn't one (afterRm is already at/above this brand's highest
- *   catalog RM, or forBrand has no RM-coded hybrids at all).
- */
-export function nextHybridAboveRm(forBrand, afterRm) {
-  let best = null;
-  let bestRm = Infinity;
-  for (const h of hybridItems(forBrand)) {
-    const rm = parseHybridRelativeMaturity(h);
-    if (rm === null || rm <= afterRm) continue;
-    if (rm < bestRm) {
-      best = h;
-      bestRm = rm;
-    }
-  }
-  return best;
-}
-
-/**
  * @param {string} raw
  * @param {string} category
  * @returns {string} the trimmed value that ended up selected ("" if raw was blank)
