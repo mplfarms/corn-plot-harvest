@@ -30,7 +30,7 @@ import { buildPdf, pdfFilename } from "../../core/pdfBuilder.js";
 import { buildXlsx, createEffectiveLists } from "../../core/xlsxBuilder.js";
 import { buildSeedwareExport } from "../../core/seedwareExportBuilder.js";
 import { getLogoDataUrl } from "../logoCache.js";
-import { downloadBlob, shareOrDownload, openMailto } from "../fileSave.js";
+import { downloadBlob, shareOrDownload, shareOrDownloadFiles, openMailto } from "../fileSave.js";
 
 // Moisture is deliberately omitted from the segmented control — ranking/
 // sorting the whole list BY moisture wasn't useful in practice; the
@@ -322,11 +322,28 @@ export function render(container, params) {
     }
   }
 
+  // Exports/shares BOTH the flat Seedware import file AND the full
+  // "Trial Outline" XLSX (this app's own formatted form) together, in
+  // one action — per explicit request, the filled-out harvest form now
+  // rides along with the Seedware file from this button too (not just
+  // from "Email XLSX to Operations" below, which already bundled both —
+  // see handleEmailXlsx()). shareOrDownloadFiles() hands both files to
+  // the OS share sheet at once when available (e.g. AirDrop, a Files
+  // app, a cloud-upload picker), falling back to two separate browser
+  // downloads otherwise.
   async function handleExportSeedware() {
     try {
       const freshHeader = await resolveHeaderForExport();
-      const { blob, filename } = buildSeedwareExportBlob(freshHeader);
-      await shareOrDownload(blob, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      const { blob: fullBlob, filename: fullFilename } = await buildFullXlsxBlob(freshHeader);
+      const seedware = buildSeedwareExportBlob(freshHeader);
+      const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      await shareOrDownloadFiles(
+        [
+          { blob: fullBlob, filename: fullFilename, mime },
+          { blob: seedware.blob, filename: seedware.filename, mime },
+        ],
+        seedware.filename
+      );
     } catch (e) {
       showToast(`Couldn't export the Seedware file: ${e.message}`, { type: "error" });
     }

@@ -73,8 +73,7 @@ function listPickerRow({
   options,
   onChange,
   onAddNew,
-  addNewPromptTitle,
-  addNewPromptMessage,
+  addNewHint,
   showLabel = true,
   // Mirrors wheelSelect.js's disabled/disabledReason — used by the
   // Hybrid row (see rebuildHybridWheel() below) while no Brand / Company
@@ -120,8 +119,7 @@ function listPickerRow({
                 return selected;
               }
             : undefined,
-          addNewPromptTitle,
-          addNewPromptMessage,
+          addNewHint,
         });
       },
     },
@@ -207,8 +205,7 @@ export function render(container, params) {
       refreshTraitOptionsForCurrentHybrid();
     },
     onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.BRAND_COMPANY),
-    addNewPromptTitle: "Add New Brand / Company",
-    addNewPromptMessage: "This is added to the list permanently, for this and every future trial.",
+    addNewHint: "This is added to the list permanently, for this and every future trial.",
   });
 
   // ---- RM (locked, 75-120) ----
@@ -237,8 +234,7 @@ export function render(container, params) {
       showLabel: false,
       onChange: (v) => trialStore.updateEntry(entryId, { trait: v }),
       onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.TRAIT),
-      addNewPromptTitle: "Add New Trait",
-      addNewPromptMessage: "This is added to the list permanently, for this and every future trial.",
+      addNewHint: "This is added to the list permanently, for this and every future trial.",
     });
     clear(traitRowHolder);
     traitRowHolder.appendChild(row);
@@ -299,8 +295,7 @@ export function render(container, params) {
         applyCatalogHybridDefaults(brand, v);
       },
       onAddNew: (raw) => listsStore.addCustomHybrid(raw, brand),
-      addNewPromptTitle: "Add New Hybrid",
-      addNewPromptMessage: `This is added under ${brand} permanently, for this and every future trial — it will only show up when ${brand} is the selected Brand / Company.`,
+      addNewHint: `This is added under ${brand} permanently, for this and every future trial — it will only show up when ${brand} is the selected Brand / Company.`,
     });
     clear(hybridWheelHolder);
     hybridWheelHolder.appendChild(row);
@@ -319,8 +314,7 @@ export function render(container, params) {
     placeholder: "Select or leave blank if unknown",
     onChange: (v) => trialStore.updateEntry(entryId, { seedTreatment: v }),
     onAddNew: (raw) => listsStore.addCustomItem(raw, listsStore.CATEGORY.SEED_TREATMENT),
-    addNewPromptTitle: "Add New Seed Treatment",
-    addNewPromptMessage: "This is added to the list permanently, for this and every future trial.",
+    addNewHint: "This is added to the list permanently, for this and every future trial.",
   });
 
   // Brand is pre-filled by trialStore for a freshly created entry (see

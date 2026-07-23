@@ -1,23 +1,39 @@
 // netlify/functions/hybridCatalog.js
 //
-// Shared Company / Hybrid / Trait / RM reference catalog -- the data
+// Shared Company / Hybrid / Trait / RM reference catalog — the data
 // behind entryEditor.js's cascading pickers (pick a Brand/Company, see
 // only that brand's hybrids; pick a Hybrid, get its Relative Maturity
 // and available Trait package(s) automatically). Unlike everything else
-// this app stores server-side, this catalog is NOT scoped per-user -- it
+// this app stores server-side, this catalog is NOT scoped per-user — it
 // is one shared reference table every signed-in device reads, same as
 // DefaultLists.json's static lists, except this one needs to be
 // updatable by an admin at any time without a new app build/deploy (see
 // adminPlots.js's "Upload Hybrid Catalog" button, the only place that
 // ever POSTs here).
 //
-// GET: public, no auth required.
+// GET: public, no auth required — this is non-sensitive shared
+//   reference data (hybrid names and maturity ratings, not grower data),
+//   the same trust level as the statically-served DefaultLists.json.
 //   -> {updatedAt: string|null, rows: Array<{company, hybrid, trait, rm}>}
 //
 // POST body: {email, rows: Array<{company, hybrid, trait, rm}>}
-//   Admin-only (requireAdmin(), identical pattern to backfillFormIds.js).
-//   REPLACES the entire catalog each time.
+//   Admin-only (requireAdmin(), identical pattern to
+//   backfillFormIds.js). REPLACES the entire catalog — this is a full
+//   re-upload each time, by design: the admin's source spreadsheet is
+//   the single source of truth, and always re-parsing it fresh from
+//   scratch means there's never a question of what merged with what
+//   from a previous upload. Company-name de-duplication against the
+//   app's existing brand list happens client-side before this is ever
+//   called (see public/js/core/companyMatch.js) — this function trusts
+//   whatever rows it's given and only validates their basic shape.
 //   -> {rowCount, companyCount, updatedAt}
+//
+// Row validation is deliberately light (matching this app's overall
+// "small trusted team" simplicity — see _shared.js's top comment): each
+// row must have a non-empty company/hybrid/trait string and a finite
+// numeric rm, or it's dropped rather than failing the whole upload —
+// one malformed row in a 1500-row spreadsheet shouldn't block every
+// other row from updating.
 
 const { getStore, connectLambda } = require("@netlify/blobs");
 const { json, normalizeEmail, requireAdmin } = require("./_shared");
@@ -34,7 +50,7 @@ function sanitizeRows(rawRows) {
     const trait = String(r.trait || "").trim();
     const rm = Number(r.rm);
     if (!company || !hybrid || !trait || !Number.isFinite(rm)) continue;
-    out.push({ company: company, hybrid: hybrid, trait: trait, rm: rm });
+    out.push({ company, hybrid, trait, rm });
   }
   return out;
 }
@@ -69,12 +85,12 @@ exports.handler = async (event) => {
 
   const rows = sanitizeRows(payload.rows);
   if (rows.length === 0) {
-    return json(400, { error: "No valid rows in upload -- expected company, hybrid, trait, and rm on every row." });
+    return json(400, { error: "No valid rows in upload — expected company, hybrid, trait, and rm on every row." });
   }
 
   const updatedAt = new Date().toISOString();
-  await store.setJSON(STATE_KEY, { updatedAt: updatedAt, rows: rows });
+  await store.setJSON(STATE_KEY, { updatedAt, rows });
 
   const companyCount = new Set(rows.map((r) => r.company.toLowerCase())).size;
-  return json(200, { rowCount: rows.length, companyCount: companyCount, updatedAt: updatedAt });
+  return json(200, { rowCount: rows.length, companyCount, updatedAt });
 };

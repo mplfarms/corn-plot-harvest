@@ -100,7 +100,7 @@ export function render(container) {
     helpSection("Finding Your Way Around", [
       p("Every screen has a bar across the top with a few icons:"),
       ul([
-        "⌂ (house) — takes you straight back to the Home Screen from anywhere.",
+        "Barn icon — takes you straight back to the Home Screen from anywhere.",
         "‹ (arrow) — goes back one screen, the same as wherever you just came from.",
         "⚙ (gear) — opens Settings.",
       ]),

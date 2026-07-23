@@ -244,15 +244,33 @@ a {
   line-height: 1;
 }
 
-/* Home and Back are icon-only (⌂, ‹ — no text label). Deliberately a
-   bit bigger than the Settings gear (1.3rem) now — glyphs at the same
-   font-size don't read as visually equal weight (⌂/‹ have less ink than
-   ⚙), so a small bump keeps all three feeling like one consistent set
-   rather than Home/Back looking smaller. Still nowhere near crowding the
-   center title: a bare glyph at this size is a fraction of the width
-   "⌂ Home"/"‹ Back" used to take. */
+/* Home and Back are icon-only (barn SVG, ‹ — no text label). Deliberately
+   a bit bigger than the Settings gear (1.3rem) now — glyphs at the same
+   font-size don't read as visually equal weight (‹/⚙ have less ink than
+   the barn), so a small bump keeps all three feeling like one consistent
+   set rather than Home/Back looking smaller. Still nowhere near crowding
+   the center title: a bare glyph/icon at this size is a fraction of the
+   width "Home"/"‹ Back" used to take. This font-size only directly sizes
+   Back's "‹" glyph now — Home's barn icon is sized via its own SVG
+   width/height (see .top-bar-btn-home/.top-bar-home-icon below), though
+   the button still carries this class for its shared button chrome. */
 .top-bar-btn-nav {
   font-size: 1.5rem;
+}
+
+/* Home is now an outlined barn SVG, not a text glyph (see topBar.js's
+   BARN_ICON_SVG) — font-size above still applies to Back's "‹" (both
+   share .top-bar-btn-nav), but the icon itself needs its own centering
+   since an inline <svg> doesn't inherit line-height-based vertical
+   centering the way a text glyph does. */
+.top-bar-btn-home {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.top-bar-home-icon {
+  display: inline-flex;
 }
 
 /* Plot Summary's "i" info icon, in the top-bar-right slot alongside the
@@ -1287,6 +1305,16 @@ h3.section-header:first-child {
 .search-list-add-new {
   color: var(--accent-strong);
   font-weight: 600;
+}
+
+/* Static caption under the search input on fields that support adding a
+   new value (see searchListPicker.js's addNewHint) — always visible,
+   rather than only shown after tapping a since-removed "+ Add New…" row's
+   popup, so context like Hybrid's brand-scoping note is never hidden. */
+.search-list-add-new-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: -4px 0 0;
 }
 
 .search-list-empty {

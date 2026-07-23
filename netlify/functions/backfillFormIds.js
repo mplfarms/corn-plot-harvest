@@ -13,10 +13,15 @@
 //
 // Reserves every backfilled ID from the exact same "formIdRegistry"
 // counter/registry formId.js uses (see _formIdShared.js) — advancing the
-// SAME shared counter and recording into the SAME `issued` map — so a
-// plot backfilled here can never collide with an ID someone is live-
-// saving elsewhere at the same moment, and the counter picks up exactly
-// where this run leaves it for every future live reservation.
+// SAME shared per-year counters and recording into the SAME `issued`
+// map — so a plot backfilled here can never collide with an ID someone
+// is live-saving elsewhere at the same moment, and each year's counter
+// picks up exactly where this run leaves it for every future live
+// reservation. Each trial's OWN dates decide which year's counter it
+// draws from (Date Harvested, else Date Planted, else today — see
+// _formIdShared.js's resolveFormYearFromHeader()), same rule formId.js
+// applies live, just computed directly from the stored header here
+// instead of trusted from a client request.
 //
 // POST body: {email} (the calling admin's own email, for the
 // requireAdmin() check — identical pattern to plots.js's scope=all and
@@ -31,7 +36,15 @@
 
 const { getStore, connectLambda } = require("@netlify/blobs");
 const { json, normalizeEmail, userKey, requireAdmin } = require("./_shared");
-const { STARTING_ID, STATE_KEY, formatFormIdCandidate, nextFreeFormId } = require("./_formIdShared");
+const {
+  STARTING_ID,
+  STATE_KEY,
+  formatFormIdCandidate,
+  yearSuffix,
+  resolveFormYearFromHeader,
+  nextFreeFormId,
+  normalizeState,
+} = require("./_formIdShared");
 
 exports.handler = async (event) => {
   connectLambda(event);
@@ -57,9 +70,7 @@ exports.handler = async (event) => {
   const adminCheck = await requireAdmin(usersStore, email);
   if (!adminCheck.ok) return json(adminCheck.statusCode, { error: adminCheck.error });
 
-  const state = (await registryStore.get(STATE_KEY, { type: "json" })) || { nextValue: STARTING_ID, issued: {} };
-  let nextValue = state.nextValue || STARTING_ID;
-  const issued = state.issued || {};
+  const state = normalizeState(await registryStore.get(STATE_KEY, { type: "json" }));
 
   // Enumerated from the "users" store (every REGISTERED account), same
   // as plots.js's handleGetAll — a user who's never saved a plot simply
@@ -84,10 +95,13 @@ exports.handler = async (event) => {
       if (!trial || !trial.header) continue;
       if (trial.header.formId) continue; // already assigned — leave it alone
 
-      const candidateBase = formatFormIdCandidate(nextValue);
-      const formId = nextFreeFormId(candidateBase, issued);
-      issued[formId] = { email: userEmail, at: new Date().toISOString(), backfilled: true };
-      nextValue += 1;
+      const ySuffix = yearSuffix(resolveFormYearFromHeader(trial.header));
+      const nextValue = state.counters[ySuffix] || STARTING_ID;
+
+      const candidateBase = formatFormIdCandidate(ySuffix, nextValue);
+      const formId = nextFreeFormId(candidateBase, state.issued);
+      state.issued[formId] = { email: userEmail, at: new Date().toISOString(), backfilled: true };
+      state.counters[ySuffix] = nextValue + 1;
 
       trial.header.formId = formId;
       changedForThisUser = true;
@@ -104,9 +118,10 @@ exports.handler = async (event) => {
 
   // Written once at the end, after every user's trials have been walked
   // — every reservation made during this run shares one in-memory
-  // `issued`/`nextValue`, so this single write is what actually commits
-  // all of them together.
-  await registryStore.setJSON(STATE_KEY, { nextValue, issued });
+  // `state`, so this single write is what actually commits all of them
+  // together (across however many different years' counters got
+  // touched along the way).
+  await registryStore.setJSON(STATE_KEY, state);
 
   return json(200, { assignedCount, updatedUserCount, totalTrialCount });
 };
