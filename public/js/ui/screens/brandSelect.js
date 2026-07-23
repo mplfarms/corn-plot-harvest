@@ -46,10 +46,9 @@ export function render(container) {
         : null,
       h("h1", { className: "brand-select-title" }, "Corn Plot Harvest"),
       h("p", { className: "brand-select-subtitle" }, "Select Brand"),
-      h("div", { className: "brand-select-buttons" }, [
-        brandButton(BRANDS.midwestSeedGenetics),
-        brandButton(BRANDS.ncPlus),
-      ]),
+      // Object.values() rather than naming each brand, so a future 4th+
+      // Brand View doesn't require touching this screen too.
+      h("div", { className: "brand-select-buttons" }, Object.values(BRANDS).map(brandButton)),
     ]),
     h(
       "p",

@@ -6,8 +6,8 @@
 // One solid-color hero per brand: "Corn Plot Entry" and that brand's
 // logo sit toward the top, "Enter a New Plot" and "Saved Plots" sit
 // toward the bottom. The background color itself is brand-specific
-// (var(--chrome) — dark green for Midwest Seed Genetics, blue for NC+)
-// and needs no per-brand branching here since applyBrandTheme() (see
+// (var(--chrome) — dark green for Midwest Seed Genetics, blue for NC+,
+// black for Crow's) and needs no per-brand branching here since applyBrandTheme() (see
 // brand.js) already keeps that CSS variable in sync with whichever
 // brand is currently selected.
 //

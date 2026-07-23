@@ -176,6 +176,14 @@ export function render(container, params) {
   adminEditStore.clearIfStale();
 
   const brand = getBrand(brandStore.getState().selectedBrand);
+  // Crow's Brand View uses a deliberately plainer Ranked Results row (per
+  // explicit request): no color-coded significance badge, the entry's
+  // ORIGINAL number on the left instead, and its sorted placement rank +
+  // actual Dry Yield always shown together on the right regardless of
+  // which metric tab is selected. Every other Brand View (and no Brand
+  // View at all) keeps the original color-coded badge + single
+  // current-metric-value layout — see the Ranked Results section below.
+  const isCrowsView = Boolean(brand && brand.id === "crows");
   // Admin editing someone else's plot (see adminEditStore.js) works by
   // temporarily loading that trial into this same trialStore draft slot
   // — trialStore.loadTrial() — so this screen (and Plot Details/Plot
@@ -653,21 +661,27 @@ export function render(container, params) {
   const meta = rankingMetricMeta[metric];
   const ranked = computeRanked(displayEntries, metric, header);
   const showsMoistureLine = metric !== RankingMetric.MOISTURE;
+  const dryYieldMeta = rankingMetricMeta[RankingMetric.DRY_YIELD];
 
-  const significanceLegend = h("div", { className: "significance-legend" }, [
-    h("span", { className: "significance-legend-item" }, [
-      h("span", { className: "significance-swatch significance-swatch-positive" }),
-      `${SIGNIFICANCE_THRESHOLD_BU_AC}+ bu/ac over plot mean`,
-    ]),
-    h("span", { className: "significance-legend-item" }, [
-      h("span", { className: "significance-swatch significance-swatch-negative" }),
-      `${SIGNIFICANCE_THRESHOLD_BU_AC}+ bu/ac under plot mean`,
-    ]),
-    h("span", { className: "significance-legend-item" }, [
-      h("span", { className: "significance-swatch significance-swatch-neutral" }),
-      `Within ${SIGNIFICANCE_THRESHOLD_BU_AC} bu/ac of plot mean`,
-    ]),
-  ]);
+  // The significance legend describes what the rank badge's color coding
+  // means — Crow's view has no color coding at all (see isCrowsView
+  // above), so the legend would just be confusing dead text there.
+  const significanceLegend = isCrowsView
+    ? null
+    : h("div", { className: "significance-legend" }, [
+        h("span", { className: "significance-legend-item" }, [
+          h("span", { className: "significance-swatch significance-swatch-positive" }),
+          `${SIGNIFICANCE_THRESHOLD_BU_AC}+ bu/ac over plot mean`,
+        ]),
+        h("span", { className: "significance-legend-item" }, [
+          h("span", { className: "significance-swatch significance-swatch-negative" }),
+          `${SIGNIFICANCE_THRESHOLD_BU_AC}+ bu/ac under plot mean`,
+        ]),
+        h("span", { className: "significance-legend-item" }, [
+          h("span", { className: "significance-swatch significance-swatch-neutral" }),
+          `Within ${SIGNIFICANCE_THRESHOLD_BU_AC} bu/ac of plot mean`,
+        ]),
+      ]);
 
   const rankedList = h("div", { className: "ranked-list" });
   if (ranked.length === 0) {
@@ -683,19 +697,40 @@ export function render(container, params) {
 
     const moistureVal = moisture(result.entry);
     const moistureText = moistureVal === null ? "—" : `${moistureVal.toFixed(1)}%`;
-    const significance = dryYieldSignificance(result.entry, summary);
 
-    rankedList.appendChild(
-      h("div", { className: "ranked-row card" }, [
-        h("span", { className: significanceBadgeClass(significance) }, String(rank)),
-        h("div", { className: "ranked-row-body" }, [
-          h("p", { className: "ranked-row-title" }, subtitleParts.length ? subtitleParts.join(" • ") : "Untitled Entry"),
-          showsMoistureLine ? h("p", { className: "ranked-row-moisture" }, `Moisture: ${moistureText}`) : null,
-          result.entry.comments.trim() ? h("p", { className: "ranked-row-comment" }, result.entry.comments.trim()) : null,
-        ]),
-        h("span", { className: "ranked-row-value" }, meta.formatValue(result.value)),
-      ])
-    );
+    const rowBody = h("div", { className: "ranked-row-body" }, [
+      h("p", { className: "ranked-row-title" }, subtitleParts.length ? subtitleParts.join(" • ") : "Untitled Entry"),
+      showsMoistureLine ? h("p", { className: "ranked-row-moisture" }, `Moisture: ${moistureText}`) : null,
+      result.entry.comments.trim() ? h("p", { className: "ranked-row-comment" }, result.entry.comments.trim()) : null,
+    ]);
+
+    if (isCrowsView) {
+      // Plain layout, no significance color-coding: the entry's ORIGINAL
+      // number (its position in the plot before any sorting — same value
+      // the Entry # metric sorts by) sits on the left; its current sorted
+      // placement rank and its actual Dry Yield (regardless of which
+      // metric tab is active) sit stacked on the right.
+      const dryYieldVal = valueForMetric(result.entry, RankingMetric.DRY_YIELD, header);
+      rankedList.appendChild(
+        h("div", { className: "ranked-row card ranked-row-plain" }, [
+          h("span", { className: "ranked-row-entry-num" }, `#${result.originalNumber}`),
+          rowBody,
+          h("div", { className: "ranked-row-right-stack" }, [
+            h("span", { className: "ranked-row-rank" }, `Rank ${rank}`),
+            h("span", { className: "ranked-row-value" }, dryYieldMeta.formatValue(dryYieldVal)),
+          ]),
+        ])
+      );
+    } else {
+      const significance = dryYieldSignificance(result.entry, summary);
+      rankedList.appendChild(
+        h("div", { className: "ranked-row card" }, [
+          h("span", { className: significanceBadgeClass(significance) }, String(rank)),
+          rowBody,
+          h("span", { className: "ranked-row-value" }, meta.formatValue(result.value)),
+        ])
+      );
+    }
   });
 
   // ---- Bottom action: back to Hybrid Entries to keep editing ----

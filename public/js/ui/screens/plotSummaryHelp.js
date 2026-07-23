@@ -91,7 +91,7 @@ export function render(container) {
 
     helpSection("Average By Brand", [
       p("When two or more hybrids from the same brand are entered in this plot, you'll see an average for that brand — a single-hybrid brand doesn't get an average of its own, since averaging one number isn't meaningful."),
-      p("Your own selected Brand View (Midwest Seed Genetics or NC+) is always listed first, regardless of how its average actually compares to the others — every other brand present follows in order by average."),
+      p("Your own selected Brand View (Midwest Seed Genetics, NC+, or Crow's) is always listed first, regardless of how its average actually compares to the others — every other brand present follows in order by average."),
     ]),
 
     helpSection("The Colored Rank Badges", [
@@ -103,6 +103,7 @@ export function render(container) {
       ]),
       p("Because this color is based on actual yield versus the plot average — not rank position — a hybrid keeps the same badge color no matter which tab (Dry Yield or Gross) you're viewing. It's always describing the same thing: how that hybrid's Dry Yield compares to the rest of this plot."),
       p("Below the moisture percentage on each row, any Comments typed in for that hybrid on the Plot Hybrids screen show up here too, so you don't have to go back and forth to see them."),
+      p("Crow's Brand View shows this list a bit differently: no colored badge — just each hybrid's entry number on the left, and its current placement rank plus Dry Yield on the right."),
     ]),
 
     helpSection("Sharing These Results", [

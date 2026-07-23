@@ -1,11 +1,11 @@
 // src/ui/brand.js (served at public/js/ui/brand.js)
 //
-// Brand palettes + theming, mirrors Theme.swift/Brand.swift. Two brands,
-// each with a set of colors that stay fixed across light/dark mode
-// (accent, accentLight, accentPale, highlight, chrome, danger) plus
+// Brand palettes + theming, mirrors Theme.swift/Brand.swift. Three
+// brands, each with a set of colors that stay fixed across light/dark
+// mode (accent, accentLight, accentPale, highlight, chrome, danger) plus
 // light/dark variants for backgrounds and cards.
 
-/** @typedef {"midwestSeedGenetics"|"ncPlus"} BrandId */
+/** @typedef {"midwestSeedGenetics"|"ncPlus"|"crows"} BrandId */
 
 export const BRANDS = {
   midwestSeedGenetics: {
@@ -64,6 +64,46 @@ export const BRANDS = {
     logo: "/logos/ncplus.png",
     operationsEmail: "operations@nc-pluse.com",
   },
+  // Per explicit request, added as a 3rd Brand View. Crow's official
+  // standards (per the brand sheet provided) specify exactly two colors —
+  // black (PMS Black 6, HEX 231f20) and red (PMS 7621, HEX b12028) — no
+  // third accent hue is defined. accentLight/accentPale below are just
+  // lighter tints of that same red (matching how NC+'s own accentLight/
+  // accentPale are tints of ITS red), and `highlight` is a muted gold NOT
+  // from Crow's standards — every brand needs some light, high-visibility
+  // color for status banners that still reads with the fixed dark text
+  // color those banners use (see .update-banner/.badge-current/etc in
+  // styles.css), and gold/yellow is what the other two brands already use
+  // for that same role. If Crow's has an official secondary color, swap
+  // this value for it.
+  crows: {
+    id: "crows",
+    accent: "#B12028",
+    accentLight: "#C8565C",
+    accentPale: "#E9AEB1",
+    highlight: "#D9A441",
+    // Chrome (top bar / browser theme-color background) is Crow's black —
+    // matches the black nav bar on crowsseed.com and the brand sheet's
+    // PMS Black 6.
+    chrome: "#231F20",
+    cardLight: "#F5F4F3",
+    danger: "#C94A4A",
+    bgLight: "#F5F4F3",
+    bgDark: "#141313",
+    cardDark: "#2A2827",
+    displayName: "Crow's",
+    // Matches DefaultLists.json's "companies"/"hybridDefaultBrands" entry
+    // exactly (see listsStore.js's HYBRID_HYPHEN_ONLY_BRANDS comment,
+    // which already calls out Crow's as a hybridDefaultBrand distinct
+    // from Midwest/NC+).
+    catalogBrandName: "Crow's",
+    // Placeholder logo (plain "CROW'S" wordmark, no rooster mark) — swap
+    // for the real logo file once provided; see this build's delivery
+    // notes.
+    logo: "/logos/crows.png",
+    // Best guess from crowsseed.com's domain — confirm/correct with Mike.
+    operationsEmail: "operations@crowsseed.com",
+  },
 };
 
 /**
@@ -75,15 +115,29 @@ export function getBrand(brandId) {
   return BRANDS[brandId] || null;
 }
 
+// Midwest Seed Genetics and NC+ Hybrids are the same underlying genetics
+// sold under two regional labels — that's the whole reason
+// entriesForBrandView() below relabels between them. Crow's is a
+// genuinely separate, independent brand (not a rebadge of either), so it
+// intentionally has NO entry here — see entriesForBrandView()'s comment.
+// If a future brand IS another rebadge partner, add its pairing here
+// rather than growing the old two-brand ternary.
+const REBADGE_PARTNER_BY_BRAND_ID = {
+  midwestSeedGenetics: "ncPlus",
+  ncPlus: "midwestSeedGenetics",
+};
+
 /**
  * Returns a copy of `entries` with .brand relabeled for display purposes
- * when a Brand View is selected: any entry belonging to the *other*
- * brand (matched by its catalogBrandName) is shown under the currently
+ * when a Brand View is selected: any entry belonging to that Brand
+ * View's *rebadge partner* (matched by its catalogBrandName, per
+ * REBADGE_PARTNER_BY_BRAND_ID above) is shown under the currently
  * selected brand's catalogBrandName instead — e.g. with "Midwest Seed
  * Genetics" selected as the Brand View, every "NC+ Hybrids" entry
  * displays (and groups, for brand averages) as "Midwest Seed Genetics",
  * and the mirror image happens when "NC+" is selected. Entries for any
- * other/third-party brand are left untouched.
+ * other/third-party brand — including Crow's, which has no rebadge
+ * partner at all — are left untouched.
  *
  * Only meant for the Plot Summary screen and its PDF export — Plot
  * Entries editing and the XLSX export intentionally keep entries' real
@@ -94,7 +148,9 @@ export function getBrand(brandId) {
  */
 export function entriesForBrandView(entries, brand) {
   if (!brand) return entries;
-  const otherBrand = brand.id === "midwestSeedGenetics" ? BRANDS.ncPlus : BRANDS.midwestSeedGenetics;
+  const partnerId = REBADGE_PARTNER_BY_BRAND_ID[brand.id];
+  if (!partnerId) return entries;
+  const otherBrand = BRANDS[partnerId];
   return entries.map((entry) =>
     entry.brand.trim() === otherBrand.catalogBrandName ? { ...entry, brand: brand.catalogBrandName } : entry
   );
@@ -109,12 +165,15 @@ const BRAND_ID_BY_EMAIL_DOMAIN = {
   "midwestseed.com": "midwestSeedGenetics",
   "republicseed.com": "midwestSeedGenetics",
   "nc-plus.com": "ncPlus",
+  // Best guess from crowsseed.com — confirm/correct with Mike if Crow's
+  // staff actually sign in from a different domain.
+  "crowsseed.com": "crows",
 };
 
 /**
  * @param {string|null|undefined} email
- * @returns {"midwestSeedGenetics"|"ncPlus"|null} the Brand View this
- *   email's domain should default to, or null if the domain isn't
+ * @returns {"midwestSeedGenetics"|"ncPlus"|"crows"|null} the Brand View
+ *   this email's domain should default to, or null if the domain isn't
  *   recognized (caller should prompt the user instead).
  */
 export function brandIdForEmail(email) {
