@@ -42,6 +42,10 @@
 // See ensureDemoPlot()'s comment for exactly how that works, including
 // the tradeoff that a version bump overwrites any practice edits a user
 // made to their demo plot.
+//
+// header.formId is likewise hardcoded (not left blank for live
+// assignment) — see the inline comment on it below for why "26-1000"
+// specifically.
 
 import { createPlotEntry } from "./models.js";
 
@@ -59,6 +63,16 @@ export function createDemoTrial() {
     id: DEMO_TRIAL_ID,
     isDemo: true,
     header: {
+      // Fixed, hardcoded Form ID (per explicit request) — "26-1000" is
+      // permanently reserved for the Demo Plot specifically and is
+      // never handed out by the real server-side counter (see
+      // netlify/functions/_formIdShared.js's STARTING_ID, which begins
+      // one past it at 1001), so there's no risk of it ever colliding
+      // with a real plot's assigned ID. Because it's already set here,
+      // formIdAssign.js's ensureFormIdAssigned() sees isFormIdAssigned()
+      // is already true and never attempts a network reservation for
+      // the Demo Plot at all.
+      formId: "26-1000",
       cooperatorName: "TE & TE Brown Inc",
       address: "",
       city: "Turin",

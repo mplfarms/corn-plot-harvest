@@ -365,6 +365,43 @@ export function addCustomHybrid(raw, brand) {
 }
 
 /**
+ * Whether `name` is a company/brand the user (or a teammate on this
+ * device) typed in through the Brand / Company picker's "+ Add New…"
+ * prompt (see searchListPicker.js/wheelSelect.js's onAddNew) — i.e. it
+ * lives in cph.customLists, NOT DefaultLists.json's built-in companies
+ * and NOT an admin-uploaded Hybrid Catalog company (see catalogStore.js
+ * — a bulk catalog upload is a real, already-known company/variety
+ * list, not a one-off "we don't have this in our system yet" pick).
+ * Used by seedwareExportBuilder.js to decide Variety Provider "Request"
+ * — see its top comment.
+ * @param {string} name
+ * @returns {boolean}
+ */
+export function isCustomCompany(name) {
+  const trimmed = (name || "").trim();
+  if (trimmed === "") return false;
+  return state.custom.companies.some((v) => v.toLowerCase() === trimmed.toLowerCase());
+}
+
+/**
+ * Same as isCustomCompany() above, but for a Hybrid / Variety typed in
+ * through the Hybrid picker's "+ Add New…" prompt under a specific
+ * Brand — i.e. it lives in cph.customLists' hybridsByBrand[brand], NOT
+ * DefaultLists.json's shared hybrid list and NOT an admin-uploaded
+ * Hybrid Catalog entry.
+ * @param {string} brand
+ * @param {string} hybrid
+ * @returns {boolean}
+ */
+export function isCustomHybrid(brand, hybrid) {
+  const brandTrimmed = (brand || "").trim();
+  const hybridTrimmed = (hybrid || "").trim();
+  if (brandTrimmed === "" || hybridTrimmed === "") return false;
+  const list = state.custom.hybridsByBrand[brandTrimmed] || [];
+  return list.some((v) => v.toLowerCase() === hybridTrimmed.toLowerCase());
+}
+
+/**
  * @param {string} value
  * @param {string} category
  */

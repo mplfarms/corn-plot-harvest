@@ -551,7 +551,7 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
 
 /**
  * Once a Form ID is assigned, the PDF's filename is just the code itself
- * — "APP00001.pdf" — matching the xlsx export exactly (see
+ * — "26-1001.pdf" — matching the xlsx export exactly (see
  * xlsxBuilder.js's exportFilename()), per explicit request. Falls back
  * to the original State_Year_Cooperator_Results.pdf scheme for a plot
  * that doesn't have a Form ID yet, same as exportFilename()'s own fallback.

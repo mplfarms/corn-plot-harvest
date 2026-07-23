@@ -413,10 +413,13 @@ function assembleWorkbook(sheet1, sheet2, templateParts) {
 }
 
 /**
+ * Also used by seedwareExportBuilder.js's own fallback filename (a
+ * plot exported before it has a Form ID) — exported so both builders
+ * sanitize the State_Year_Cooperator fallback scheme identically.
  * @param {string} s
  * @returns {string}
  */
-function sanitizeFilenamePart(s) {
+export function sanitizeFilenamePart(s) {
   let out = String(s).replace(/[^A-Za-z0-9]/g, "_");
   out = out.replace(/_+/g, "_");
   out = out.replace(/^_+/, "").replace(/_+$/, "");

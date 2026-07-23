@@ -1,10 +1,14 @@
 // src/ui/formIdAssign.js
 //
 // Owns the one-time "lock in" step of a plot's Form ID — reserving the
-// next number from the server's single global counter (see
+// next number from the server's counter for the plot's own year (see
 // netlify/functions/formId.js) and writing it onto the current draft's
 // header (see models.js and core/formId.js's top comment for the full
-// design).
+// design). The year is computed here, client-side, via models.js's
+// harvestedYear() (Date Harvested's year, else Date Planted's, else
+// today's) and sent along with the reservation request — the server
+// trusts this rather than re-deriving it, since only the client has the
+// live draft header in hand at this exact moment.
 //
 // Called from exactly two places:
 //   1. entryEditor.js's "Save Plot" button — the real trigger, by
@@ -28,6 +32,7 @@
 import * as trialStore from "./stores/trialStore.js";
 import * as authStore from "./authStore.js";
 import { isFormIdAssigned } from "../core/formId.js";
+import { harvestedYear } from "../core/models.js";
 import { showToast } from "./components/toast.js";
 
 // Dedupes overlapping calls (e.g. the screen re-mounting quickly, or a
@@ -72,7 +77,9 @@ async function doEnsure() {
     res = await fetch("/.netlify/functions/formId", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: creds.email }),
+      // year decides the Form ID's "<year>-" prefix server-side — see
+      // this file's top comment and _formIdShared.js.
+      body: JSON.stringify({ email: creds.email, year: harvestedYear(header) }),
     });
   } catch (e) {
     lastFailureReason = "no network connection";

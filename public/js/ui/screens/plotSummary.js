@@ -28,6 +28,7 @@ import {
 } from "../../core/yieldCalculator.js";
 import { buildPdf, pdfFilename } from "../../core/pdfBuilder.js";
 import { buildXlsx, createEffectiveLists } from "../../core/xlsxBuilder.js";
+import { buildSeedwareExport } from "../../core/seedwareExportBuilder.js";
 import { getLogoDataUrl } from "../logoCache.js";
 import { downloadBlob, shareOrDownload, openMailto } from "../fileSave.js";
 
@@ -35,8 +36,10 @@ import { downloadBlob, shareOrDownload, openMailto } from "../fileSave.js";
 // sorting the whole list BY moisture wasn't useful in practice; the
 // per-hybrid moisture reading is still shown on each row (see
 // showsMoistureLine below) and still factors into Gross's deduction
-// calculation, it's just no longer its own selectable "view".
-const METRIC_ORDER = [RankingMetric.DRY_YIELD, RankingMetric.GROSS];
+// calculation, it's just no longer its own selectable "view". Entry #
+// sits between Dry Yield and Gross (per explicit request) — it sorts
+// back to original/planting order rather than by a measured value.
+const METRIC_ORDER = [RankingMetric.DRY_YIELD, RankingMetric.ENTRY_NUM, RankingMetric.GROSS];
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const BOX_PLOT_VIEW_W = 320;
@@ -149,7 +152,7 @@ function computeRanked(entries, metric, header) {
   const all = entries.map((entry, idx) => ({
     originalNumber: idx + 1,
     entry,
-    value: valueForMetric(entry, metric, header),
+    value: valueForMetric(entry, metric, header, idx + 1),
   }));
   const withValue = all.filter((r) => r.value !== null);
   const withoutValue = all.filter((r) => r.value === null);
@@ -224,6 +227,7 @@ export function render(container, params) {
     const body = h("div", { className: "share-menu-panel share-menu-panel-modal" }, [
       menuAction("Export / Share PDF (Ranked Results)", handleExportPdf),
       menuAction("Export / Share XLSX (Full Form)", handleExportXlsx),
+      menuAction("Export for Seedware", handleExportSeedware),
       menuAction("Print Ranked Results", handlePrint),
       menuAction(`Email XLSX to ${brand ? brand.displayName : "Operations"} Operations`, handleEmailXlsx),
     ]);
@@ -284,6 +288,19 @@ export function render(container, params) {
     return buildXlsx(freshHeader, entries, effectiveLists);
   }
 
+  // Deliberately built from the raw (unrelabeled) `entries`, same as
+  // buildFullXlsxBlob() above and NOT displayEntries — see brand.js's
+  // entriesForBrandView() comment: exports keep entries' real Brand/
+  // Company value, only Plot Summary's on-screen display relabels it.
+  // isCustomCompany/isCustomHybrid decide Variety Provider "Request" —
+  // see seedwareExportBuilder.js's top comment.
+  function buildSeedwareExportBlob(freshHeader) {
+    return buildSeedwareExport(freshHeader, entries, {
+      isCustomCompany: listsStore.isCustomCompany,
+      isCustomHybrid: listsStore.isCustomHybrid,
+    });
+  }
+
   async function handleExportPdf() {
     try {
       const includePlotDetails = await promptIncludePlotDetails();
@@ -302,6 +319,16 @@ export function render(container, params) {
       await shareOrDownload(blob, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     } catch (e) {
       showToast(`Couldn't export the XLSX: ${e.message}`, { type: "error" });
+    }
+  }
+
+  async function handleExportSeedware() {
+    try {
+      const freshHeader = await resolveHeaderForExport();
+      const { blob, filename } = buildSeedwareExportBlob(freshHeader);
+      await shareOrDownload(blob, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    } catch (e) {
+      showToast(`Couldn't export the Seedware file: ${e.message}`, { type: "error" });
     }
   }
 
@@ -334,27 +361,41 @@ export function render(container, params) {
     }
   }
 
+  // Emails BOTH the full "Trial Outline" XLSX (this app's own formatted
+  // form) and the flat Seedware import file together, in a single
+  // action — per explicit request, Seedware's file rides along with
+  // whatever this button already sent to Operations, rather than being
+  // a separate share-menu-only action. shareOrDownload's multi-file
+  // Web Share path (below) hands both files to the OS share sheet at
+  // once, which is what actually lets a phone attach two files to one
+  // outgoing email; the mailto: fallback can't attach anything at all
+  // (mailto doesn't support attachments), so both files download
+  // separately there and the user attaches them by hand.
   async function handleEmailXlsx() {
     try {
       const freshHeader = await resolveHeaderForExport();
       const { blob, filename } = await buildFullXlsxBlob(freshHeader);
+      const seedware = buildSeedwareExportBlob(freshHeader);
       const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
       const file = new File([blob], filename, { type: mime });
-      if (navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
+      const seedwareFile = new File([seedware.blob], seedware.filename, { type: mime });
+      const files = [file, seedwareFile];
+      if (navigator.canShare && navigator.share && navigator.canShare({ files })) {
         try {
-          await navigator.share({ files: [file], title: filename });
+          await navigator.share({ files, title: filename });
           return;
         } catch (e) {
           if (e && e.name === "AbortError") return;
         }
       }
       downloadBlob(blob, filename);
+      downloadBlob(seedware.blob, seedware.filename);
       openMailto(
         brand.operationsEmail,
         `Corn Plot Harvest — ${filename}`,
-        `Attached is the trial outline for ${freshHeader.cooperatorName || "this plot"}.\n\n(Your file downloaded separately — attach it manually in this email.)`
+        `Attached is the trial outline for ${freshHeader.cooperatorName || "this plot"}, along with the Seedware import file (${seedware.filename}).\n\n(Your files downloaded separately — attach them both manually in this email.)`
       );
-      showToast("Your file downloaded — attach it manually in the email that just opened.", { type: "info" });
+      showToast("Your files downloaded — attach them manually in the email that just opened.", { type: "info" });
     } catch (e) {
       showToast(`Couldn't prepare the email: ${e.message}`, { type: "error" });
     }
@@ -403,7 +444,7 @@ export function render(container, params) {
   // expanded panel is the actual way in to change anything (works the
   // same during an admin edit as the existing "Edit This Plot" button
   // below does — see its comment).
-  // Form ID (see core/formId.js) shown as a trailing "• APP00001" once
+  // Form ID (see core/formId.js) shown as a trailing "• 26-1001" once
   // assigned — omitted entirely (not even a placeholder dash) for a plot
   // that doesn't have one yet, same as everywhere else this shows up.
   const subtitle = `${filenameYear(header)} • ${header.state || "—"} • ${header.county || "—"}${

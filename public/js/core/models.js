@@ -30,13 +30,19 @@
  * @property {number} pricePerBushel
  * @property {string} trialNotes
  * @property {string} formId A short, permanent reference number for this
- *   exact plot — e.g. "APP00001", or "APP00001a" if "APP00001" was
- *   somehow already taken (see netlify/functions/formId.js's
- *   duplicate-suffix logic). Reserved from a single global server-side
- *   counter (starting at APP00001, shared across every user — see
- *   ui/formIdAssign.js) the moment the user taps "Save Plot" on the
- *   Entry Editor (never just from opening/browsing Plot Details), and
- *   reused forever after — "" until assigned. Shown on Plot Details and
+ *   exact plot — e.g. "26-1001", or "27-1001a" if "27-1001" was somehow
+ *   already taken (see netlify/functions/formId.js's duplicate-suffix
+ *   logic). The 2-digit year prefix is THIS plot's own year — this
+ *   header's dateHarvested if set, else datePlanted if set, else
+ *   today's date (see harvestedYear() below, which ui/formIdAssign.js
+ *   calls to decide what to ask for) — NOT necessarily the real-world
+ *   date the plot happens to be saved on. Reserved from a global
+ *   server-side counter for that year (a fresh one starting at
+ *   "<year>-1001" the first time each new year is needed, shared across
+ *   every user — "<year>-1000" is reserved and never issued from here)
+ *   the moment the user taps "Save Plot" on the Entry Editor (never
+ *   just from opening/browsing Plot Details), and reused forever after
+ *   — "" until assigned. Shown on Plot Details and
  *   used as the .xlsx export's filename / the PDF+print footer's
  *   "Form ID" label.
  */
