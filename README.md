@@ -58,7 +58,7 @@ online at least once (to cache the PDF library), after which it also works offli
 ## What matches the iOS app
 
 - Same data entry flow: brand selection → saved plots or new plot → Plot Details →
-  Plot Entries → Plot Summary & Results.
+  Hybrid Entries → Plot Summary & Results.
 - Same brand-scoped hybrid lists, same wheel-style pickers, same Dry Yield manual
   override, same Population wheel (14,000–46,000 in 500s, defaults to 32,000).
 - The exported `.xlsx` is assembled from the exact same template XML/styles as the
@@ -157,16 +157,35 @@ back.
 
 If any of this errors out, the most likely cause is the site still being on a
 drag-and-drop deploy instead of a Git-connected one (step 1) — Functions silently
-won't exist without it, and `/.netlify/functions/auth` (or `plots`, or
-`adminUsers`) will 404. A **502** instead (the function exists and is being
+won't exist without it, and `/.netlify/functions/auth` (or `plots`, `adminUsers`,
+`formId`, `backfillFormIds`, or `hybridCatalog`) will 404. This is also exactly
+what happens if a function file (or a shared file it `require()`s, like
+`_shared.js` or `_formIdShared.js`) simply never made it into the GitHub repo on
+a manual upload — every new function file added to `netlify/functions/` has to
+actually be committed there, or Netlify never registers it as deployed at all;
+check the repo's file listing directly if a specific function keeps 404ing while
+its siblings work fine. A **502** instead (the function exists and is being
 called, but errors out) most likely means the function threw
-`MissingBlobsEnvironmentError` — all three functions (`auth.js`, `plots.js`,
-`adminUsers.js`) use the classic Lambda-compatible `(event, context)` handler
-signature, and in that mode Netlify Blobs requires an explicit
-`connectLambda(event)` call before `getStore()` or its environment isn't
-configured. This is already handled at the top of all three functions — if you're
-still seeing a 502 after deploying, check **Site → Functions → (auth / plots /
-adminUsers) → real-time logs** in the Netlify dashboard for the actual error.
+`MissingBlobsEnvironmentError` — every function (`auth.js`, `plots.js`,
+`adminUsers.js`, `formId.js`, `backfillFormIds.js`, `hybridCatalog.js`, etc.)
+uses the classic Lambda-compatible `(event, context)` handler signature, and in
+that mode Netlify Blobs requires an explicit `connectLambda(event)` call before
+`getStore()` or its environment isn't configured. This is already handled at the
+top of every function — if you're still seeing a 502 after deploying, check
+**Site → Functions → (auth / plots / adminUsers / formId / backfillFormIds /
+hybridCatalog) → real-time logs** in the Netlify dashboard for the actual error.
+(`formId.js` specifically backs the "Form ID" reference number shown on Plot
+Details, on Plot Summary, and on exported/printed plots — see
+`netlify/functions/formId.js`'s top comment for what it does; a 502 there just
+means a plot won't get a Form ID yet, everything else keeps working.
+`backfillFormIds.js` is the one-time, safely-repeatable admin action — the
+"Assign Form IDs to All Plots" button on the All Plots (Admin) screen — that
+assigns a Form ID to every plot that existed before this feature did; see its
+own top comment. `hybridCatalog.js` backs the "Upload Hybrid Catalog" button on
+that same screen — the shared Company/Hybrid/Trait/RM reference data behind the
+Hybrid Details cascading pickers in the entry editor; a 502/404 there just means
+those pickers fall back to fully manual entry, same as before this feature
+existed — see `netlify/functions/hybridCatalog.js`'s top comment.)
 
 ## Local testing (optional, for whoever's deploying this)
 
