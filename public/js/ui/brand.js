@@ -97,9 +97,9 @@ export const BRANDS = {
     // which already calls out Crow's as a hybridDefaultBrand distinct
     // from Midwest/NC+).
     catalogBrandName: "Crow's",
-    // Placeholder logo (plain "CROW'S" wordmark, no rooster mark) — swap
-    // for the real logo file once provided; see this build's delivery
-    // notes.
+    // The real rooster-mark + "CROW'S" wordmark logo, provided directly —
+    // background made transparent to match midwest.png/ncplus.png's
+    // format (see public/logos/crows.png).
     logo: "/logos/crows.png",
     // Best guess from crowsseed.com's domain — confirm/correct with Mike.
     operationsEmail: "operations@crowsseed.com",
