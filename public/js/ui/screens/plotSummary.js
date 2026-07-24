@@ -36,10 +36,12 @@ import { downloadBlob, shareOrDownload, shareOrDownloadFiles, openMailto } from 
 // sorting the whole list BY moisture wasn't useful in practice; the
 // per-hybrid moisture reading is still shown on each row (see
 // showsMoistureLine below) and still factors into Gross's deduction
-// calculation, it's just no longer its own selectable "view". Entry #
-// sits between Dry Yield and Gross (per explicit request) — it sorts
-// back to original/planting order rather than by a measured value.
-const METRIC_ORDER = [RankingMetric.DRY_YIELD, RankingMetric.ENTRY_NUM, RankingMetric.GROSS];
+// calculation, it's just no longer its own selectable "view". An Entry #
+// tab (sorting back to original/planting order) previously sat between
+// these two but was removed per explicit request across all 3 Brand
+// Views — see yieldCalculator.js's RankingMetric, which no longer has an
+// ENTRY_NUM member at all.
+const METRIC_ORDER = [RankingMetric.DRY_YIELD, RankingMetric.GROSS];
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const BOX_PLOT_VIEW_W = 320;
@@ -152,7 +154,7 @@ function computeRanked(entries, metric, header) {
   const all = entries.map((entry, idx) => ({
     originalNumber: idx + 1,
     entry,
-    value: valueForMetric(entry, metric, header, idx + 1),
+    value: valueForMetric(entry, metric, header),
   }));
   const withValue = all.filter((r) => r.value !== null);
   const withoutValue = all.filter((r) => r.value === null);
@@ -180,9 +182,10 @@ export function render(container, params) {
   // explicit request): no color-coded significance badge, the entry's
   // ORIGINAL number on the left instead, and its sorted placement rank +
   // actual Dry Yield always shown together on the right regardless of
-  // which metric tab is selected. Every other Brand View (and no Brand
-  // View at all) keeps the original color-coded badge + single
-  // current-metric-value layout — see the Ranked Results section below.
+  // which metric tab (Dry Yield/Gross) is selected. Every other Brand
+  // View (and no Brand View at all) keeps the original color-coded
+  // badge + single current-metric-value layout — see the Ranked Results
+  // section below.
   const isCrowsView = Boolean(brand && brand.id === "crows");
   // Admin editing someone else's plot (see adminEditStore.js) works by
   // temporarily loading that trial into this same trialStore draft slot
@@ -707,29 +710,18 @@ export function render(container, params) {
 
     if (isCrowsView) {
       // Plain layout, no significance color-coding: the entry's ORIGINAL
-      // number (its position in the plot before any sorting — same value
-      // the Entry # metric sorts by) sits on the left. The right side
-      // normally stacks the current sorted placement rank plus the
-      // entry's actual Dry Yield (Dry Yield/Gross tabs) — but on the
-      // Entry # tab specifically, "Rank N" would just re-state the SAME
-      // number already sitting on the left (this list is now sorted by
-      // entry number, so placement rank == entry number for every row),
-      // and Midwest/NC+'s own Entry # tab doesn't show a separate "Rank"
-      // concept at all there either — it's just "#N". So on this one
-      // tab, Crow's matches that exact single-value right side (per
-      // explicit request: "make that tab consistent across all 3
-      // views") instead of the redundant Rank + Dry Yield stack.
-      const isEntryNumTab = metric === RankingMetric.ENTRY_NUM;
-      const rightSide = isEntryNumTab
-        ? [h("span", { className: "ranked-row-value" }, meta.formatValue(result.value))]
-        : [
-            h("span", { className: "ranked-row-rank" }, `Rank ${rank}`),
-            h(
-              "span",
-              { className: "ranked-row-value" },
-              dryYieldMeta.formatValue(valueForMetric(result.entry, RankingMetric.DRY_YIELD, header))
-            ),
-          ];
+      // number (its position in the plot before any sorting) sits on the
+      // left; the current sorted placement rank plus the entry's actual
+      // Dry Yield sit together on the right, regardless of which metric
+      // tab (Dry Yield/Gross) is active.
+      const rightSide = [
+        h("span", { className: "ranked-row-rank" }, `Rank ${rank}`),
+        h(
+          "span",
+          { className: "ranked-row-value" },
+          dryYieldMeta.formatValue(valueForMetric(result.entry, RankingMetric.DRY_YIELD, header))
+        ),
+      ];
       rankedList.appendChild(
         h("div", { className: "ranked-row card ranked-row-plain" }, [
           h("span", { className: "ranked-row-entry-num" }, `#${result.originalNumber}`),

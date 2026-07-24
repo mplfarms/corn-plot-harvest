@@ -84,7 +84,6 @@ export const RankingMetric = {
   DRY_YIELD: "dryYield",
   GROSS: "gross",
   MOISTURE: "moisture",
-  ENTRY_NUM: "entryNumber",
 };
 
 /**
@@ -111,31 +110,15 @@ export const rankingMetricMeta = {
     ascending: true,
     formatValue: (value) => (value === null || value === undefined ? "—" : `${value.toFixed(1)}%`),
   },
-  // Sorts back to the plot's original entry/planting order (the order
-  // entries were added on Hybrid Entries — same 1-based numbering as
-  // the Seedware export's "Position" column) rather than by any
-  // measured value — lets a user flip Ranked Results back to layout
-  // order after having sorted by Dry Yield/Gross. Always ascending
-  // (Entry 1 first) — "ascending" wouldn't have a meaningful opposite
-  // here, so it's fixed rather than user-toggleable.
-  [RankingMetric.ENTRY_NUM]: {
-    displayName: "Entry #",
-    ascending: true,
-    formatValue: (value) => (value === null || value === undefined ? "—" : `#${value}`),
-  },
 };
 
 /**
  * @param {import('./models.js').PlotEntry} entry
  * @param {string} metric one of RankingMetric values
  * @param {import('./models.js').TrialHeader} header
- * @param {number} [position] entry's 1-based position in the original
- *   (unsorted) entries array — only consulted for RankingMetric.ENTRY_NUM,
- *   since that's the one metric that isn't a value read off the entry
- *   itself. Callers ranking by any other metric can omit this.
  * @returns {number|null}
  */
-export function valueForMetric(entry, metric, header, position) {
+export function valueForMetric(entry, metric, header) {
   switch (metric) {
     case RankingMetric.DRY_YIELD:
       return dryYield(entry);
@@ -143,8 +126,6 @@ export function valueForMetric(entry, metric, header, position) {
       return gross(entry, header);
     case RankingMetric.MOISTURE:
       return moisture(entry);
-    case RankingMetric.ENTRY_NUM:
-      return position === undefined ? null : position;
     default:
       return null;
   }
