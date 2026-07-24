@@ -146,15 +146,34 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
 }
 
 // ---- Crow's view: white CIRCLE behind the logo (per explicit request),
-// not the white rounded-rectangle "card" every other brand uses ----
+// not the white rounded-rectangle "card" every other brand uses. Unlike
+// Midwest/NC+ (a plain <img class="home-logo">), Crow's renders as a
+// wrapper <div class="home-logo home-logo-circle"> around an <img
+// class="home-logo-circle-img"> — see plotChooser.js's homeLogo() for
+// why: applying border-radius straight to the <img> (an earlier build)
+// hit a browser quirk that silently clipped some of the wordmark's
+// finer strokes even with plenty of geometric margin: an
+// overflow:hidden wrapper avoids it, and (per explicit follow-up
+// request) the circle is also noticeably bigger now with generous
+// padding around the logo. ----
 {
   const page = await browser.newPage();
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await seedBrandOnly(page, "crows");
   await page.goto(`${BASE}/index.html?r=3#/plot-chooser`);
   await page.waitForSelector(".home-screen", { timeout: 5000 });
+  await page.waitForFunction(() => {
+    const img = document.querySelector(".home-logo-circle-img");
+    return img && img.complete && img.naturalWidth > 0;
+  }, { timeout: 5000 });
 
-  const logoAlt = await page.$eval(".home-logo", (el) => el.alt);
+  // The wrapper div (not an <img>) carries the "home-logo" class Midwest/
+  // NC+ put directly on their <img> — the actual logo <img> is a child
+  // with its own "home-logo-circle-img" class and the alt text.
+  const wrapperTag = await page.$eval(".home-logo", (el) => el.tagName);
+  check(wrapperTag === "DIV", `Crow's ".home-logo" is a wrapper <div>, not a plain <img> like Midwest/NC+ (got <${wrapperTag}>)`);
+
+  const logoAlt = await page.$eval(".home-logo-circle-img", (el) => el.alt);
   check(logoAlt === "Crow's", `Crow's view: logo alt matches the selected brand (got "${logoAlt}")`);
 
   const heroBg = await page.$eval(".home-hero", (el) => getComputedStyle(el).backgroundColor);
@@ -162,21 +181,77 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
 
   // Unlike Midwest (wide card) and NC+ (square card), Crow's logo sits on
   // a perfect white CIRCLE — equal width/height and a fully round corner
-  // radius, not the 16px rounded-rectangle every other brand gets.
+  // radius, not the 16px rounded-rectangle every other brand gets — and
+  // (per explicit follow-up request) noticeably bigger than the 116px
+  // every other brand's card uses, so there's generous white margin.
   const logoBox = await page.$eval(".home-logo", (el) => {
     const r = el.getBoundingClientRect();
     const style = getComputedStyle(el);
-    return { w: r.width, h: r.height, borderRadius: style.borderRadius, background: style.backgroundColor };
+    return { w: r.width, h: r.height, borderRadius: style.borderRadius, background: style.backgroundColor, overflow: style.overflow };
   });
   check(
     Math.abs(logoBox.w - logoBox.h) < 1,
     `Crow's logo box is a perfect square (equal width/height) so its circle isn't an oval (got ${JSON.stringify(logoBox)})`
   );
+  check(logoBox.w > 116, `Crow's white circle is bigger than the 116px every other brand's card uses (got ${logoBox.w}px)`);
   check(
     logoBox.borderRadius === "50%",
     `Crow's logo has a fully round (50%) border-radius, making a circle not a rounded square (got "${logoBox.borderRadius}")`
   );
+  check(logoBox.overflow === "hidden", `Crow's wrapper clips via overflow: hidden, not border-radius directly on the <img> (got "${logoBox.overflow}")`);
   check(logoBox.background === "rgb(255, 255, 255)", `Crow's logo's circle background is white (got "${logoBox.background}")`);
+
+  // The inner <img>'s ACTUAL VISIBLE content (after object-fit: contain
+  // letterboxes the wide rooster+wordmark artwork to fit the img's
+  // square box — it doesn't fill that box's own corners) sits
+  // comfortably inside the circle with real margin on every side, not
+  // touching its edge. Computed from the img box plus the source
+  // image's own aspect ratio, the same way the browser's object-fit
+  // math works, rather than using the img element's own (square, so
+  // necessarily corner-touching) box directly.
+  const geometry = await page.evaluate(() => {
+    const wrap = document.querySelector(".home-logo-circle").getBoundingClientRect();
+    const img = document.querySelector(".home-logo-circle-img");
+    const box = img.getBoundingClientRect();
+    return { wrap, box, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight };
+  });
+  const ratio = geometry.naturalWidth / geometry.naturalHeight;
+  let contentW = geometry.box.width;
+  let contentH = contentW / ratio;
+  if (contentH > geometry.box.height) {
+    contentH = geometry.box.height;
+    contentW = contentH * ratio;
+  }
+  const contentX = geometry.box.x + (geometry.box.width - contentW) / 2;
+  const contentY = geometry.box.y + (geometry.box.height - contentH) / 2;
+  const cx = geometry.wrap.x + geometry.wrap.width / 2;
+  const cy = geometry.wrap.y + geometry.wrap.height / 2;
+  const radius = geometry.wrap.width / 2;
+  const corners = [
+    [contentX, contentY],
+    [contentX + contentW, contentY],
+    [contentX, contentY + contentH],
+    [contentX + contentW, contentY + contentH],
+  ];
+  const maxCornerDist = Math.max(...corners.map(([x, y]) => Math.hypot(x - cx, y - cy)));
+  check(
+    maxCornerDist < radius - 3,
+    `the logo's actual visible content sits with real margin inside the circle, not touching its edge (max corner distance ${maxCornerDist.toFixed(1)}px vs radius ${radius}px)`
+  );
+
+  // Primary regression guard against the actual bug: the earlier build's
+  // clipping quirk was specifically about applying border-radius directly
+  // to a scaled <img>'s own box. Confirming NO element with the
+  // "home-logo" family of classes has both border-radius AND is itself
+  // an <img> (i.e. the clip always lives on a wrapper, never the
+  // replaced element being scaled) structurally rules that out, without
+  // needing a flaky in-browser pixel-rasterization comparison.
+  const anyImgWithRadius = await page.evaluate(() => {
+    return Array.from(document.querySelectorAll("img.home-logo, img.home-logo-circle, img[class*='home-logo']")).some(
+      (img) => getComputedStyle(img).borderRadius !== "0px"
+    );
+  });
+  check(!anyImgWithRadius, "no <img> in the home-logo family has border-radius applied directly to it (the clip always lives on a wrapper element)");
 
   await page.close();
 }
