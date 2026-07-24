@@ -854,17 +854,33 @@ h3.section-header:first-child {
 
 /* Crow's Home Screen logo, per explicit request: a white CIRCLE behind
    the rooster-mark/wordmark instead of the white rounded-rectangle
-   "card" every other brand uses above — needs a fixed equal
-   width/height (unlike the default rule's auto width, which follows
-   each logo's own aspect ratio) so border-radius: 50% actually draws a
-   circle rather than an oval; object-fit: contain (inherited from
-   .home-logo above) then shrinks the wide rooster+wordmark artwork to
-   fit fully inside that circle, uncropped, with even padding all
-   around rather than the default rule's asymmetric 14px/18px. */
-[data-brand="crows"] .home-logo {
-  width: 116px;
+   "card" every other brand uses above. See plotChooser.js's homeLogo()
+   for why this is a plain wrapper <div> (overflow: hidden doing the
+   actual circular clip) around an ordinary centered <img>, rather than
+   border-radius applied straight to the <img> the way the rest of this
+   file's badges/cards do it — that direct approach silently lost some
+   of the wordmark's finer strokes to a browser rendering quirk. Sized
+   noticeably bigger (140px) than the 116px every other brand's card
+   uses, with generous padding around the 100px inner image, so there's
+   comfortable white margin on every side and nothing sits anywhere near
+   the circle's own edge. */
+.home-logo-circle {
+  width: 140px;
+  height: 140px;
+  padding: 0;
   border-radius: 50%;
-  padding: 18px;
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-logo-circle-img {
+  display: block;
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
 }
 
 .home-actions {
