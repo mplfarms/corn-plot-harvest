@@ -199,7 +199,8 @@ export function render(container, params) {
   // Relabeled view of entries used only for this screen and its PDF
   // export (Hybrid Entries editing and the XLSX export use the real,
   // unrelabeled `entries` above) — see entriesForBrandView() for the
-  // Midwest Seed Genetics <-> NC+ mirrored relabeling rule.
+  // Midwest Seed Genetics / NC+ / Crow's mutual rebadge relabeling rule
+  // (brand name AND hybrid brand-code prefix both swap together).
   const displayEntries = entriesForBrandView(entries, brand);
   const metric = (params && params.metric) || RankingMetric.DRY_YIELD;
 
@@ -707,18 +708,33 @@ export function render(container, params) {
     if (isCrowsView) {
       // Plain layout, no significance color-coding: the entry's ORIGINAL
       // number (its position in the plot before any sorting — same value
-      // the Entry # metric sorts by) sits on the left; its current sorted
-      // placement rank and its actual Dry Yield (regardless of which
-      // metric tab is active) sit stacked on the right.
-      const dryYieldVal = valueForMetric(result.entry, RankingMetric.DRY_YIELD, header);
+      // the Entry # metric sorts by) sits on the left. The right side
+      // normally stacks the current sorted placement rank plus the
+      // entry's actual Dry Yield (Dry Yield/Gross tabs) — but on the
+      // Entry # tab specifically, "Rank N" would just re-state the SAME
+      // number already sitting on the left (this list is now sorted by
+      // entry number, so placement rank == entry number for every row),
+      // and Midwest/NC+'s own Entry # tab doesn't show a separate "Rank"
+      // concept at all there either — it's just "#N". So on this one
+      // tab, Crow's matches that exact single-value right side (per
+      // explicit request: "make that tab consistent across all 3
+      // views") instead of the redundant Rank + Dry Yield stack.
+      const isEntryNumTab = metric === RankingMetric.ENTRY_NUM;
+      const rightSide = isEntryNumTab
+        ? [h("span", { className: "ranked-row-value" }, meta.formatValue(result.value))]
+        : [
+            h("span", { className: "ranked-row-rank" }, `Rank ${rank}`),
+            h(
+              "span",
+              { className: "ranked-row-value" },
+              dryYieldMeta.formatValue(valueForMetric(result.entry, RankingMetric.DRY_YIELD, header))
+            ),
+          ];
       rankedList.appendChild(
         h("div", { className: "ranked-row card ranked-row-plain" }, [
           h("span", { className: "ranked-row-entry-num" }, `#${result.originalNumber}`),
           rowBody,
-          h("div", { className: "ranked-row-right-stack" }, [
-            h("span", { className: "ranked-row-rank" }, `Rank ${rank}`),
-            h("span", { className: "ranked-row-value" }, dryYieldMeta.formatValue(dryYieldVal)),
-          ]),
+          h("div", { className: "ranked-row-right-stack" }, rightSide),
         ])
       );
     } else {

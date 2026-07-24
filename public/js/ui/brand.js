@@ -115,45 +115,90 @@ export function getBrand(brandId) {
   return BRANDS[brandId] || null;
 }
 
-// Midwest Seed Genetics and NC+ Hybrids are the same underlying genetics
-// sold under two regional labels — that's the whole reason
-// entriesForBrandView() below relabels between them. Crow's is a
-// genuinely separate, independent brand (not a rebadge of either), so it
-// intentionally has NO entry here — see entriesForBrandView()'s comment.
-// If a future brand IS another rebadge partner, add its pairing here
-// rather than growing the old two-brand ternary.
-const REBADGE_PARTNER_BY_BRAND_ID = {
-  midwestSeedGenetics: "ncPlus",
-  ncPlus: "midwestSeedGenetics",
+// Midwest Seed Genetics, NC+ Hybrids, and Crow's are the same underlying
+// genetics sold under three regional labels — that's the whole reason
+// entriesForBrandView() below relabels between them (per explicit
+// request extending Crow's into this group exactly like Midwest/NC+
+// already worked). Every brand listed here is a mutual rebadge partner
+// of every OTHER brand in the list — not just a fixed pair — so adding a
+// 4th rebadge brand later just means appending its id here, not
+// rewriting the matching logic. A brand NOT in this group (a genuinely
+// separate third-party company, or a future Brand View that isn't a
+// rebadge of the others) is simply left out of this list and
+// entriesForBrandView() leaves its entries untouched.
+const REBADGE_GROUP_BRAND_IDS = ["midwestSeedGenetics", "ncPlus", "crows"];
+
+// Each rebadge brand also has its own 2-letter hybrid-name code — the
+// SAME hybrid genetics gets entered under a different code per brand
+// (e.g. "MW 09-90 PCE" under Midwest is the identical hybrid as
+// "NC 09-90 PCE" under NC+ and "CR 09-90 PCE" under Crow's — per
+// explicit request/example). entriesForBrandView() swaps this prefix
+// alongside the .brand field, so an entry relabeled from NC+ to Midwest
+// shows BOTH "Midwest Seed Genetics" AND "MW 09-90 PCE" — never a
+// relabeled brand sitting next to a stale other-brand hybrid prefix.
+const HYBRID_CODE_BY_BRAND_ID = {
+  midwestSeedGenetics: "MW",
+  ncPlus: "NC",
+  crows: "CR",
 };
 
 /**
- * Returns a copy of `entries` with .brand relabeled for display purposes
- * when a Brand View is selected: any entry belonging to that Brand
- * View's *rebadge partner* (matched by its catalogBrandName, per
- * REBADGE_PARTNER_BY_BRAND_ID above) is shown under the currently
- * selected brand's catalogBrandName instead — e.g. with "Midwest Seed
- * Genetics" selected as the Brand View, every "NC+ Hybrids" entry
- * displays (and groups, for brand averages) as "Midwest Seed Genetics",
- * and the mirror image happens when "NC+" is selected. Entries for any
- * other/third-party brand — including Crow's, which has no rebadge
- * partner at all — are left untouched.
+ * Swaps a leading "<CODE> " hybrid-name prefix (one of
+ * HYBRID_CODE_BY_BRAND_ID's codes, case-insensitive) for `toBrand`'s own
+ * code — e.g. "nc 09-90 pce" (from-code "NC") -> "MW 09-90 pce" when
+ * relabeling to Midwest. Only swaps when the hybrid actually starts with
+ * `fromBrand`'s own code; anything else (a hybrid with no recognized
+ * prefix at all, e.g. "P1185Q", or one that's inconsistent with its
+ * entry's real brand) is left exactly as typed rather than guessed at.
+ * @param {string} hybrid
+ * @param {typeof BRANDS[BrandId]} fromBrand
+ * @param {typeof BRANDS[BrandId]} toBrand
+ * @returns {string}
+ */
+function swapHybridBrandCode(hybrid, fromBrand, toBrand) {
+  const fromCode = HYBRID_CODE_BY_BRAND_ID[fromBrand.id];
+  const toCode = HYBRID_CODE_BY_BRAND_ID[toBrand.id];
+  const trimmed = String(hybrid || "").trim();
+  if (!fromCode || !toCode || !trimmed) return hybrid;
+  const match = trimmed.match(/^([a-z]+)(\s+)(.*)$/i);
+  if (!match || match[1].toUpperCase() !== fromCode) return hybrid;
+  return `${toCode}${match[2]}${match[3]}`;
+}
+
+/**
+ * Returns a copy of `entries` with .brand (and, when recognized, the
+ * hybrid name's brand code prefix — see swapHybridBrandCode() above)
+ * relabeled for display purposes when a Brand View is selected: any
+ * entry belonging to one of that Brand View's *rebadge partners* (any
+ * OTHER brand in REBADGE_GROUP_BRAND_IDS, matched by its
+ * catalogBrandName) is shown under the currently selected brand's
+ * catalogBrandName instead — e.g. with "Midwest Seed Genetics" selected
+ * as the Brand View, every "NC+ Hybrids" entry displays (and groups, for
+ * brand averages) as "Midwest Seed Genetics" with its hybrid's "NC "
+ * prefix swapped to "MW ", and the same happens in every other direction
+ * among Midwest/NC+/Crow's. Entries for any other/third-party brand
+ * (one NOT in REBADGE_GROUP_BRAND_IDS) are left untouched.
  *
  * Only meant for the Plot Summary screen and its PDF export — Plot
  * Entries editing and the XLSX export intentionally keep entries' real
- * (unrelabeled) brand, since those are the source-of-truth data.
+ * (unrelabeled) brand and hybrid text, since those are the
+ * source-of-truth data.
  * @param {import('../core/models.js').PlotEntry[]} entries
  * @param {typeof BRANDS[BrandId]|null} brand - the currently selected Brand View
  * @returns {import('../core/models.js').PlotEntry[]}
  */
 export function entriesForBrandView(entries, brand) {
-  if (!brand) return entries;
-  const partnerId = REBADGE_PARTNER_BY_BRAND_ID[brand.id];
-  if (!partnerId) return entries;
-  const otherBrand = BRANDS[partnerId];
-  return entries.map((entry) =>
-    entry.brand.trim() === otherBrand.catalogBrandName ? { ...entry, brand: brand.catalogBrandName } : entry
-  );
+  if (!brand || !REBADGE_GROUP_BRAND_IDS.includes(brand.id)) return entries;
+  const otherGroupBrands = REBADGE_GROUP_BRAND_IDS.filter((id) => id !== brand.id).map((id) => BRANDS[id]);
+  return entries.map((entry) => {
+    const sourceBrand = otherGroupBrands.find((b) => entry.brand.trim() === b.catalogBrandName);
+    if (!sourceBrand) return entry;
+    return {
+      ...entry,
+      brand: brand.catalogBrandName,
+      hybrid: swapHybridBrandCode(entry.hybrid, sourceBrand, brand),
+    };
+  });
 }
 
 // Email domains whose employees should default straight into a specific

@@ -92,6 +92,7 @@ export function render(container) {
     helpSection("Average By Brand", [
       p("When two or more hybrids from the same brand are entered in this plot, you'll see an average for that brand — a single-hybrid brand doesn't get an average of its own, since averaging one number isn't meaningful."),
       p("Your own selected Brand View (Midwest Seed Genetics, NC+, or Crow's) is always listed first, regardless of how its average actually compares to the others — every other brand present follows in order by average."),
+      p("Midwest Seed Genetics, NC+, and Crow's share the same underlying hybrids under three different names — so whichever of the three is your current Brand View, entries from the other two display (and average in) under YOUR brand's name, and a hybrid's brand-code prefix (MW/NC/CR) switches to match too. For example, \"NC 09-90 PCE\" shows here as \"MW 09-90 PCE\" when Midwest is your Brand View. This is just how it displays here and in PDF exports — your actual saved data always keeps the real brand and hybrid name you entered."),
     ]),
 
     helpSection("The Colored Rank Badges", [
