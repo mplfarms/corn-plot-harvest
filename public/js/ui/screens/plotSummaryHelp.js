@@ -104,7 +104,7 @@ export function render(container) {
       ]),
       p("Because this color is based on actual yield versus the plot average — not rank position — a hybrid keeps the same badge color no matter which tab (Dry Yield or Gross) you're viewing. It's always describing the same thing: how that hybrid's Dry Yield compares to the rest of this plot."),
       p("Below the moisture percentage on each row, any Comments typed in for that hybrid on the Plot Hybrids screen show up here too, so you don't have to go back and forth to see them."),
-      p("Crow's Brand View shows this list a bit differently: no colored badge — just each hybrid's entry number on the left, and its current placement rank plus Dry Yield on the right."),
+      p("This same colored-badge layout is used across all 3 Brand Views (Midwest Seed Genetics, NC+, and Crow's) and in every share option (PDF, print, etc.) — nothing about it changes based on your selected Brand View."),
     ]),
 
     helpSection("Sharing These Results", [

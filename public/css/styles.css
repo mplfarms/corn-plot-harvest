@@ -2170,38 +2170,6 @@ button.summary-header-card {
   white-space: nowrap;
 }
 
-/* Crow's Brand View's Ranked Results row (see plotSummary.js's
-   isCrowsView) — no color-coded rank-badge circle; instead a plain entry
-   number on the left, and the sorted rank + actual Dry Yield stacked on
-   the right. .ranked-row-plain itself needs no rules of its own (it
-   still inherits the flex-row layout from .ranked-row above) — it exists
-   only as a hook in case Crow's ever needs its own spacing/border tweaks
-   later. */
-.ranked-row-entry-num {
-  flex-shrink: 0;
-  width: 34px;
-  text-align: center;
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  padding-top: 2px;
-}
-
-.ranked-row-right-stack {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  white-space: nowrap;
-}
-
-.ranked-row-rank {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
 /* ---------- share menu ---------- */
 
 .share-menu-wrapper {
