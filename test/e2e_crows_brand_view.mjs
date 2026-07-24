@@ -1,16 +1,17 @@
-// Verifies the new 3rd Brand View, Crow's (per explicit request, brand
+// Verifies the 3rd Brand View, Crow's (per explicit request, brand
 // standards: black HEX 231f20 / red HEX b12028): it shows up as a 3rd
 // choice on the manual Brand View picker, and its Plot Summary Ranked
-// Results list renders the deliberately plainer layout Crow's asked for —
-// no color-coded significance badge, the entry's ORIGINAL number on the
-// left, and its sorted placement rank + actual Dry Yield together on the
-// right on the Dry Yield/Gross tabs (the only 2 tabs — a prior Entry #
-// tab that sat between them was removed per explicit request, across
-// all 3 Brand Views, see plotSummary.js's METRIC_ORDER) — with the
-// significance-color legend hidden entirely, since there's no more
-// color coding for it to explain. Every other Brand View keeps the
-// original colored-badge layout untouched (see e2e_brand_view_relabel.mjs
-// and plotSummary.js's isCrowsView).
+// Results list renders IDENTICALLY to Midwest Seed Genetics/NC+ — same
+// colored significance rank-badge, same significance-color legend, same
+// single current-metric-value on the right. Crow's previously had its
+// own plainer variant here (no color coding, entry number on the left,
+// Rank + Dry Yield stacked on the right) — that was removed per explicit
+// request ("Make the layout of all views and share options match the
+// Midwest and NC+ views"), so this file now checks Crow's is a plain
+// no-op pass-through of the shared layout rather than checking a
+// Crow's-specific one. See plotSummary.js (the isCrowsView branch is
+// gone entirely) and e2e_brand_view_relabel.mjs (which still covers the
+// separate, UNCHANGED brand-name/hybrid-code-prefix relabeling feature).
 import { chromium } from "playwright";
 
 const BASE = "http://localhost:34205";
@@ -28,23 +29,24 @@ function check(cond, label) {
 function entry(id, brand, yieldVal) {
   return {
     id, brand, hybrid: id, trait: "", relativeMaturity: "100", seedTreatment: "",
-    sampleNetWeightLbs: "", moisturePercent: "", testWeight: "", stripLengthFeet: "",
+    sampleNetWeightLbs: "", testWeight: "", stripLengthFeet: "",
     numberOfRows: "", widthInches: "", comments: "", manualDryYield: String(yieldVal),
+    // Equal to the test header's baseMoisturePercent (15) below, so
+    // gross() takes its "at or under base moisture" branch (no shrink
+    // deduction) and the Gross-tab check can assert an exact value.
+    moisturePercent: "15.0",
   };
 }
 
-// Deliberately out of yield order (e3 highest, e1 lowest) so "original
-// number" (planting order) and "placement rank" (sorted order) diverge —
-// otherwise a bug that swapped the two wouldn't be caught.
 const ENTRIES = [
-  entry("e1", "Crow's", 180), // originalNumber 1, lowest yield -> rank 3
-  entry("e2", "Crow's", 210), // originalNumber 2, middle yield -> rank 2
-  entry("e3", "Crow's", 240), // originalNumber 3, highest yield -> rank 1
+  entry("e1", "Crow's", 180),
+  entry("e2", "Crow's", 210),
+  entry("e3", "Crow's", 240),
 ];
 
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 
-// ---- 1. Brand Select picker now offers 3 choices, Crow's included ----
+// ---- 1. Brand Select picker still offers 3 choices, Crow's included ----
 {
   const page = await browser.newPage();
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
@@ -58,12 +60,12 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   const names = await page.$$eval(".brand-select-name", (els) => els.map((e) => e.textContent.trim()));
   check(
     names.length === 3 && names.includes("Midwest Seed Genetics") && names.includes("NC+") && names.includes("Crow's"),
-    `Brand Select now offers all 3 brands, Crow's included (got ${JSON.stringify(names)})`
+    `Brand Select still offers all 3 brands, Crow's included (got ${JSON.stringify(names)})`
   );
   await page.close();
 }
 
-// ---- 2. Crow's Plot Summary: plain Ranked Results layout ----
+// ---- 2. Crow's Plot Summary now uses the exact same layout as every other Brand View ----
 {
   const page = await browser.newPage();
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
@@ -75,98 +77,13 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
       localStorage.setItem("cph.authSession", JSON.stringify({ name: "Test User", email: "test@example.com", isAdmin: false }));
       localStorage.setItem(
         "cph.draftTrial",
-        JSON.stringify({ id: "t1", header: { cooperatorName: "Test Coop", state: "IA", county: "" }, entries })
-      );
-    },
-    ENTRIES
-  );
-  await page.goto(`${BASE}/index.html?r=1#/plot-summary`);
-  await page.waitForSelector(".plot-summary-screen", { timeout: 5000 });
-
-  // No colored significance badges at all in Crow's view.
-  const colorBadges = await page.$(".rank-badge");
-  check(!colorBadges, "Crow's view has no colored significance rank-badge at all");
-
-  // No significance legend either — nothing left for it to explain.
-  const legend = await page.$(".significance-legend");
-  check(!legend, "Crow's view hides the significance-color legend entirely");
-
-  // Plain entry-number elements on the left, one per row.
-  const entryNums = await page.$$eval(".ranked-row-entry-num", (els) => els.map((e) => e.textContent.trim()));
-  check(
-    entryNums.length === 3 && entryNums.includes("#1") && entryNums.includes("#2") && entryNums.includes("#3"),
-    `each row shows its ORIGINAL entry number on the left (got ${JSON.stringify(entryNums)})`
-  );
-
-  // Right-side stack shows "Rank N" + the actual Dry Yield, top row first (sorted by Dry Yield desc by default).
-  const rightStacks = await page.$$eval(".ranked-row-right-stack", (els) =>
-    els.map((el) => ({
-      rank: el.querySelector(".ranked-row-rank").textContent.trim(),
-      value: el.querySelector(".ranked-row-value").textContent.trim(),
-    }))
-  );
-  check(rightStacks.length === 3, `3 right-side rank/yield stacks rendered (got ${rightStacks.length})`);
-  check(
-    rightStacks[0].rank === "Rank 1" && rightStacks[0].value === "240.0 bu/ac",
-    `top row (highest yield, e3) shows "Rank 1" and its actual Dry Yield on the right (got ${JSON.stringify(rightStacks[0])})`
-  );
-  check(
-    rightStacks[2].rank === "Rank 3" && rightStacks[2].value === "180.0 bu/ac",
-    `bottom row (lowest yield, e1) shows "Rank 3" and its actual Dry Yield on the right (got ${JSON.stringify(rightStacks[2])})`
-  );
-
-  // Cross-check: the top row (rank 1, highest yield = e3) has ORIGINAL
-  // number #3 (its planting-order position), NOT #1 — confirms entry
-  // number and placement rank are genuinely two different, un-swapped
-  // values rather than both accidentally showing the same thing.
-  const topRowEntryNum = await page.$eval(".ranked-row:first-child .ranked-row-entry-num", (el) => el.textContent.trim());
-  check(
-    topRowEntryNum === "#3",
-    `the top-ranked row's LEFT entry-number is its original planting position (#3 for e3), distinct from its "Rank 1" on the right (got "${topRowEntryNum}")`
-  );
-
-  // Dry Yield is shown on the right even though Dry Yield already IS the
-  // active sort tab by default — also switch to the Gross tab and confirm
-  // Dry Yield keeps showing on the right regardless of the active metric.
-  await page.locator(".segmented-control .segmented-btn", { hasText: "Gross" }).click();
-  await page.waitForTimeout(200);
-  const rightStacksOnGross = await page.$$eval(".ranked-row-right-stack .ranked-row-value", (els) =>
-    els.map((e) => e.textContent.trim())
-  );
-  check(
-    rightStacksOnGross.every((t) => t.endsWith("bu/ac")),
-    `Dry Yield keeps showing on the right even with the Gross tab active (got ${JSON.stringify(rightStacksOnGross)})`
-  );
-  // "Rank N" still shows on the Gross tab too.
-  const ranksOnGross = await page.$$eval(".ranked-row-rank", (els) => els.map((e) => e.textContent.trim()));
-  check(ranksOnGross.length === 3, `"Rank N" still shows on the Gross tab (got ${JSON.stringify(ranksOnGross)})`);
-
-  // The Entry # tab is gone — only Dry Yield and Gross remain selectable.
-  const tabLabels = await page.$$eval(".segmented-control .segmented-btn", (els) => els.map((e) => e.textContent.trim()));
-  check(
-    tabLabels.length === 2 && tabLabels[0] === "Dry Yield" && tabLabels[1] === "Gross" && !tabLabels.includes("Entry #"),
-    `Crow's view's segmented control shows only Dry Yield and Gross, no Entry # tab (got ${JSON.stringify(tabLabels)})`
-  );
-
-  await page.close();
-}
-
-// ---- 3. Sanity check: a NON-Crow's Brand View is completely unaffected (still colored badges, single value, legend shown) ----
-{
-  const page = await browser.newPage();
-  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
-  await page.goto(`${BASE}/index.html`);
-  await page.evaluate(
-    (entries) => {
-      localStorage.clear();
-      localStorage.setItem("cph.selectedBrand", JSON.stringify("midwestSeedGenetics"));
-      localStorage.setItem("cph.authSession", JSON.stringify({ name: "Test User", email: "test@example.com", isAdmin: false }));
-      localStorage.setItem(
-        "cph.draftTrial",
         JSON.stringify({
           id: "t1",
-          header: { cooperatorName: "Test Coop", state: "IA", county: "" },
-          entries: entries.map((e) => ({ ...e, brand: "Midwest Seed Genetics" })),
+          // pricePerBushel/baseMoisturePercent/dryingShrinkRate needed so
+          // gross() can actually compute a value (not just null) for the
+          // Gross-tab check below.
+          header: { cooperatorName: "Test Coop", state: "IA", county: "", baseMoisturePercent: 15, dryingShrinkRate: 0.06, pricePerBushel: 4.25 },
+          entries,
         })
       );
     },
@@ -175,14 +92,86 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   await page.goto(`${BASE}/index.html?r=1#/plot-summary`);
   await page.waitForSelector(".plot-summary-screen", { timeout: 5000 });
 
+  // Colored significance rank-badges, one per row — same as Midwest/NC+.
   const colorBadges = await page.$$(".rank-badge");
-  check(colorBadges.length === 3, `Midwest (non-Crow's) view still shows the original colored rank-badges (got ${colorBadges.length})`);
+  check(colorBadges.length === 3, `Crow's view now shows colored significance rank-badges, one per row (got ${colorBadges.length})`);
+
+  // The significance-color legend is shown, not hidden.
   const legend = await page.$(".significance-legend");
-  check(Boolean(legend), "Midwest (non-Crow's) view still shows the significance-color legend");
+  check(Boolean(legend), "Crow's view now shows the significance-color legend");
+
+  // No leftover plain-layout elements from the old Crow's-specific variant.
   const entryNums = await page.$(".ranked-row-entry-num");
-  check(!entryNums, "Midwest (non-Crow's) view does NOT use Crow's plain entry-number layout");
+  check(!entryNums, "Crow's view no longer uses the old plain entry-number-on-the-left layout");
+  const rightStack = await page.$(".ranked-row-right-stack");
+  check(!rightStack, "Crow's view no longer uses the old Rank+DryYield right-side stack");
+
+  // Each row shows a single current-metric value on the right (Dry Yield
+  // by default), highest first, same shape as every other Brand View.
+  const values = await page.$$eval(".ranked-row-value", (els) => els.map((e) => e.textContent.trim()));
+  check(
+    JSON.stringify(values) === JSON.stringify(["240.0 bu/ac", "210.0 bu/ac", "180.0 bu/ac"]),
+    `Crow's view shows a single Dry Yield value per row, highest first (got ${JSON.stringify(values)})`
+  );
+
+  // Switching to Gross re-sorts and re-labels the single value column too,
+  // exactly like Midwest/NC+ — no separate Dry Yield display lingers.
+  await page.locator(".segmented-control .segmented-btn", { hasText: "Gross" }).click();
+  await page.waitForTimeout(200);
+  const grossValues = await page.$$eval(".ranked-row-value", (els) => els.map((e) => e.textContent.trim()));
+  check(
+    grossValues.every((t) => t.startsWith("$")),
+    `Crow's view's Gross tab shows dollar values in the single value column, like every other Brand View (got ${JSON.stringify(grossValues)})`
+  );
+
+  // Only Dry Yield and Gross are selectable (the Entry # tab was removed
+  // separately, across all 3 Brand Views).
+  const tabLabels = await page.$$eval(".segmented-control .segmented-btn", (els) => els.map((e) => e.textContent.trim()));
+  check(
+    tabLabels.length === 2 && tabLabels[0] === "Dry Yield" && tabLabels[1] === "Gross",
+    `Crow's view's segmented control shows only Dry Yield and Gross (got ${JSON.stringify(tabLabels)})`
+  );
 
   await page.close();
+}
+
+// ---- 3. Cross-check: Crow's rendering is now byte-for-byte structurally identical to Midwest's for the same data ----
+{
+  async function rankedRowsFor(brandId, brandLabel) {
+    const page = await browser.newPage();
+    page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
+    await page.goto(`${BASE}/index.html`);
+    await page.evaluate(
+      (args) => {
+        localStorage.clear();
+        localStorage.setItem("cph.selectedBrand", JSON.stringify(args.brandId));
+        localStorage.setItem("cph.authSession", JSON.stringify({ name: "Test User", email: "test@example.com", isAdmin: false }));
+        localStorage.setItem(
+          "cph.draftTrial",
+          JSON.stringify({
+            id: "t1",
+            header: { cooperatorName: "Test Coop", state: "IA", county: "" },
+            entries: args.entries.map((e) => ({ ...e, brand: args.brandLabel })),
+          })
+        );
+      },
+      { brandId, entries: ENTRIES, brandLabel }
+    );
+    await page.goto(`${BASE}/index.html?r=1#/plot-summary`);
+    await page.waitForSelector(".plot-summary-screen", { timeout: 5000 });
+    const badgeCount = (await page.$$(".rank-badge")).length;
+    const hasLegend = Boolean(await page.$(".significance-legend"));
+    const values = await page.$$eval(".ranked-row-value", (els) => els.map((e) => e.textContent.trim()));
+    await page.close();
+    return { badgeCount, hasLegend, values };
+  }
+
+  const crows = await rankedRowsFor("crows", "Crow's");
+  const midwest = await rankedRowsFor("midwestSeedGenetics", "Midwest Seed Genetics");
+  check(
+    crows.badgeCount === midwest.badgeCount && crows.hasLegend === midwest.hasLegend && JSON.stringify(crows.values) === JSON.stringify(midwest.values),
+    `Crow's and Midwest render structurally identical Ranked Results for the same data (Crow's: ${JSON.stringify(crows)}, Midwest: ${JSON.stringify(midwest)})`
+  );
 }
 
 await browser.close();
