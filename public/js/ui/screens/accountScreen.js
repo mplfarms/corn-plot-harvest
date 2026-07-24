@@ -2,8 +2,11 @@
 //
 // The app's launch/sign-in screen — a "Corn Plot Entry Tool" title, the
 // Republic shield below it, the four-brand logo train below that, and a
-// one-field Sign In With Email form, all over a gradient background (see
-// styles.css's .launch-screen). Signing in is now mandatory (there
+// one-field Sign In With Email form, over a plain white background
+// framed by a header bar and a footer bar in the same navy blue as the
+// Republic shield artwork (see styles.css's .launch-screen/
+// .launch-header-bar/.launch-footer-bar — per explicit request; this
+// used to be a full-bleed blue gradient background instead). Signing in is now mandatory (there
 // is no "Continue Without Signing In" — see router.js's guard, which
 // bounces every other route back here when there's no session) — this is
 // the first thing anyone sees until they sign in, and it's also where
@@ -129,6 +132,11 @@ export function render(container) {
   });
 
   const screen = h("div", { className: "screen launch-screen" }, [
+    // A plain solid-navy band top and bottom (see styles.css) frames the
+    // now-white page — both bleed into the device's safe-area insets
+    // (notch/home-indicator) themselves, so .launch-screen no longer
+    // needs to reserve that space itself.
+    h("div", { className: "launch-header-bar" }),
     h("div", { className: "launch-branding" }, [
       h("h1", { className: "launch-title" }, "Corn Plot Entry Tool"),
       h("img", {
@@ -168,6 +176,7 @@ export function render(container) {
         "📖 Quick Start Guide"
       ),
     ]),
+    h("div", { className: "launch-footer-bar" }),
   ]);
 
   mount(container, screen);

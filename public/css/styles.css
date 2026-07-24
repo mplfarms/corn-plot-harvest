@@ -527,31 +527,47 @@ h3.section-header:first-child {
 
 /* ---------- launch screen (Home / sign in with email) ---------- */
 
-/* Fixed light-blue gradient regardless of light/dark mode — this is the
-   app's title/brand splash, same idea as brand-select-screen forcing its
-   own navy background below rather than following --bg. The gradient is
-   a tint of the same navy blue the Republic shield artwork itself uses
-   (#0c2336 — see .launch-form-body .btn-primary below), rather than an
-   unrelated color, so the page and the shield read as one consistent
-   "Republic blue" rather than a plain white page with a blue logo
-   dropped on top. Darkened three times by explicit request since first
-   introduced — most recently by another ~25% (each stop's RGB channels
-   × 0.75 again, on top of the prior darkening) — still comfortably
-   legible against the dark navy (#16241c) text/links that sit directly
-   on it. */
+/* Plain white page, fixed regardless of light/dark mode — same idea as
+   brand-select-screen forcing its own navy background below rather than
+   following --bg. Per explicit request, this replaced what used to be a
+   full-bleed navy-blue gradient background (see .launch-header-bar/
+   .launch-footer-bar right below, which now carry that same navy —
+   #0c2336, the Republic shield artwork's own blue, also used by
+   .launch-title/.launch-quick-start-link/the primary button further
+   down — as a header/footer frame instead of a full-page background). */
 .launch-screen {
-  background: linear-gradient(160deg, #6f7884 0%, #4a5f76 100%);
+  background: #ffffff;
   color: #16241c;
   justify-content: flex-start;
+}
+
+/* Solid-navy bands bookending the page top and bottom — each bleeds into
+   its side's device safe-area inset (notch / home-indicator) via its own
+   padding, so .launch-screen itself no longer needs to reserve that
+   space. .launch-form-body's flex:1 (inherited from .screen-body) fills
+   any leftover vertical space above the footer bar, so it sits right at
+   the bottom of the viewport on short content and scrolls into view
+   below the fold on tall content — same behavior as a normal page
+   footer. */
+.launch-header-bar {
+  background: #0c2336;
+  height: 28px;
   padding-top: env(safe-area-inset-top);
+  flex-shrink: 0;
+}
+
+.launch-footer-bar {
+  background: #0c2336;
+  height: 28px;
   padding-bottom: env(safe-area-inset-bottom);
+  flex-shrink: 0;
 }
 
 .launch-branding {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: max(28px, env(safe-area-inset-top)) 24px 12px;
+  padding: 28px 24px 12px;
 }
 
 /* The app's name, above the Republic shield. Same navy as the shield
@@ -589,10 +605,29 @@ h3.section-header:first-child {
   max-width: 420px;
   margin: 8px auto 0;
   gap: 12px;
+  /* Overrides .screen-body's shared calc(32px + env(safe-area-inset-bottom))
+     bottom padding — .launch-footer-bar right below already extends into
+     that same safe-area inset itself, so keeping it here too would just
+     double up the blank space above the footer bar on notch/home-
+     indicator devices. */
+  padding-bottom: 24px;
+}
+
+/* Fixed muted gray-green (light mode's own --text-muted value) rather
+   than plain var(--text-muted) — this screen's background is now
+   deliberately fixed white regardless of theme (see .launch-screen
+   above), but the CSS variable itself still flips to a much LIGHTER
+   shade in dark mode (meant for dark backgrounds), which would read as
+   washed-out/low-contrast against this always-white page. Same fixed-
+   regardless-of-theme approach as .launch-title/.launch-quick-start-link
+   just above. */
+.launch-form-body .field-label {
+  color: #5b6b60;
 }
 
 .launch-note {
   text-align: center;
+  color: #5b6b60;
 }
 
 /* Sign In button — no brand is known yet on this screen (that's decided
@@ -815,6 +850,21 @@ h3.section-header:first-child {
   border-radius: 16px;
   background: #ffffff;
   padding: 14px 18px;
+}
+
+/* Crow's Home Screen logo, per explicit request: a white CIRCLE behind
+   the rooster-mark/wordmark instead of the white rounded-rectangle
+   "card" every other brand uses above — needs a fixed equal
+   width/height (unlike the default rule's auto width, which follows
+   each logo's own aspect ratio) so border-radius: 50% actually draws a
+   circle rather than an oval; object-fit: contain (inherited from
+   .home-logo above) then shrinks the wide rooster+wordmark artwork to
+   fit fully inside that circle, uncropped, with even padding all
+   around rather than the default rule's asymmetric 14px/18px. */
+[data-brand="crows"] .home-logo {
+  width: 116px;
+  border-radius: 50%;
+  padding: 18px;
 }
 
 .home-actions {
