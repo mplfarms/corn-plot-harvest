@@ -9,6 +9,7 @@
 import {
   rankingMetricMeta,
   moisture,
+  dryYield,
   dryYieldSummary,
   dryYieldSignificance,
   SIGNIFICANCE_THRESHOLD_BU_AC,
@@ -39,6 +40,14 @@ const LEGEND_ITEMS = [
 // Fallback box-plot accent color when no brand is selected (matches the
 // Midwest green, this app's original default accent, before NC+ existed).
 const DEFAULT_BOX_PLOT_RGB = [9, 69, 44];
+
+// Fixed dark blue for the Moisture by Entry Position bar chart (see
+// drawEntryPositionBarChart() below) — per explicit request, this one
+// deliberately does NOT follow the brand accent the way the Dry Yield
+// Distribution box and the Yield by Entry Position bars do. Reuses the
+// same navy already used for the sign-in splash screen's header/footer
+// bars (see .launch-header-bar in styles.css).
+const MOISTURE_BAR_RGB = [12, 35, 54];
 
 /**
  * @param {string} hex e.g. "#09452C"
@@ -299,6 +308,17 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     y = rowStartY + rowHeight;
   }
 
+  // The IQR box's own color — for NC+, that's its chrome blue (the same
+  // blue already used for its top bar and Home Screen) rather than its
+  // saturated red accent; every other brand (and no brand at all) just
+  // uses the regular accent. Shared with drawEntryPositionBarChart()
+  // below for the Yield by Entry Position bars, per explicit request that
+  // they use "the same shaded color as the box in the bar and whisker
+  // graph."
+  function boxAccentRgb() {
+    return hexToRgb(brand && brand.id === "ncPlus" ? brand.chrome : brand ? brand.accent : null);
+  }
+
   // Horizontal box-and-whisker for the plot's Dry Yield distribution —
   // same shape/rule as the Plot Summary screen's box plot (see
   // buildBoxPlotSvg() in plotSummary.js): one hue (the selected brand's
@@ -326,7 +346,7 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     // stays exactly as it was (its accent IS already this app's original
     // green, so there's nothing to change there).
     const [r, g, b] = hexToRgb(brand ? brand.accent : null);
-    const [boxR, boxG, boxB] = hexToRgb(brand && brand.id === "ncPlus" ? brand.chrome : brand ? brand.accent : null);
+    const [boxR, boxG, boxB] = boxAccentRgb();
 
     const xMin = scale(min);
     const xQ1 = scale(q1);
@@ -388,6 +408,91 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     y += 8 * 1.3 + 6;
   }
 
+  // A zero-baseline vertical bar chart, one bar per entry, in the
+  // entries' ORIGINAL plot position (left-to-right = first-to-last
+  // planted) — never re-sorted by rank/value, so it shows the trend from
+  // one end of the physical plot to the other. Drawn as its own box
+  // (title, chart, caption), the same visual treatment as
+  // drawBoxPlot()'s "Dry Yield Distribution" box just above it — per
+  // explicit request: on the export/print/share PDF only (the Plot
+  // Summary screen itself keeps its original single box-and-whisker
+  // chart, unchanged). Entries with no value for `valueFn` keep their
+  // x-slot (so every other bar's position stays meaningful) but simply
+  // draw no bar there.
+  // @param {import('./models.js').PlotEntry[]} entries
+  // @param {(entry: import('./models.js').PlotEntry) => number|null} valueFn
+  // @param {string} title
+  // @param {[number, number, number]} barRgb
+  // @param {(v: number) => string} formatValue
+  function drawEntryPositionBarChart(entries, valueFn, title, barRgb, formatValue) {
+    const n = entries.length;
+    const values = entries.map((entry) => valueFn(entry));
+    const numeric = values.filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text(`${title}:`, MARGIN, y + 9 * 0.8);
+    y += 9 * 1.15 + 8;
+
+    if (numeric.length === 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.text("No data yet.", MARGIN, y + 8 * 0.8);
+      doc.setTextColor(0, 0, 0);
+      y += 8 * 1.3 + 6;
+      return;
+    }
+
+    // Zero-baseline, honest magnitude encoding (never truncated) — a
+    // touch of headroom above the tallest bar so it doesn't touch the
+    // chart's own title line above it.
+    const maxValue = Math.max(...numeric, 0);
+    const domainMax = maxValue > 0 ? maxValue * 1.08 : 1;
+
+    const chartH = 46;
+    const gap = 2;
+    const barW = Math.max((tableWidth - (n - 1) * gap) / n, 1);
+    const baselineY = y + chartH;
+
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(1);
+    doc.line(MARGIN, baselineY, MARGIN + tableWidth, baselineY);
+
+    doc.setFillColor(barRgb[0], barRgb[1], barRgb[2]);
+    values.forEach((v, i) => {
+      if (v === null || v === undefined || Number.isNaN(v)) return;
+      const barH = (v / domainMax) * chartH;
+      const x = MARGIN + i * (barW + gap);
+      doc.rect(x, baselineY - barH, barW, Math.max(barH, 0.5), "F");
+    });
+
+    // Thin the x-axis position-number labels so they don't collide when
+    // there are many entries — always keep the first and last position,
+    // plus an evenly spaced handful in between.
+    const maxLabels = Math.max(4, Math.floor(tableWidth / 28));
+    const labelStep = Math.max(1, Math.ceil(n / maxLabels));
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(120, 120, 120);
+    values.forEach((v, i) => {
+      if (i !== 0 && i !== n - 1 && i % labelStep !== 0) return;
+      const x = MARGIN + i * (barW + gap) + barW / 2;
+      doc.text(String(i + 1), x, baselineY + 8, { align: "center" });
+    });
+    doc.setTextColor(0, 0, 0);
+
+    y = baselineY + 14;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+    const caption = `Low ${formatValue(Math.min(...numeric))}  •  High ${formatValue(Math.max(...numeric))}`;
+    doc.text(caption, MARGIN, y);
+    doc.setTextColor(0, 0, 0);
+    y += 8 * 1.3 + 6;
+  }
+
   function drawSummaryBlock() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
@@ -414,7 +519,17 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
       doc.text(line, MARGIN, y + 9 * 0.8);
       y += 9 * 1.15 + 6;
 
-      if (summary.boxPlot) drawBoxPlot(summary.boxPlot);
+      if (summary.boxPlot) {
+        drawBoxPlot(summary.boxPlot);
+        // Per explicit request, these two entry-position bar charts are
+        // PDF/print/share-only — the Plot Summary screen itself keeps its
+        // original single box-and-whisker chart unchanged. Gated on the
+        // same summary.boxPlot check as the box plot above (there's no
+        // point drawing an entry-position chart when there isn't even
+        // enough data for a distribution chart).
+        drawEntryPositionBarChart(allEntries, dryYield, "Yield by Entry Position", boxAccentRgb(), (v) => `${v.toFixed(1)} bu/ac`);
+        drawEntryPositionBarChart(allEntries, moisture, "Moisture by Entry Position", MOISTURE_BAR_RGB, (v) => `${v.toFixed(1)}%`);
+      }
 
       // Only brands with 2+ hybrids in this plot get an average (a
       // "brand average" of one hybrid isn't meaningful); the selected
