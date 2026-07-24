@@ -4,16 +4,13 @@
 // Results list renders the deliberately plainer layout Crow's asked for —
 // no color-coded significance badge, the entry's ORIGINAL number on the
 // left, and its sorted placement rank + actual Dry Yield together on the
-// right on the Dry Yield/Gross tabs — with the significance-color legend
-// hidden entirely, since there's no more color coding for it to explain.
-// On the Entry # tab specifically, the right side shows just "#N" (no
-// separate "Rank" — the list is sorted BY entry number there, so it'd
-// just restate the same number already on the left), matching exactly
-// what Midwest/NC+'s own Entry # tab shows — per explicit request, this
-// one tab is deliberately IDENTICAL across all 3 Brand Views, not
-// Crow's-specific. Every other Brand View keeps the original
-// colored-badge layout untouched (see e2e_brand_view_relabel.mjs and
-// plotSummary.js's isCrowsView).
+// right on the Dry Yield/Gross tabs (the only 2 tabs — a prior Entry #
+// tab that sat between them was removed per explicit request, across
+// all 3 Brand Views, see plotSummary.js's METRIC_ORDER) — with the
+// significance-color legend hidden entirely, since there's no more
+// color coding for it to explain. Every other Brand View keeps the
+// original colored-badge layout untouched (see e2e_brand_view_relabel.mjs
+// and plotSummary.js's isCrowsView).
 import { chromium } from "playwright";
 
 const BASE = "http://localhost:34205";
@@ -140,32 +137,15 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
     rightStacksOnGross.every((t) => t.endsWith("bu/ac")),
     `Dry Yield keeps showing on the right even with the Gross tab active (got ${JSON.stringify(rightStacksOnGross)})`
   );
-  // "Rank N" still shows on the Gross tab too (only the Entry # tab below drops it).
+  // "Rank N" still shows on the Gross tab too.
   const ranksOnGross = await page.$$eval(".ranked-row-rank", (els) => els.map((e) => e.textContent.trim()));
   check(ranksOnGross.length === 3, `"Rank N" still shows on the Gross tab (got ${JSON.stringify(ranksOnGross)})`);
 
-  // ---- Entry # tab: sorts by entry number, and the right side matches
-  // Midwest/NC+'s own Entry # tab exactly — just "#N", no "Rank" stack ----
-  await page.locator(".segmented-control .segmented-btn", { hasText: "Entry #" }).click();
-  await page.waitForTimeout(200);
-
-  // e1 (originalNumber 1) first, e2 (2) second, e3 (3) third — entry
-  // order, NOT yield order (which was e3 > e2 > e1 — see ENTRIES above).
-  const entryNumTabOrder = await page.$$eval(".ranked-row-entry-num", (els) => els.map((e) => e.textContent.trim()));
+  // The Entry # tab is gone — only Dry Yield and Gross remain selectable.
+  const tabLabels = await page.$$eval(".segmented-control .segmented-btn", (els) => els.map((e) => e.textContent.trim()));
   check(
-    JSON.stringify(entryNumTabOrder) === JSON.stringify(["#1", "#2", "#3"]),
-    `Entry # tab sorts Crow's rows by entry number (#1, #2, #3), not by Dry Yield rank (got ${JSON.stringify(entryNumTabOrder)})`
-  );
-
-  const noRankOnEntryNumTab = await page.$(".ranked-row-rank");
-  check(!noRankOnEntryNumTab, `Entry # tab shows no separate "Rank N" label — it'd just restate the entry number already on the left`);
-
-  const entryNumTabRightValues = await page.$$eval(".ranked-row-right-stack .ranked-row-value", (els) =>
-    els.map((e) => e.textContent.trim())
-  );
-  check(
-    JSON.stringify(entryNumTabRightValues) === JSON.stringify(["#1", "#2", "#3"]),
-    `Entry # tab's right side shows plain "#N" (matching Midwest/NC+'s own Entry # tab), not Dry Yield (got ${JSON.stringify(entryNumTabRightValues)})`
+    tabLabels.length === 2 && tabLabels[0] === "Dry Yield" && tabLabels[1] === "Gross" && !tabLabels.includes("Entry #"),
+    `Crow's view's segmented control shows only Dry Yield and Gross, no Entry # tab (got ${JSON.stringify(tabLabels)})`
   );
 
   await page.close();

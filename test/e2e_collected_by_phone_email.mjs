@@ -15,9 +15,10 @@
 //      whatever raw digits the account has on file.
 //   6. The Plot Summary header card's chevron is visibly larger than an
 //      ordinary navigation row's chevron elsewhere in the app, and the
-//      Moisture tab is gone from the Dry Yield/Entry #/Gross segmented
-//      control (moisture still shows per-row, it's just no longer
-//      sortable).
+//      Moisture tab is gone from the Dry Yield/Gross segmented control
+//      (moisture still shows per-row, it's just no longer sortable) —
+//      Entry # was a 3rd tab there too, but was removed per explicit
+//      request.
 // Also verifies, in the same screen:
 //   7. The Address field is relabeled "Cooperator Address" with a "leave
 //      blank if not known" note, and an 11-digit leading-"1" phone
@@ -300,17 +301,17 @@ function fieldInput(page, label) {
     parseFloat(getComputedStyle(el).fontSize)
   );
 
-  // The Moisture tab is gone — only Dry Yield, Entry #, and Gross remain
-  // selectable (Entry # added between Dry Yield and Gross — see
-  // yieldCalculator.js's RankingMetric.ENTRY_NUM).
+  // The Moisture tab is gone, and the Entry # tab (previously between
+  // Dry Yield and Gross) was removed per explicit request across all 3
+  // Brand Views — only Dry Yield and Gross remain selectable.
   const tabLabels = await page.$$eval(".segmented-control .segmented-btn", (els) => els.map((el) => el.textContent.trim()));
   check(
-    tabLabels.length === 3 &&
+    tabLabels.length === 2 &&
       tabLabels[0] === "Dry Yield" &&
-      tabLabels[1] === "Entry #" &&
-      tabLabels[2] === "Gross" &&
-      !tabLabels.includes("Moisture"),
-    `Plot Summary shows the Dry Yield, Entry #, and Gross tabs in order, no Moisture tab (got ${JSON.stringify(tabLabels)})`
+      tabLabels[1] === "Gross" &&
+      !tabLabels.includes("Moisture") &&
+      !tabLabels.includes("Entry #"),
+    `Plot Summary shows only the Dry Yield and Gross tabs in order, no Moisture or Entry # tab (got ${JSON.stringify(tabLabels)})`
   );
   // Each hybrid's moisture reading is still shown on its row, just not sortable.
   const moistureLineText = await page.$eval(".ranked-row-moisture", (el) => el.textContent).catch(() => null);
