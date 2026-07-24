@@ -145,6 +145,42 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   await page.close();
 }
 
+// ---- Crow's view: white CIRCLE behind the logo (per explicit request),
+// not the white rounded-rectangle "card" every other brand uses ----
+{
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
+  await seedBrandOnly(page, "crows");
+  await page.goto(`${BASE}/index.html?r=3#/plot-chooser`);
+  await page.waitForSelector(".home-screen", { timeout: 5000 });
+
+  const logoAlt = await page.$eval(".home-logo", (el) => el.alt);
+  check(logoAlt === "Crow's", `Crow's view: logo alt matches the selected brand (got "${logoAlt}")`);
+
+  const heroBg = await page.$eval(".home-hero", (el) => getComputedStyle(el).backgroundColor);
+  check(heroBg === "rgb(35, 31, 32)", `Crow's view: Home Screen background uses Crow's black chrome color (got "${heroBg}")`);
+
+  // Unlike Midwest (wide card) and NC+ (square card), Crow's logo sits on
+  // a perfect white CIRCLE — equal width/height and a fully round corner
+  // radius, not the 16px rounded-rectangle every other brand gets.
+  const logoBox = await page.$eval(".home-logo", (el) => {
+    const r = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return { w: r.width, h: r.height, borderRadius: style.borderRadius, background: style.backgroundColor };
+  });
+  check(
+    Math.abs(logoBox.w - logoBox.h) < 1,
+    `Crow's logo box is a perfect square (equal width/height) so its circle isn't an oval (got ${JSON.stringify(logoBox)})`
+  );
+  check(
+    logoBox.borderRadius === "50%",
+    `Crow's logo has a fully round (50%) border-radius, making a circle not a rounded square (got "${logoBox.borderRadius}")`
+  );
+  check(logoBox.background === "rgb(255, 255, 255)", `Crow's logo's circle background is white (got "${logoBox.background}")`);
+
+  await page.close();
+}
+
 await browser.close();
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
