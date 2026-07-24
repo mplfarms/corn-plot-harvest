@@ -25,6 +25,34 @@ import * as authStore from "../authStore.js";
 import { createTopBar } from "../components/topBar.js";
 import { navigate } from "../router.js";
 
+/**
+ * The brand logo sitting below "Corn Plot Entry". Every brand but Crow's
+ * is a plain <img class="home-logo"> — a white rounded-rectangle "card"
+ * behind the logo, sized to that logo's own aspect ratio (see
+ * .home-logo in styles.css). Crow's instead gets a white CIRCLE (per
+ * explicit request) — implemented as a plain wrapper <div> whose own
+ * overflow:hidden does the circular clip, with the <img> as an ordinary
+ * centered child, rather than putting border-radius directly on the
+ * <img> itself. That direct approach (an earlier build) hit a browser
+ * rendering quirk: some of the wordmark's finer strokes (the outer
+ * edges of the "C" and "S" in "CROW'S") silently vanished at every
+ * size tested, even though the circle geometry had plenty of margin
+ * around them — confirmed by a pixel-level before/after comparison.
+ * Clipping via a parent's overflow:hidden instead renders every stroke
+ * intact, so this is the one brand that needs its own two-element
+ * markup (see .home-logo-circle/.home-logo-circle-img in styles.css).
+ * @param {ReturnType<typeof getBrand>} brand
+ */
+function homeLogo(brand) {
+  if (!brand) return null;
+  if (brand.id === "crows") {
+    return h("div", { className: "home-logo home-logo-circle" }, [
+      h("img", { className: "home-logo-circle-img", src: brand.logo, alt: brand.displayName }),
+    ]);
+  }
+  return h("img", { className: "home-logo", src: brand.logo, alt: brand.displayName });
+}
+
 export function render(container) {
   const brand = getBrand(brandStore.getState().selectedBrand);
   const savedCount = libraryStore.getState().trials.length;
@@ -35,7 +63,7 @@ export function render(container) {
 
   const heroTop = h("div", { className: "home-hero-top" }, [
     h("h1", { className: "home-title" }, "Corn Plot Entry"),
-    brand ? h("img", { className: "home-logo", src: brand.logo, alt: brand.displayName }) : null,
+    homeLogo(brand),
   ]);
 
   const newPlotBtn = h(
