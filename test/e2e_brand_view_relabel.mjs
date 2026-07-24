@@ -1,9 +1,17 @@
-// Verifies the new Brand View relabeling rule on Plot Summary + PDF
-// export: whichever brand (Midwest Seed Genetics or NC+) is the selected
-// Brand View, entries belonging to the *other* of those two brands
-// display (and average) under the selected brand's name instead. A
-// third-party brand ("Crow's") must never be touched. Plot Entries
-// editing / the XLSX export must keep entries' real, unrelabeled brand.
+// Verifies the Brand View relabeling rule on Plot Summary + PDF export:
+// whichever brand (Midwest Seed Genetics, NC+, or Crow's) is the selected
+// Brand View, entries belonging to either OTHER of those three rebadge
+// brands display (and average) under the selected brand's name instead —
+// AND (per explicit request extending Crow's into this the same way
+// Midwest/NC+ already worked) the hybrid name's 2-letter brand code
+// prefix ("MW "/"NC "/"CR ") swaps to match too, so "MW 09-90 PCE",
+// "NC 09-90 PCE", and "CR 09-90 PCE" are all recognized as the exact same
+// underlying hybrid and always display under whichever of the three is
+// the current Brand View. A hybrid with no recognized prefix (hand-typed,
+// no brand code) is left exactly as typed. A genuine third-party brand
+// ("Dekalb", not one of the three rebadge brands) must never be touched.
+// Plot Entries editing / the XLSX export must keep entries' real,
+// unrelabeled brand and hybrid text.
 import { chromium } from "playwright";
 
 const BASE = "http://localhost:34205";
@@ -18,22 +26,35 @@ function check(cond, label) {
   }
 }
 
-function entry(id, brand, yieldVal) {
+function entry(id, brand, hybrid, yieldVal) {
   return {
-    id, brand, hybrid: id, trait: "", relativeMaturity: "100", seedTreatment: "",
+    id, brand, hybrid, trait: "", relativeMaturity: "100", seedTreatment: "",
     sampleNetWeightLbs: "", moisturePercent: "", testWeight: "", stripLengthFeet: "",
     numberOfRows: "", widthInches: "", comments: "", manualDryYield: String(yieldVal),
   };
 }
 
-// 2 Midwest entries, 2 NC+ Hybrids entries, 1 third-party (Crow's) entry.
+// 2 Midwest, 2 NC+, 2 Crow's (all three are rebadge partners of each
+// other), 1 genuine third-party (Dekalb, never touched). e1/e3/e5 share
+// the same hybrid "family" (09-90 PCE) under each brand's own code — the
+// key case this whole feature is about. e2 has NO recognized brand-code
+// prefix at all, to confirm hybrid text is left alone when there's
+// nothing safe to swap.
 const ENTRIES = [
-  entry("e1", "Midwest Seed Genetics", 200),
-  entry("e2", "Midwest Seed Genetics", 210),
-  entry("e3", "NC+ Hybrids", 190),
-  entry("e4", "NC+ Hybrids", 220),
-  entry("e5", "Crow's", 205),
+  entry("e1", "Midwest Seed Genetics", "MW 09-90 PCE", 200),
+  entry("e2", "Midwest Seed Genetics", "P1185Q", 210),
+  entry("e3", "NC+ Hybrids", "NC 09-90 PCE", 190),
+  entry("e4", "NC+ Hybrids", "NC 11-30 TRERIB", 220),
+  entry("e5", "Crow's", "CR 09-90 PCE", 205),
+  entry("e6", "Crow's", "CR 14-36 PCE", 215),
+  entry("e7", "Dekalb", "DKC61-88", 225),
 ];
+
+// (200+210+190+220+205+215)/6 = 206.666... -> 206.7 — the combined
+// average of the 6 rebadge-group entries is the SAME in every one of the
+// 3 views (same 6 entries, just grouped/labeled differently), a useful
+// cross-check that nothing is being double-counted or dropped.
+const REBADGE_GROUP_AVG = "206.7";
 
 async function seed(page, selectedBrand) {
   await page.goto(`${BASE}/index.html`);
@@ -53,52 +74,87 @@ async function seed(page, selectedBrand) {
 
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 
-// ---- Case 1: Midwest Seed Genetics is the selected Brand View ----
-{
+async function checkView(selectedBrandId, viewLabel, ownDisplayBrand, ownCode) {
   const page = await browser.newPage();
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
-  await seed(page, "midwestSeedGenetics");
+  await seed(page, selectedBrandId);
   await page.goto(`${BASE}/index.html?r=1#/plot-summary`);
   await page.waitForSelector(".plot-summary-screen", { timeout: 5000 });
 
   const rowTitles = await page.$$eval(".ranked-row-title", (els) => els.map((el) => el.textContent));
+
   check(
-    rowTitles.every((t) => !t.includes("NC+ Hybrids")),
-    `no ranked row still shows "NC+ Hybrids" when Midwest is the selected Brand View (got ${JSON.stringify(rowTitles)})`
+    rowTitles.every((t) => !t.includes("Midwest Seed Genetics") || ownDisplayBrand === "Midwest Seed Genetics"),
+    `[${viewLabel}] no row shows a stale "Midwest Seed Genetics" label unless that's the current view (got ${JSON.stringify(rowTitles)})`
   );
   check(
-    rowTitles.filter((t) => t.includes("Midwest Seed Genetics")).length === 4,
-    `4 ranked rows (2 real Midwest + 2 relabeled NC+) now show "Midwest Seed Genetics" (got ${JSON.stringify(rowTitles)})`
+    rowTitles.every((t) => !t.includes("NC+ Hybrids") || ownDisplayBrand === "NC+ Hybrids"),
+    `[${viewLabel}] no row shows a stale "NC+ Hybrids" label unless that's the current view`
   );
   check(
-    rowTitles.some((t) => t.includes("Crow's")),
-    "the third-party brand (Crow's) is untouched"
+    rowTitles.every((t) => !t.includes("Crow's") || ownDisplayBrand === "Crow's"),
+    `[${viewLabel}] no row shows a stale "Crow's" label unless that's the current view`
+  );
+  check(
+    rowTitles.filter((t) => t.includes(ownDisplayBrand)).length === 6,
+    `[${viewLabel}] all 6 rebadge-group rows now show "${ownDisplayBrand}" (got ${JSON.stringify(rowTitles)})`
+  );
+  check(
+    rowTitles.some((t) => t.includes("Dekalb")),
+    `[${viewLabel}] the genuine third-party brand (Dekalb) is untouched`
+  );
+
+  // The 3 "09-90 PCE" siblings (e1/e3/e5) all converge on THIS view's own
+  // code — the central claim of the feature.
+  const familyCount = rowTitles.filter((t) => t.includes(`${ownCode} 09-90 PCE`)).length;
+  check(
+    familyCount === 3,
+    `[${viewLabel}] all 3 "09-90 PCE" sibling hybrids now show the "${ownCode} 09-90 PCE" prefix (got ${familyCount}, titles: ${JSON.stringify(rowTitles)})`
+  );
+  // No stale prefix from either OTHER rebadge brand survives anywhere.
+  const OTHER_CODES = ["MW", "NC", "CR"].filter((c) => c !== ownCode);
+  for (const staleCode of OTHER_CODES) {
+    check(
+      !rowTitles.some((t) => t.includes(`${staleCode} 09-90 PCE`)),
+      `[${viewLabel}] no row still shows the stale "${staleCode} 09-90 PCE" prefix`
+    );
+  }
+  // The no-prefix hybrid (e2, "P1185Q") is left completely alone.
+  check(
+    rowTitles.some((t) => t.includes("P1185Q")),
+    `[${viewLabel}] a hybrid with no recognized brand code ("P1185Q") is left exactly as typed`
+  );
+  // Dekalb's own hybrid text is untouched too (not swept into the family).
+  check(
+    rowTitles.some((t) => t.includes("DKC61-88")),
+    `[${viewLabel}] the third-party brand's hybrid text ("DKC61-88") is untouched`
   );
 
   const brandAverages = await page.$$eval(".brand-average-block", (els) =>
     els.map((el) => el.querySelector(".brand-average-name").textContent + " " + el.querySelector(".brand-average-value").textContent)
   );
-  console.log("Brand averages (Midwest view):", brandAverages);
+  console.log(`Brand averages (${viewLabel}):`, brandAverages);
+  const ownLine = brandAverages.find((t) => t.startsWith(ownDisplayBrand));
   check(
-    !brandAverages.some((t) => t.includes("NC+")),
-    `"Average By Brand" no longer lists a separate NC+ entry (got ${JSON.stringify(brandAverages)})`
+    !!ownLine && ownLine.includes("n=6") && ownLine.includes(REBADGE_GROUP_AVG),
+    `[${viewLabel}] "${ownDisplayBrand}"'s combined average covers n=6 at ${REBADGE_GROUP_AVG} bu/ac (got "${ownLine}")`
   );
-  const midwestLine = brandAverages.find((t) => t.startsWith("Midwest Seed Genetics"));
-  check(!!midwestLine && midwestLine.includes("n=4"), `Midwest's combined average now covers all 4 entries (n=4) (got "${midwestLine}")`);
-  // (200+210+190+220)/4 = 205.0
-  check(!!midwestLine && midwestLine.includes("205.0"), `Midwest's combined average value is correct (got "${midwestLine}")`);
 
   // Underlying trial data must remain unrelabeled (Plot Entries / XLSX source of truth).
-  const storedBrands = await page.evaluate(() => JSON.parse(localStorage.getItem("cph.draftTrial")).entries.map((e) => e.brand));
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("cph.draftTrial")).entries);
   check(
-    storedBrands.includes("NC+ Hybrids") && storedBrands.filter((b) => b === "Midwest Seed Genetics").length === 2,
-    `stored trial data keeps entries' real brand untouched (got ${JSON.stringify(storedBrands)})`
+    stored.find((e) => e.id === "e3").hybrid === "NC 09-90 PCE" && stored.find((e) => e.id === "e3").brand === "NC+ Hybrids",
+    `[${viewLabel}] stored trial data keeps e3's real brand/hybrid untouched (got ${JSON.stringify(stored.find((e) => e.id === "e3"))})`
   );
 
   await page.close();
 }
 
-// ---- Case 2 (mirror): NC+ is the selected Brand View ----
+await checkView("midwestSeedGenetics", "Midwest view", "Midwest Seed Genetics", "MW");
+await checkView("ncPlus", "NC+ view", "NC+ Hybrids", "NC");
+await checkView("crows", "Crow's view", "Crow's", "CR");
+
+// ---- PDF export mirrors the same relabeling (mocked jsPDF), NC+ view ----
 {
   const page = await browser.newPage();
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
@@ -106,32 +162,6 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   await page.goto(`${BASE}/index.html?r=1#/plot-summary`);
   await page.waitForSelector(".plot-summary-screen", { timeout: 5000 });
 
-  const rowTitles = await page.$$eval(".ranked-row-title", (els) => els.map((el) => el.textContent));
-  check(
-    rowTitles.every((t) => !t.includes("Midwest Seed Genetics")),
-    `no ranked row still shows "Midwest Seed Genetics" when NC+ is the selected Brand View (got ${JSON.stringify(rowTitles)})`
-  );
-  check(
-    rowTitles.filter((t) => t.includes("NC+ Hybrids")).length === 4,
-    `4 ranked rows (2 real NC+ + 2 relabeled Midwest) now show "NC+ Hybrids" (got ${JSON.stringify(rowTitles)})`
-  );
-  check(
-    rowTitles.some((t) => t.includes("Crow's")),
-    "the third-party brand (Crow's) is untouched (mirror case)"
-  );
-
-  const brandAverages = await page.$$eval(".brand-average-block", (els) =>
-    els.map((el) => el.querySelector(".brand-average-name").textContent + " " + el.querySelector(".brand-average-value").textContent)
-  );
-  console.log("Brand averages (NC+ view):", brandAverages);
-  check(
-    !brandAverages.some((t) => t.startsWith("Midwest Seed Genetics")),
-    `"Average By Brand" no longer lists a separate Midwest entry (got ${JSON.stringify(brandAverages)})`
-  );
-  const ncLine = brandAverages.find((t) => t.startsWith("NC+ Hybrids"));
-  check(!!ncLine && ncLine.includes("n=4") && ncLine.includes("205.0"), `NC+'s combined average is correct and covers n=4 (got "${ncLine}")`);
-
-  // ---- PDF export mirrors the same relabeling (mocked jsPDF) ----
   const pdfCalls = await page.evaluate(async (rawEntries) => {
     const calls = { text: [] };
     function FakeJsPDF() {
@@ -163,14 +193,44 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
     return calls;
   }, ENTRIES);
   check(
-    pdfCalls.text.some((t) => t.includes("NC+ Hybrids:") && t.includes("(n=4)")),
-    `PDF's brand-average section shows the combined n=4 NC+ Hybrids average (got ${JSON.stringify(pdfCalls.text.filter((t) => t.includes("bu/ac (n=")))})`
+    pdfCalls.text.some((t) => t.includes("NC+ Hybrids:") && t.includes("(n=6)")),
+    `PDF's brand-average section shows the combined n=6 NC+ Hybrids average (got ${JSON.stringify(pdfCalls.text.filter((t) => t.includes("bu/ac (n=")))})`
   );
   check(
-    !pdfCalls.text.some((t) => t.startsWith("Midwest Seed Genetics:")),
-    "PDF no longer lists a separate Midwest Seed Genetics brand-average line"
+    !pdfCalls.text.some((t) => t.startsWith("Midwest Seed Genetics:") || t.startsWith("Crow's:")),
+    "PDF no longer lists separate Midwest Seed Genetics or Crow's brand-average lines"
+  );
+  check(
+    pdfCalls.text.some((t) => t.includes("NC 09-90 PCE")),
+    `PDF text includes the swapped "NC 09-90 PCE" hybrid name (got ${JSON.stringify(pdfCalls.text.filter((t) => t.includes("09-90")))})`
   );
 
+  await page.close();
+}
+
+// ---- Case-insensitive prefix matching + a non-rebadge Brand View (none
+// selected) leaves everything alone — checked directly against the
+// function, not through the DOM, since these are pure-logic edge cases ----
+{
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
+  await page.goto(`${BASE}/index.html`);
+  const results = await page.evaluate(async (rawEntries) => {
+    const { getBrand, entriesForBrandView } = await import("/js/ui/brand.js");
+    const lowerCaseEntry = {
+      id: "x1", brand: "NC+ Hybrids", hybrid: "nc 12-48 dgvt2prib", trait: "", relativeMaturity: "100",
+      seedTreatment: "", sampleNetWeightLbs: "", moisturePercent: "", testWeight: "", stripLengthFeet: "",
+      numberOfRows: "", widthInches: "", comments: "", manualDryYield: "200",
+    };
+    const swapped = entriesForBrandView([lowerCaseEntry], getBrand("midwestSeedGenetics"));
+    const untouchedByNullBrand = entriesForBrandView(rawEntries, null);
+    return { swappedHybrid: swapped[0].hybrid, sameRefForNullBrand: untouchedByNullBrand === rawEntries };
+  }, ENTRIES);
+  check(
+    results.swappedHybrid === "MW 12-48 dgvt2prib",
+    `hybrid brand-code matching is case-insensitive on input, canonical-uppercase on output (got "${results.swappedHybrid}")`
+  );
+  check(results.sameRefForNullBrand, "entriesForBrandView(entries, null) returns entries untouched (no Brand View selected at all)");
   await page.close();
 }
 
