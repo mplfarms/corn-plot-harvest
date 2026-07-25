@@ -348,3 +348,39 @@ export function computeLinearTrend(entries, valueFn) {
   const r2 = ssYY === 0 ? 0 : (ssXY * ssXY) / (ssXX * ssYY);
   return { slope, intercept, n, r2 };
 }
+
+/**
+ * Recenters a trendline's two pixel-space endpoints so their midpoint
+ * lands in the middle of the chart's plot area, instead of wherever the
+ * actual regression values happen to fall — per explicit request, since
+ * real yield/moisture data tends to sit in the upper portion of a
+ * zero-baseline chart (values are always a large fraction of the
+ * domain max), which crowded the trendline up against the bar tops and
+ * the chart's own top edge/headroom, making it easy to miss entirely on
+ * screen and hard to see against the bars in the PDF. Shared by both
+ * callers (see buildEntryPositionBarSvg() in plotSummary.js and
+ * drawEntryPositionBarChart() in pdfBuilder.js) so the two apply
+ * identical geometry.
+ *
+ * The vertical DISTANCE between the two endpoints (i.e. the line's own
+ * steepness in pixels) is preserved exactly — only its position is
+ * shifted up/down as a whole — so the tilt still honestly reflects the
+ * fit's real slope and direction, it's just relocated to sit across the
+ * visible middle of the bars (in front of their own fill color, with
+ * open space above and below) rather than hugging an edge.
+ *
+ * @param {number} rawYFirst unshifted first endpoint, in the same pixel
+ *   space as areaTop/areaBottom (smaller y = higher up)
+ * @param {number} rawYLast unshifted last endpoint
+ * @param {number} areaTop the plot area's top edge (smallest allowed y)
+ * @param {number} areaBottom the plot area's bottom edge / baseline
+ *   (largest allowed y)
+ * @returns {{yFirst: number, yLast: number}}
+ */
+export function recenterTrendLineY(rawYFirst, rawYLast, areaTop, areaBottom) {
+  const rawMid = (rawYFirst + rawYLast) / 2;
+  const targetMid = (areaTop + areaBottom) / 2;
+  const shift = targetMid - rawMid;
+  const clamp = (v) => Math.max(areaTop, Math.min(areaBottom, v));
+  return { yFirst: clamp(rawYFirst + shift), yLast: clamp(rawYLast + shift) };
+}

@@ -15,6 +15,7 @@ import {
   SIGNIFICANCE_THRESHOLD_BU_AC,
   brandAveragesForDisplay,
   computeLinearTrend,
+  recenterTrendLineY,
 } from "./yieldCalculator.js";
 import { filenameYear, harvestedYear, formatHeaderDate, gpsCellText } from "./models.js";
 import { exportFilename } from "./xlsxBuilder.js";
@@ -519,17 +520,19 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     // version of this chart) — a neutral ink color (not the bar's own
     // hue) and hand-dashed (see drawDashedLine()) so it reads as a
     // statistical overlay on top of the bars rather than a 3rd data
-    // series.
+    // series. Recentered to the vertical middle of the chart (see
+    // recenterTrendLineY()) rather than drawn at the actual regression
+    // height — per explicit follow-up request, since real yield/moisture
+    // values sit high in a zero-baseline chart and crowded the line up
+    // against the bar tops, hard to see. The tilt/steepness is preserved
+    // exactly; only its position moves.
     const trend = computeLinearTrend(entries, valueFn);
     if (trend) {
-      const clampY = (value) => {
-        const raw = baselineY - (value / domainMax) * chartH;
-        return Math.max(chartTop, Math.min(baselineY, raw));
-      };
+      const rawYFirst = baselineY - ((trend.slope * 1 + trend.intercept) / domainMax) * chartH;
+      const rawYLast = baselineY - ((trend.slope * n + trend.intercept) / domainMax) * chartH;
       const xFirst = x + barW / 2;
       const xLast = x + (n - 1) * (barW + gap) + barW / 2;
-      const yFirst = clampY(trend.slope * 1 + trend.intercept);
-      const yLast = clampY(trend.slope * n + trend.intercept);
+      const { yFirst, yLast } = recenterTrendLineY(rawYFirst, rawYLast, chartTop, baselineY);
       doc.setDrawColor(26, 26, 25);
       doc.setLineWidth(1.25);
       drawDashedLine(xFirst, yFirst, xLast, yLast, 4, 3);

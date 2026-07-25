@@ -27,6 +27,7 @@ import {
   SIGNIFICANCE_THRESHOLD_BU_AC,
   brandAveragesForDisplay,
   computeLinearTrend,
+  recenterTrendLineY,
 } from "../../core/yieldCalculator.js";
 import { buildPdf, pdfFilename } from "../../core/pdfBuilder.js";
 import { buildXlsx, createEffectiveLists } from "../../core/xlsxBuilder.js";
@@ -255,17 +256,19 @@ function buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatA
   // ink color (not the bar's own hue) so it reads as a statistical
   // overlay rather than a 3rd data series, and dashed rather than solid
   // so it's visually distinct from the solid hairline axis below it.
-  // Clamped to the plot area's own top/bottom so a steep slope's
-  // endpoints can't run off the chart.
+  // Recentered to the vertical middle of the plot area (see
+  // recenterTrendLineY() in yieldCalculator.js) rather than drawn at the
+  // actual regression height — per explicit request/follow-up, since
+  // real yield/moisture values sit high in a zero-baseline chart and
+  // crowded the line up against the bar tops, where it was easy to miss
+  // entirely. The tilt/steepness is preserved exactly; only its position
+  // moves.
   if (trend) {
-    const clampY = (value) => {
-      const raw = baselineY - (value / domainMax) * plotH;
-      return Math.max(ENTRY_BAR_PAD_TOP, Math.min(baselineY, raw));
-    };
+    const rawYFirst = baselineY - ((trend.slope * 1 + trend.intercept) / domainMax) * plotH;
+    const rawYLast = baselineY - ((trend.slope * n + trend.intercept) / domainMax) * plotH;
     const xFirst = ENTRY_BAR_PAD_X + barW / 2;
     const xLast = ENTRY_BAR_PAD_X + (n - 1) * (barW + ENTRY_BAR_GAP) + barW / 2;
-    const yFirst = clampY(trend.slope * 1 + trend.intercept);
-    const yLast = clampY(trend.slope * n + trend.intercept);
+    const { yFirst, yLast } = recenterTrendLineY(rawYFirst, rawYLast, ENTRY_BAR_PAD_TOP, baselineY);
     const trendLine = document.createElementNS(SVG_NS, "line");
     trendLine.setAttribute("x1", xFirst);
     trendLine.setAttribute("y1", yFirst);
