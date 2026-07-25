@@ -14,6 +14,7 @@ import {
   dryYieldSignificance,
   SIGNIFICANCE_THRESHOLD_BU_AC,
   brandAveragesForDisplay,
+  computeLinearTrend,
 } from "./yieldCalculator.js";
 import { filenameYear, harvestedYear, formatHeaderDate, gpsCellText } from "./models.js";
 import { exportFilename } from "./xlsxBuilder.js";
@@ -172,6 +173,27 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     let x = MARGIN;
     for (let i = 0; i < index; i++) x += allColumnWidths[i];
     return x;
+  }
+
+  // Draws a straight line as a series of short dashes — hand-rolled
+  // rather than jsPDF's native setLineDash() API, so it works with the
+  // exact same doc.line() primitive already used everywhere else in this
+  // file (and the same mocked jsPDF test doubles elsewhere in the test
+  // suite, none of which stub out setLineDash). Used by
+  // drawEntryPositionBarChart()'s trendline overlay.
+  function drawDashedLine(x1, y1, x2, y2, dashLen, gapLen) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist === 0) return;
+    const ux = dx / dist;
+    const uy = dy / dist;
+    let drawn = 0;
+    while (drawn < dist) {
+      const segEnd = Math.min(drawn + dashLen, dist);
+      doc.line(x1 + ux * drawn, y1 + uy * drawn, x1 + ux * segEnd, y1 + uy * segEnd);
+      drawn += dashLen + gapLen;
+    }
   }
 
   function drawLogo() {
@@ -474,6 +496,7 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     const maxValue = Math.max(...numeric, 0);
     const domainMax = maxValue > 0 ? maxValue * 1.08 : 1;
 
+    const chartTop = localY; // captured before localY moves on below — clamps the trendline to this chart's own plot area
     const chartH = 46;
     const gap = 2;
     const barW = Math.max((width - (n - 1) * gap) / n, 1);
@@ -490,6 +513,28 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
       const barX = x + i * (barW + gap);
       doc.rect(barX, baselineY - barH, barW, Math.max(barH, 0.5), "F");
     });
+
+    // Least-squares trendline overlay (see computeLinearTrend() in
+    // yieldCalculator.js, shared with the Plot Summary screen's own
+    // version of this chart) — a neutral ink color (not the bar's own
+    // hue) and hand-dashed (see drawDashedLine()) so it reads as a
+    // statistical overlay on top of the bars rather than a 3rd data
+    // series.
+    const trend = computeLinearTrend(entries, valueFn);
+    if (trend) {
+      const clampY = (value) => {
+        const raw = baselineY - (value / domainMax) * chartH;
+        return Math.max(chartTop, Math.min(baselineY, raw));
+      };
+      const xFirst = x + barW / 2;
+      const xLast = x + (n - 1) * (barW + gap) + barW / 2;
+      const yFirst = clampY(trend.slope * 1 + trend.intercept);
+      const yLast = clampY(trend.slope * n + trend.intercept);
+      doc.setDrawColor(26, 26, 25);
+      doc.setLineWidth(1.25);
+      drawDashedLine(xFirst, yFirst, xLast, yLast, 4, 3);
+      doc.setDrawColor(0, 0, 0);
+    }
 
     // Every bar gets its own position-number label below it — per
     // explicit request, no thinning/skipping even when there are a lot
@@ -519,7 +564,41 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     // left-justified — per explicit request.
     doc.text(caption, x + width / 2, localY, { align: "center" });
     doc.setTextColor(0, 0, 0);
-    return localY + 8 * 1.3 + 6;
+    localY += 8 * 1.3;
+
+    // Trend caption + honest caveat — per a later explicit follow-up
+    // request to show whether there's variability from first entry to
+    // last. See computeLinearTrend()'s own comment in yieldCalculator.js
+    // for why this can't cleanly separate genetic differences between
+    // hybrids from actual field/soil variability: these entries are
+    // different, non-replicated hybrids, not a repeated check planted at
+    // intervals, so the trend is presented as descriptive rather than a
+    // controlled measurement.
+    if (trend) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(70, 70, 70);
+      const sign = trend.slope >= 0 ? "+" : "−";
+      const trendCaption = `Trend: ${sign}${formatValue(Math.abs(trend.slope))} per entry (R² ${trend.r2.toFixed(2)})`;
+      doc.text(trendCaption, x + width / 2, localY, { align: "center" });
+      doc.setTextColor(0, 0, 0);
+      localY += 8 * 1.3;
+
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(6.5);
+      doc.setTextColor(120, 120, 120);
+      const disclaimerLines = doc.splitTextToSize(
+        "Reflects hybrid differences as well as field variation — not a pure soil measurement.",
+        width
+      );
+      for (const line of disclaimerLines) {
+        doc.text(line, x + width / 2, localY, { align: "center" });
+        localY += 6.5 * 1.3;
+      }
+      doc.setTextColor(0, 0, 0);
+    }
+
+    return localY + 6;
   }
 
   function drawSummaryBlock() {

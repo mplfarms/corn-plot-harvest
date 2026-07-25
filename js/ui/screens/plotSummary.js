@@ -26,6 +26,7 @@ import {
   dryYieldSignificance,
   SIGNIFICANCE_THRESHOLD_BU_AC,
   brandAveragesForDisplay,
+  computeLinearTrend,
 } from "../../core/yieldCalculator.js";
 import { buildPdf, pdfFilename } from "../../core/pdfBuilder.js";
 import { buildXlsx, createEffectiveLists } from "../../core/xlsxBuilder.js";
@@ -172,15 +173,18 @@ function buildBoxPlotSection(boxPlot) {
  * re-sorted by rank/value, since the whole point is to show the trend
  * from one end of the physical plot to the other. Entries with no value
  * for `valueFn` keep their x-slot (so the spacing/position of every
- * other bar stays meaningful) but simply draw no bar there.
+ * other bar stays meaningful) but simply draw no bar there. When `trend`
+ * is given (see computeLinearTrend()), overlays a dashed least-squares
+ * trendline across the full position range.
  * @param {import('../../core/models.js').PlotEntry[]} entries
  * @param {(entry: import('../../core/models.js').PlotEntry) => number|null} valueFn
  * @param {string} barClass
  * @param {string} ariaTitle
  * @param {(v: number) => string} formatAria
+ * @param {{slope: number, intercept: number, n: number, r2: number}|null} trend
  * @returns {SVGSVGElement}
  */
-function buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatAria) {
+function buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatAria, trend) {
   const values = entries.map((entry) => valueFn(entry));
   const numeric = values.filter((v) => v !== null && !Number.isNaN(v));
   const maxValue = numeric.length > 0 ? Math.max(...numeric, 0) : 0;
@@ -247,6 +251,30 @@ function buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatA
     svg.appendChild(text);
   });
 
+  // Dashed least-squares trendline, drawn on top of the bars — a neutral
+  // ink color (not the bar's own hue) so it reads as a statistical
+  // overlay rather than a 3rd data series, and dashed rather than solid
+  // so it's visually distinct from the solid hairline axis below it.
+  // Clamped to the plot area's own top/bottom so a steep slope's
+  // endpoints can't run off the chart.
+  if (trend) {
+    const clampY = (value) => {
+      const raw = baselineY - (value / domainMax) * plotH;
+      return Math.max(ENTRY_BAR_PAD_TOP, Math.min(baselineY, raw));
+    };
+    const xFirst = ENTRY_BAR_PAD_X + barW / 2;
+    const xLast = ENTRY_BAR_PAD_X + (n - 1) * (barW + ENTRY_BAR_GAP) + barW / 2;
+    const yFirst = clampY(trend.slope * 1 + trend.intercept);
+    const yLast = clampY(trend.slope * n + trend.intercept);
+    const trendLine = document.createElementNS(SVG_NS, "line");
+    trendLine.setAttribute("x1", xFirst);
+    trendLine.setAttribute("y1", yFirst);
+    trendLine.setAttribute("x2", xLast);
+    trendLine.setAttribute("y2", yLast);
+    trendLine.setAttribute("class", "entry-bar-trend-line");
+    svg.appendChild(trendLine);
+  }
+
   return svg;
 }
 
@@ -254,7 +282,16 @@ function buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatA
  * A standalone card — same "window" pattern as the Dry Yield Summary
  * card right above it — for one entry-position bar chart, per explicit
  * request: "add the Yield by Position and Moisture by Position graphs,
- * each in a separate window, below the Dry Yield Summary window."
+ * each in a separate window, below the Dry Yield Summary window." Also
+ * overlays a least-squares trendline (see computeLinearTrend()) when
+ * there's enough data to fit one, per a later explicit follow-up request
+ * to show whether there's variability in the plot from first entry to
+ * last — with an honest caption note, since these entries are different,
+ * non-replicated hybrids rather than a repeated check planted at
+ * intervals: the trend can't cleanly separate genetic yield/moisture
+ * differences between hybrids from actual field/soil variability, so
+ * it's presented as a descriptive summary rather than a controlled
+ * measurement.
  * @param {import('../../core/models.js').PlotEntry[]} entries
  * @param {(entry: import('../../core/models.js').PlotEntry) => number|null} valueFn
  * @param {string} barClass
@@ -270,10 +307,24 @@ function buildEntryPositionCard(entries, valueFn, barClass, title, formatCaption
     numeric.length > 0
       ? `Low ${formatCaption(Math.min(...numeric))} • High ${formatCaption(Math.max(...numeric))}`
       : "No entries with complete data yet.";
+
+  const trend = computeLinearTrend(entries, valueFn);
+  const trendCaption = trend
+    ? `Trend: ${trend.slope >= 0 ? "+" : "−"}${formatCaption(Math.abs(trend.slope))} per entry (R² ${trend.r2.toFixed(2)})`
+    : null;
+
   return h("section", { className: "card" }, [
     h("h3", { className: "section-header" }, title),
-    buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatAria),
+    buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatAria, trend),
     h("p", { className: "box-plot-caption" }, caption),
+    trendCaption ? h("p", { className: "box-plot-caption entry-bar-trend-caption" }, trendCaption) : null,
+    trendCaption
+      ? h(
+          "p",
+          { className: "entry-bar-trend-disclaimer" },
+          "Reflects hybrid differences as well as field variation — not a pure soil measurement."
+        )
+      : null,
   ]);
 }
 
