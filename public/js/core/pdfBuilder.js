@@ -41,13 +41,18 @@ const LEGEND_ITEMS = [
 // Midwest green, this app's original default accent, before NC+ existed).
 const DEFAULT_BOX_PLOT_RGB = [9, 69, 44];
 
-// Fixed dark blue for the Moisture by Entry Position bar chart (see
-// drawEntryPositionBarChart() below) — per explicit request, this one
-// deliberately does NOT follow the brand accent the way the Dry Yield
-// Distribution box and the Yield by Entry Position bars do. Reuses the
-// same navy already used for the sign-in splash screen's header/footer
-// bars (see .launch-header-bar in styles.css).
-const MOISTURE_BAR_RGB = [12, 35, 54];
+// Fixed colors for the two entry-position bar charts (see
+// drawEntryPositionBarChart() below) — per explicit request, both now use
+// one fixed color each across all 3 Brand Views instead of following the
+// active brand's own accent (the Dry Yield Distribution box above them
+// still does that via boxAccentRgb(); only these two bar charts changed).
+// Yield uses Midwest's own `highlight` brand color (#FEBE10 — see
+// BRANDS.midwestSeedGenetics.highlight in brand.js); Moisture uses NC+'s
+// own `chrome` brand color (#215AA8 — see BRANDS.ncPlus.chrome in
+// brand.js). Both match the on-screen .entry-bar-yield/.entry-bar-moisture
+// CSS rules in styles.css.
+const YIELD_BAR_RGB = [254, 190, 16];
+const MOISTURE_BAR_RGB = [33, 90, 168];
 
 /**
  * @param {string} hex e.g. "#09452C"
@@ -407,7 +412,10 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     const caption = `Min ${min.toFixed(1)}  •  Q1 ${q1.toFixed(1)}  •  Median ${median.toFixed(1)}  •  Q3 ${q3.toFixed(
       1
     )}  •  Max ${max.toFixed(1)} bu/ac`;
-    doc.text(caption, MARGIN, y);
+    // Centered under the chart (matches the Plot Summary screen's own
+    // .box-plot-caption, which is already centered via CSS) rather than
+    // left-justified at the margin — per explicit request.
+    doc.text(caption, MARGIN + tableWidth / 2, y, { align: "center" });
     doc.setTextColor(0, 0, 0);
     y += 8 * 1.3 + 6;
   }
@@ -483,30 +491,33 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
       doc.rect(barX, baselineY - barH, barW, Math.max(barH, 0.5), "F");
     });
 
-    // Thin the x-axis position-number labels so they don't collide when
-    // there are many entries — always keep the first and last position,
-    // plus an evenly spaced handful in between. maxLabels scales with
-    // this chart's own column width (now roughly half the page since the
-    // two charts sit side by side), not the full table width.
-    const maxLabels = Math.max(4, Math.floor(width / 28));
-    const labelStep = Math.max(1, Math.ceil(n / maxLabels));
+    // Every bar gets its own position-number label below it — per
+    // explicit request, no thinning/skipping even when there are a lot
+    // of entries (an earlier build thinned these out to avoid crowding;
+    // that's no longer what's wanted here).
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
     doc.setTextColor(120, 120, 120);
     values.forEach((v, i) => {
-      if (i !== 0 && i !== n - 1 && i % labelStep !== 0) return;
       const labelX = x + i * (barW + gap) + barW / 2;
       doc.text(String(i + 1), labelX, baselineY + 8, { align: "center" });
     });
     doc.setTextColor(0, 0, 0);
 
-    localY = baselineY + 14;
+    // A bit more breathing room between the position-number row and the
+    // Low/High caption below it than the box plot's own caption gets —
+    // per explicit request (was baselineY + 14, tight enough that the
+    // two lines almost ran together).
+    localY = baselineY + 20;
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(90, 90, 90);
     const caption = `Low ${formatValue(Math.min(...numeric))}  •  High ${formatValue(Math.max(...numeric))}`;
-    doc.text(caption, x, localY);
+    // Centered under this chart's own column (matches the Plot Summary
+    // screen's .box-plot-caption, already centered via CSS) rather than
+    // left-justified — per explicit request.
+    doc.text(caption, x + width / 2, localY, { align: "center" });
     doc.setTextColor(0, 0, 0);
     return localY + 8 * 1.3 + 6;
   }
@@ -558,7 +569,7 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
           allEntries,
           dryYield,
           "Yield by Entry Position",
-          boxAccentRgb(),
+          YIELD_BAR_RGB,
           (v) => `${v.toFixed(1)} bu/ac`
         );
         const moistureChartEndY = drawEntryPositionBarChart(

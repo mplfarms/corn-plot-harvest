@@ -2108,24 +2108,23 @@ button.summary-header-card {
   font-size: 8px;
 }
 
-/* Same shaded color as the box-and-whisker's own box (including NC+'s
-   chrome-blue override below) — solid fill here rather than translucent,
-   since a single filled bar reads more clearly than a translucent one. */
+/* Fixed Midwest gold regardless of brand — per explicit request, both
+   entry-position bar charts now use one fixed color each across all 3
+   Brand Views instead of following the active brand's own accent (the
+   box-and-whisker chart right above them still does that; only these two
+   bar charts changed). Matches Midwest's own `highlight` brand color
+   (#FEBE10 — see BRANDS.midwestSeedGenetics.highlight in brand.js) and
+   the PDF export's matching YIELD_BAR_RGB constant. */
 .entry-bar-yield {
-  fill: var(--accent-strong);
+  fill: #febe10;
 }
 
-[data-brand="ncPlus"] .entry-bar-yield {
-  fill: var(--chrome);
-}
-
-/* Fixed dark blue regardless of brand — per explicit request, this one
-   deliberately does NOT follow the brand accent the way the yield bars
-   and box-plot do. Reuses the same navy as the sign-in splash screen's
-   header/footer bars (see .launch-header-bar) and the PDF export's
-   matching MOISTURE_BAR_RGB constant. */
+/* Fixed NC+ blue regardless of brand — per explicit request. Matches
+   NC+'s own `chrome` brand color (#215AA8 — see
+   BRANDS.ncPlus.chrome in brand.js) and the PDF export's matching
+   MOISTURE_BAR_RGB constant. */
 .entry-bar-moisture {
-  fill: #0c2336;
+  fill: #215aa8;
 }
 
 .brand-average-list {

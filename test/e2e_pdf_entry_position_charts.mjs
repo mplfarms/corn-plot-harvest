@@ -104,16 +104,16 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
     `sections drawn in order: box plot -> yield-by-position -> moisture-by-position -> brand averages (indices ${JSON.stringify({ boxIdx, yieldPosIdx, moisturePosIdx, brandIdx })})`
   );
 
-  // 9 bars each (10 entries, 1 null each). Midwest's IQR box fill also
-  // happens to use this same green (Midwest's accent color IS this app's
-  // original green), so filter out anything as wide as the IQR box —
-  // each of the 10 narrow per-entry bars is only ~tableWidth/10 wide,
-  // while the one IQR box rect spans a much wider slice of the chart.
-  const yieldBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[9,69,44]" && r.w < 100);
-  check(yieldBars.length === 9, `9 yield-by-position bars drawn (Midwest green fill), skipping the 1 null entry (got ${yieldBars.length})`);
+  // 9 bars each (10 entries, 1 null each) — identified by their fixed
+  // colors (Midwest gold for yield, NC+ blue for moisture), per explicit
+  // request that both are now fixed across all 3 Brand Views instead of
+  // following the active brand's own accent the way the box-and-whisker
+  // chart still does.
+  const yieldBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[254,190,16]");
+  check(yieldBars.length === 9, `9 yield-by-position bars drawn (fixed Midwest gold fill), skipping the 1 null entry (got ${yieldBars.length})`);
 
-  const moistureBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[12,35,54]");
-  check(moistureBars.length === 9, `9 moisture-by-position bars drawn (fixed dark blue fill), skipping the 1 null entry (got ${moistureBars.length})`);
+  const moistureBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[33,90,168]");
+  check(moistureBars.length === 9, `9 moisture-by-position bars drawn (fixed NC+ blue fill), skipping the 1 null entry (got ${moistureBars.length})`);
 
   // Bars are in PLOT POSITION order, not rank: the entry at position 3
   // (index 2 among non-null yield bars, since position 4 is null) has the
@@ -143,24 +143,58 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   check(allText.some((t) => t.includes("Low 150.0") && t.includes("High 240.0")), `yield-by-position caption shows correct low/high`);
   check(allText.some((t) => t.includes("Low 15.0") && t.includes("High 22.5")), `moisture-by-position caption shows correct low/high`);
 
+  // Position-number labels: every one of the 10 entries gets its own
+  // label below its bar (or below its empty x-slot, for the 1 null
+  // entry each chart has) — no thinning, even though 10 would have been
+  // thinned under the old maxLabels rule. Both charts' labels sit on the
+  // same row (labelY = shared baseline + 8); distinguish yield's labels
+  // from moisture's by x position (left column vs. right column).
+  const labelY = yieldBaseline + 8;
+  const midX = (yieldMaxX + moistureMinX) / 2;
+  const positionLabels = calls.text.filter(
+    (t) => Math.abs(t.y - labelY) < 0.5 && t.opts && t.opts.align === "center" && /^\d+$/.test(t.str)
+  );
+  const yieldLabels = positionLabels.filter((t) => t.x < midX);
+  const moistureLabels = positionLabels.filter((t) => t.x >= midX);
+  check(yieldLabels.length === 10, `all 10 position labels drawn under the yield-by-position chart, no thinning (got ${yieldLabels.length})`);
+  check(moistureLabels.length === 10, `all 10 position labels drawn under the moisture-by-position chart, no thinning (got ${moistureLabels.length})`);
+
+  // Spacing: a bit more room between the position-label row and the
+  // Low/High caption below it than before (was a 6pt gap, now 12pt).
+  const yieldCaptionCall = calls.text.find((t) => t.str.includes("Low 150.0"));
+  check(!!yieldCaptionCall && Math.abs(yieldCaptionCall.y - labelY - 12) < 0.01, `more vertical space between the position-label row and the Low/High caption (labelY=${labelY}, captionY=${yieldCaptionCall && yieldCaptionCall.y}, gap=${yieldCaptionCall ? (yieldCaptionCall.y - labelY).toFixed(1) : "?"})`);
+
+  // Centering: the box plot's own "Min ... Max ..." caption and both
+  // Low/High captions are now center-aligned under their chart, not
+  // left-justified at the margin.
+  const boxCaptionCall = calls.text.find((t) => t.str.includes("Min 150.0"));
+  const moistureCaptionCall = calls.text.find((t) => t.str.includes("Low 15.0"));
+  check(boxCaptionCall && boxCaptionCall.opts && boxCaptionCall.opts.align === "center", `box-and-whisker "Min/Q1/Median/Q3/Max" caption is center-aligned, not left-justified`);
+  check(yieldCaptionCall && yieldCaptionCall.opts && yieldCaptionCall.opts.align === "center", `yield-by-position "Low/High" caption is center-aligned, not left-justified`);
+  check(moistureCaptionCall && moistureCaptionCall.opts && moistureCaptionCall.opts.align === "center", `moisture-by-position "Low/High" caption is center-aligned, not left-justified`);
+
   await page.close();
 }
 
-// ---- NC+: yield-by-position bars follow the box plot's chrome-blue override; moisture stays fixed dark blue ----
-{
+// ---- NC+ and Crow's: both fixed colors hold regardless of the active brand ----
+for (const [brandId, brandName] of [
+  ["ncPlus", "NC+ Hybrids"],
+  ["crows", "Republic Shield Crow's Genetics"],
+]) {
   const page = await browser.newPage();
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.goto(`${BASE}/index.html`);
-  const calls = await buildPdfCalls(page, "ncPlus", "NC+ Hybrids");
+  const calls = await buildPdfCalls(page, brandId, brandName);
 
-  // Same collision as the Midwest case above — NC+'s IQR box fill also
-  // uses this chrome blue (that's the whole point of the override), so
-  // exclude the one wide IQR-box rect by width.
-  const yieldBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[33,90,168]" && r.w < 100);
-  check(yieldBars.length === 9, `NC+'s yield-by-position bars use chrome blue, matching its box-plot override (got ${yieldBars.length} matching rects)`);
+  const yieldBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[254,190,16]");
+  check(yieldBars.length === 9, `${brandId}'s yield-by-position bars are still the fixed Midwest gold, unaffected by brand (got ${yieldBars.length} matching rects)`);
 
-  const moistureBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[12,35,54]");
-  check(moistureBars.length === 9, `NC+'s moisture-by-position bars are still the fixed dark blue, unaffected by brand (got ${moistureBars.length} matching rects)`);
+  // On NC+ specifically, the box-and-whisker's own IQR fill ALSO uses
+  // this same blue (that's the whole point of its chrome-blue override —
+  // see boxAccentRgb()), so exclude the one wide IQR-box rect by width
+  // to count only the 9 narrow per-entry moisture bars.
+  const moistureBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[33,90,168]" && r.w < 100);
+  check(moistureBars.length === 9, `${brandId}'s moisture-by-position bars are still the fixed NC+ blue, unaffected by brand (got ${moistureBars.length} matching rects)`);
 
   await page.close();
 }
@@ -176,8 +210,11 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   check(allText.some((t) => t.includes("Yield by Entry Position:")), `no-Brand-View PDF still includes "Yield by Entry Position:"`);
   check(allText.some((t) => t.includes("Moisture by Entry Position:")), `no-Brand-View PDF still includes "Moisture by Entry Position:"`);
 
-  const yieldBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[9,69,44]" && r.w < 100);
-  check(yieldBars.length === 9, `no-Brand-View falls back to the default green for yield-by-position bars (got ${yieldBars.length})`);
+  const yieldBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[254,190,16]");
+  check(yieldBars.length === 9, `no-Brand-View still uses the fixed Midwest gold for yield-by-position bars (got ${yieldBars.length})`);
+
+  const moistureBars = calls.rect.filter((r) => r.style === "F" && JSON.stringify(r.fill) === "[33,90,168]");
+  check(moistureBars.length === 9, `no-Brand-View still uses the fixed NC+ blue for moisture-by-position bars (got ${moistureBars.length})`);
 
   await page.close();
 }

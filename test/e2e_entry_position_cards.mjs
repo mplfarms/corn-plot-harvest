@@ -113,13 +113,15 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   const moistureBarCount = await page.$$eval(".entry-bar-moisture", (els) => els.length);
   check(moistureBarCount === 9, `moisture chart draws 9 bars, skipping the 1 null entry (got ${moistureBarCount})`);
 
-  // Colors: yield bar matches the box-and-whisker box color on Midwest; moisture is the fixed dark blue.
+  // Colors: yield bar is the fixed Midwest gold (#FEBE10), moisture bar
+  // is the fixed NC+ blue (#215AA8) — per explicit request, both are now
+  // fixed across all 3 Brand Views instead of following the active
+  // brand's own accent the way the box-and-whisker chart still does.
   const yieldFill = await page.$eval(".entry-bar-yield", (el) => getComputedStyle(el).fill);
-  const boxFill = await page.$eval(".box-plot-box", (el) => getComputedStyle(el).fill);
-  check(yieldFill === boxFill, `yield bar color matches the box-and-whisker box color on Midwest (got "${yieldFill}" vs "${boxFill}")`);
+  check(yieldFill === "rgb(254, 190, 16)", `yield bar is the fixed Midwest gold #FEBE10 on Midwest (got "${yieldFill}")`);
 
   const moistureFill = await page.$eval(".entry-bar-moisture", (el) => getComputedStyle(el).fill);
-  check(moistureFill === "rgb(12, 35, 54)", `moisture bar is the fixed dark blue #0c2336 (got "${moistureFill}")`);
+  check(moistureFill === "rgb(33, 90, 168)", `moisture bar is the fixed NC+ blue #215AA8 on Midwest (got "${moistureFill}")`);
 
   // Captions.
   const yieldCaption = await page.evaluate(
@@ -135,17 +137,40 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   await page.close();
 }
 
-// ---- NC+: yield bar follows the box-plot's chrome-blue override; moisture stays fixed dark blue ----
+// ---- NC+ and Crow's: both fixed colors hold across every Brand View, unaffected by the active brand ----
+for (const [brandId, brandName] of [
+  ["ncPlus", "NC+ Hybrids"],
+  ["crows", "Republic Shield Crow's Genetics"],
+]) {
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
+  await seedAndOpenSummary(page, brandId, brandName, ENTRIES);
+
+  const yieldFill = await page.$eval(".entry-bar-yield", (el) => getComputedStyle(el).fill);
+  check(yieldFill === "rgb(254, 190, 16)", `${brandId}'s yield bar is still the fixed Midwest gold, unaffected by brand (got "${yieldFill}")`);
+
+  const moistureFill = await page.$eval(".entry-bar-moisture", (el) => getComputedStyle(el).fill);
+  check(moistureFill === "rgb(33, 90, 168)", `${brandId}'s moisture bar is still the fixed NC+ blue, unaffected by brand (got "${moistureFill}")`);
+
+  await page.close();
+}
+
+// ---- Position labels: every bar gets its own number below it, even with a lot of entries ----
 {
   const page = await browser.newPage();
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
-  await seedAndOpenSummary(page, "ncPlus", "NC+ Hybrids", ENTRIES);
+  const manyEntries = Array.from({ length: 18 }, (_, i) => ({ y: 150 + i, m: 15 + i * 0.2 }));
+  await seedAndOpenSummary(page, "midwestSeedGenetics", "Midwest Seed Genetics", manyEntries);
 
-  const yieldFill = await page.$eval(".entry-bar-yield", (el) => getComputedStyle(el).fill);
-  check(yieldFill === "rgb(33, 90, 168)", `NC+'s yield bar uses chrome blue, matching its box-plot override (got "${yieldFill}")`);
-
-  const moistureFill = await page.$eval(".entry-bar-moisture", (el) => getComputedStyle(el).fill);
-  check(moistureFill === "rgb(12, 35, 54)", `NC+'s moisture bar is still the fixed dark blue, unaffected by brand (got "${moistureFill}")`);
+  const labelCounts = await page.$$eval(".card", (cards) =>
+    cards
+      .filter((c) => c.querySelector(".entry-bar-svg"))
+      .map((c) => c.querySelectorAll(".entry-bar-axis-label").length)
+  );
+  check(
+    labelCounts.length === 2 && labelCounts.every((n) => n === 18),
+    `every one of the 18 entries gets its own position-number label below it, on both charts, no thinning (got ${JSON.stringify(labelCounts)})`
+  );
 
   await page.close();
 }
