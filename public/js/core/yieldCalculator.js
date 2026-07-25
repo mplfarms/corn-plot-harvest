@@ -288,3 +288,63 @@ export function brandAveragesForDisplay(byBrand, leadBrandName) {
     leadBrandName
   );
 }
+
+// A trendline needs at least this many (position, value) points before
+// it's worth fitting/drawing at all — 2 points always fit a line
+// perfectly (slope is meaningless, R² is always 1), so 3 is the minimum
+// that gives even one degree of freedom for the fit to say anything.
+// This is a floor for "can compute a line" only — see
+// computeLinearTrend()'s own comment for the more important caveat about
+// what this line can and can't tell you.
+export const MIN_TREND_POINTS = 3;
+
+/**
+ * Ordinary least-squares linear regression of value vs. entry position
+ * (1-indexed, in original plot/planting order), skipping entries with no
+ * value. Shared by the Plot Summary screen (see buildEntryPositionCard()
+ * in plotSummary.js) and the PDF export (see drawEntryPositionBarChart()
+ * in pdfBuilder.js) so both compute the identical fit.
+ *
+ * Important caveat, since this gets surfaced to the user alongside the
+ * fit itself (see the "Reflects hybrid differences as well as field
+ * variation" caption note at both call sites): each entry here is a
+ * DIFFERENT, non-replicated hybrid — there's no repeated "check" hybrid
+ * planted at intervals across the plot, and no randomization/replication
+ * of hybrid order. That means a position-vs-value trend can't cleanly
+ * separate genetic yield/moisture differences between hybrids from
+ * actual field/soil variability the way a proper checked or replicated
+ * trial design could; it's a statistically valid description of the
+ * data exactly as plotted, but not a controlled measurement of the field
+ * itself. Callers should present it accordingly rather than implying a
+ * causal "this end of the field is better" conclusion.
+ *
+ * @param {import('./models.js').PlotEntry[]} entries
+ * @param {(entry: import('./models.js').PlotEntry) => number|null} valueFn
+ * @returns {{slope: number, intercept: number, n: number, r2: number}|null}
+ */
+export function computeLinearTrend(entries, valueFn) {
+  const points = [];
+  entries.forEach((entry, idx) => {
+    const v = valueFn(entry);
+    if (v !== null && !Number.isNaN(v)) points.push({ x: idx + 1, y: v });
+  });
+  if (points.length < MIN_TREND_POINTS) return null;
+
+  const n = points.length;
+  const meanX = points.reduce((s, p) => s + p.x, 0) / n;
+  const meanY = points.reduce((s, p) => s + p.y, 0) / n;
+  let ssXY = 0;
+  let ssXX = 0;
+  let ssYY = 0;
+  for (const p of points) {
+    ssXY += (p.x - meanX) * (p.y - meanY);
+    ssXX += (p.x - meanX) * (p.x - meanX);
+    ssYY += (p.y - meanY) * (p.y - meanY);
+  }
+  if (ssXX === 0) return null;
+
+  const slope = ssXY / ssXX;
+  const intercept = meanY - slope * meanX;
+  const r2 = ssYY === 0 ? 0 : (ssXY * ssXY) / (ssXX * ssYY);
+  return { slope, intercept, n, r2 };
+}
