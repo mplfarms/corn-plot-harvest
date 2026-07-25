@@ -578,9 +578,13 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     // intervals, so the trend is presented as descriptive rather than a
     // controlled measurement.
     if (trend) {
-      doc.setFont("helvetica", "bold");
+      // Same font/weight/color as the Low/High caption right above it
+      // (helvetica normal, 8pt, [90,90,90]) — per explicit request, so
+      // the two captions read as one consistent style rather than the
+      // trend line looking like a different kind of label.
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
-      doc.setTextColor(70, 70, 70);
+      doc.setTextColor(90, 90, 90);
       const sign = trend.slope >= 0 ? "+" : "−";
       const trendCaption = `Trend: ${sign}${formatValue(Math.abs(trend.slope))} per entry (R² ${trend.r2.toFixed(2)})`;
       doc.text(trendCaption, x + width / 2, localY, { align: "center" });
