@@ -2090,6 +2090,44 @@ button.summary-header-card {
   text-align: center;
 }
 
+/* ---------- Yield by Position / Moisture by Position cards ---------- */
+
+.entry-bar-svg {
+  display: block;
+  width: 100%;
+  height: 96px;
+}
+
+.entry-bar-axis-line {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.entry-bar-axis-label {
+  fill: var(--text-muted);
+  font-size: 8px;
+}
+
+/* Same shaded color as the box-and-whisker's own box (including NC+'s
+   chrome-blue override below) — solid fill here rather than translucent,
+   since a single filled bar reads more clearly than a translucent one. */
+.entry-bar-yield {
+  fill: var(--accent-strong);
+}
+
+[data-brand="ncPlus"] .entry-bar-yield {
+  fill: var(--chrome);
+}
+
+/* Fixed dark blue regardless of brand — per explicit request, this one
+   deliberately does NOT follow the brand accent the way the yield bars
+   and box-plot do. Reuses the same navy as the sign-in splash screen's
+   header/footer bars (see .launch-header-bar) and the PDF export's
+   matching MOISTURE_BAR_RGB constant. */
+.entry-bar-moisture {
+  fill: #0c2336;
+}
+
 .brand-average-list {
   list-style: none;
   margin: 0;

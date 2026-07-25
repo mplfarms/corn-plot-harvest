@@ -217,12 +217,15 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
   // Optional compact "Plot Details" block — only drawn when the user
   // answers "Yes" to the "Include Plot Details" prompt (see
   // plotSummary.js). Deliberately terse: a bold gray section label, then
-  // a 2-column grid of "Label: value" pairs at 8pt (each value clipped to
+  // a 3-column grid of "Label: value" pairs at 8pt (each value clipped to
   // one line — this is a quick reference, not a full recap), so it adds
   // real content without eating much of the page the way a full copy of
-  // the Plot Details screen would. Only ever called once, right after the
-  // title/subtitle on page 1 — startNewPage() never calls this, so it
-  // never repeats on later pages.
+  // the Plot Details screen would. 3 columns (per explicit request,
+  // narrowed down from an original 2) packs more fields into fewer rows
+  // — each value simply clips to a shorter line than it did at 2 columns,
+  // which is an acceptable trade for a "quick reference" block. Only
+  // ever called once, right after the title/subtitle on page 1 —
+  // startNewPage() never calls this, so it never repeats on later pages.
   function drawPlotDetailsHeader() {
     const fields = plotDetailsFields(header);
     if (fields.length === 0) return;
@@ -239,7 +242,8 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     doc.setTextColor(0, 0, 0);
     y += 9 * 1.15 + 4;
 
-    const colWidth = tableWidth / 2;
+    const NUM_DETAIL_COLS = 3;
+    const colWidth = tableWidth / NUM_DETAIL_COLS;
     const rowHeight = 8 * 1.6;
     let col = 0;
     let rowStartY = y;
@@ -261,12 +265,12 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
       doc.text(valueLines[0], x + labelWidth, rowStartY + 8 * 0.8);
 
       col += 1;
-      if (col > 1) {
+      if (col >= NUM_DETAIL_COLS) {
         col = 0;
         rowStartY += rowHeight;
       }
     }
-    if (col === 1) rowStartY += rowHeight;
+    if (col > 0) rowStartY += rowHeight;
 
     doc.setTextColor(0, 0, 0);
     y = rowStartY + 6;
@@ -416,32 +420,44 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
   // drawBoxPlot()'s "Dry Yield Distribution" box just above it — per
   // explicit request: on the export/print/share PDF only (the Plot
   // Summary screen itself keeps its original single box-and-whisker
-  // chart, unchanged). Entries with no value for `valueFn` keep their
-  // x-slot (so every other bar's position stays meaningful) but simply
-  // draw no bar there.
+  // chart, unchanged; it gets its own separate full-width cards instead
+  // — see buildEntryPositionCard() in plotSummary.js). Entries with no
+  // value for `valueFn` keep their x-slot (so every other bar's position
+  // stays meaningful) but simply draw no bar there.
+  //
+  // Takes an explicit (x, width, startY) rather than reading/writing the
+  // shared `y` directly, so the caller can draw two of these SIDE BY
+  // SIDE (per explicit request, to use less vertical space) instead of
+  // stacked — each instance is self-contained and returns the y just
+  // below its own caption; the caller takes the max of both before
+  // continuing.
+  // @param {number} startY
+  // @param {number} x
+  // @param {number} width
   // @param {import('./models.js').PlotEntry[]} entries
   // @param {(entry: import('./models.js').PlotEntry) => number|null} valueFn
   // @param {string} title
   // @param {[number, number, number]} barRgb
   // @param {(v: number) => string} formatValue
-  function drawEntryPositionBarChart(entries, valueFn, title, barRgb, formatValue) {
+  // @returns {number} the y position just below this chart's caption
+  function drawEntryPositionBarChart(startY, x, width, entries, valueFn, title, barRgb, formatValue) {
+    let localY = startY;
     const n = entries.length;
     const values = entries.map((entry) => valueFn(entry));
     const numeric = values.filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text(`${title}:`, MARGIN, y + 9 * 0.8);
-    y += 9 * 1.15 + 8;
+    doc.text(`${title}:`, x, localY + 9 * 0.8);
+    localY += 9 * 1.15 + 8;
 
     if (numeric.length === 0) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(120, 120, 120);
-      doc.text("No data yet.", MARGIN, y + 8 * 0.8);
+      doc.text("No data yet.", x, localY + 8 * 0.8);
       doc.setTextColor(0, 0, 0);
-      y += 8 * 1.3 + 6;
-      return;
+      return localY + 8 * 1.3 + 6;
     }
 
     // Zero-baseline, honest magnitude encoding (never truncated) — a
@@ -452,45 +468,47 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
 
     const chartH = 46;
     const gap = 2;
-    const barW = Math.max((tableWidth - (n - 1) * gap) / n, 1);
-    const baselineY = y + chartH;
+    const barW = Math.max((width - (n - 1) * gap) / n, 1);
+    const baselineY = localY + chartH;
 
     doc.setDrawColor(150, 150, 150);
     doc.setLineWidth(1);
-    doc.line(MARGIN, baselineY, MARGIN + tableWidth, baselineY);
+    doc.line(x, baselineY, x + width, baselineY);
 
     doc.setFillColor(barRgb[0], barRgb[1], barRgb[2]);
     values.forEach((v, i) => {
       if (v === null || v === undefined || Number.isNaN(v)) return;
       const barH = (v / domainMax) * chartH;
-      const x = MARGIN + i * (barW + gap);
-      doc.rect(x, baselineY - barH, barW, Math.max(barH, 0.5), "F");
+      const barX = x + i * (barW + gap);
+      doc.rect(barX, baselineY - barH, barW, Math.max(barH, 0.5), "F");
     });
 
     // Thin the x-axis position-number labels so they don't collide when
     // there are many entries — always keep the first and last position,
-    // plus an evenly spaced handful in between.
-    const maxLabels = Math.max(4, Math.floor(tableWidth / 28));
+    // plus an evenly spaced handful in between. maxLabels scales with
+    // this chart's own column width (now roughly half the page since the
+    // two charts sit side by side), not the full table width.
+    const maxLabels = Math.max(4, Math.floor(width / 28));
     const labelStep = Math.max(1, Math.ceil(n / maxLabels));
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
     doc.setTextColor(120, 120, 120);
     values.forEach((v, i) => {
       if (i !== 0 && i !== n - 1 && i % labelStep !== 0) return;
-      const x = MARGIN + i * (barW + gap) + barW / 2;
-      doc.text(String(i + 1), x, baselineY + 8, { align: "center" });
+      const labelX = x + i * (barW + gap) + barW / 2;
+      doc.text(String(i + 1), labelX, baselineY + 8, { align: "center" });
     });
     doc.setTextColor(0, 0, 0);
 
-    y = baselineY + 14;
+    localY = baselineY + 14;
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(90, 90, 90);
     const caption = `Low ${formatValue(Math.min(...numeric))}  •  High ${formatValue(Math.max(...numeric))}`;
-    doc.text(caption, MARGIN, y);
+    doc.text(caption, x, localY);
     doc.setTextColor(0, 0, 0);
-    y += 8 * 1.3 + 6;
+    return localY + 8 * 1.3 + 6;
   }
 
   function drawSummaryBlock() {
@@ -522,13 +540,38 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
       if (summary.boxPlot) {
         drawBoxPlot(summary.boxPlot);
         // Per explicit request, these two entry-position bar charts are
-        // PDF/print/share-only — the Plot Summary screen itself keeps its
-        // original single box-and-whisker chart unchanged. Gated on the
-        // same summary.boxPlot check as the box plot above (there's no
-        // point drawing an entry-position chart when there isn't even
-        // enough data for a distribution chart).
-        drawEntryPositionBarChart(allEntries, dryYield, "Yield by Entry Position", boxAccentRgb(), (v) => `${v.toFixed(1)} bu/ac`);
-        drawEntryPositionBarChart(allEntries, moisture, "Moisture by Entry Position", MOISTURE_BAR_RGB, (v) => `${v.toFixed(1)}%`);
+        // PDF/print/share-only — the Plot Summary screen itself gets its
+        // own separate full-width cards instead (see
+        // buildEntryPositionCard() in plotSummary.js). Gated on the same
+        // summary.boxPlot check as the box plot above (there's no point
+        // drawing an entry-position chart when there isn't even enough
+        // data for a distribution chart). Side by side (not stacked) —
+        // per explicit request, to use less vertical space — so both
+        // start at the same y and the block only advances past whichever
+        // one ends up taller.
+        const entryChartGap = 16;
+        const entryChartColWidth = (tableWidth - entryChartGap) / 2;
+        const yieldChartEndY = drawEntryPositionBarChart(
+          y,
+          MARGIN,
+          entryChartColWidth,
+          allEntries,
+          dryYield,
+          "Yield by Entry Position",
+          boxAccentRgb(),
+          (v) => `${v.toFixed(1)} bu/ac`
+        );
+        const moistureChartEndY = drawEntryPositionBarChart(
+          y,
+          MARGIN + entryChartColWidth + entryChartGap,
+          entryChartColWidth,
+          allEntries,
+          moisture,
+          "Moisture by Entry Position",
+          MOISTURE_BAR_RGB,
+          (v) => `${v.toFixed(1)}%`
+        );
+        y = Math.max(yieldChartEndY, moistureChartEndY);
       }
 
       // Only brands with 2+ hybrids in this plot get an average (a

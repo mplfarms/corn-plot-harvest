@@ -3,7 +3,9 @@
 // request: keep the Plot Summary SCREEN's Dry Yield Summary exactly as
 // it was (see e2e_box_plot.mjs's screen-side checks, unchanged), and add
 // these two as their own boxes (same visual treatment as the existing
-// "Dry Yield Distribution" box) to the PDF/print/share export only.
+// "Dry Yield Distribution" box) to the PDF/print/share export only —
+// drawn SIDE BY SIDE (not stacked) per a later explicit follow-up
+// request, to use less vertical space on the page.
 import { chromium } from "playwright";
 
 const BASE = "http://localhost:34205";
@@ -123,6 +125,19 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   const minH = Math.min(...heightsInOrder);
   check(heightsInOrder.indexOf(maxH) === 2, `tallest yield-by-position bar is plot position 3 (240 bu/ac) (heights=${JSON.stringify(heightsInOrder)})`);
   check(heightsInOrder.indexOf(minH) === 1, `shortest yield-by-position bar is plot position 2 (150 bu/ac) (heights=${JSON.stringify(heightsInOrder)})`);
+
+  // Side by side: the moisture chart's bars must sit entirely to the
+  // RIGHT of the yield chart's bars (non-overlapping columns), and both
+  // charts' baselines (the bottom of every bar, y + h) must land on the
+  // same row — confirming they share one horizontal row instead of being
+  // stacked vertically.
+  const yieldMaxX = Math.max(...yieldBars.map((r) => r.x + r.w));
+  const moistureMinX = Math.min(...moistureBars.map((r) => r.x));
+  check(moistureMinX >= yieldMaxX, `moisture chart's bars sit to the right of the yield chart's bars, side by side (yieldMaxX=${yieldMaxX.toFixed(1)}, moistureMinX=${moistureMinX.toFixed(1)})`);
+
+  const yieldBaseline = yieldBars[0].y + yieldBars[0].h;
+  const moistureBaseline = moistureBars[0].y + moistureBars[0].h;
+  check(Math.abs(yieldBaseline - moistureBaseline) < 0.5, `both charts share the same baseline row (yieldBaseline=${yieldBaseline.toFixed(1)}, moistureBaseline=${moistureBaseline.toFixed(1)})`);
 
   // Captions.
   check(allText.some((t) => t.includes("Low 150.0") && t.includes("High 240.0")), `yield-by-position caption shows correct low/high`);

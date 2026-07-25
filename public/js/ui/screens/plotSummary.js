@@ -21,6 +21,7 @@ import {
   rankingMetricMeta,
   valueForMetric,
   moisture,
+  dryYield,
   dryYieldSummary,
   dryYieldSignificance,
   SIGNIFICANCE_THRESHOLD_BU_AC,
@@ -49,6 +50,23 @@ const BOX_PLOT_VIEW_H = 56;
 const BOX_PLOT_PAD_X = 16;
 const BOX_PLOT_HEIGHT = 22;
 const BOX_PLOT_CAP_HEIGHT = 12;
+
+// ---- entry-position bar charts (Dry Yield / Moisture "one end of the
+// plot to the other") ----
+//
+// Each renders as its own full-width card (see buildEntryPositionCard()
+// below), placed right below the Dry Yield Summary card — per explicit
+// request. preserveAspectRatio="none" (set in buildEntryPositionBarSvg())
+// makes each SVG simply stretch to fill its own card's actual rendered
+// width, so the exact viewBox width chosen here doesn't need to match
+// any particular device's screen width.
+const ENTRY_BAR_VIEW_W = 320;
+const ENTRY_BAR_VIEW_H = 110;
+const ENTRY_BAR_PAD_X = 10;
+const ENTRY_BAR_PAD_TOP = 8;
+const ENTRY_BAR_AXIS_AREA_H = 18;
+const ENTRY_BAR_GAP = 2;
+const ENTRY_BAR_MAX_AXIS_LABELS = 12;
 
 /**
  * Builds a horizontal box-and-whisker SVG for the plot's Dry Yield
@@ -146,6 +164,121 @@ function buildBoxPlotSection(boxPlot) {
         1
       )} • Q3 ${boxPlot.q3.toFixed(1)} • Max ${boxPlot.max.toFixed(1)} bu/ac`
     ),
+  ]);
+}
+
+/**
+ * A zero-baseline vertical bar chart, one bar per entry, in the entries'
+ * ORIGINAL plot position (left-to-right = first-to-last planted) — never
+ * re-sorted by rank/value, since the whole point is to show the trend
+ * from one end of the physical plot to the other. Entries with no value
+ * for `valueFn` keep their x-slot (so the spacing/position of every
+ * other bar stays meaningful) but simply draw no bar there.
+ * @param {import('../../core/models.js').PlotEntry[]} entries
+ * @param {(entry: import('../../core/models.js').PlotEntry) => number|null} valueFn
+ * @param {string} barClass
+ * @param {string} ariaTitle
+ * @param {(v: number) => string} formatAria
+ * @returns {SVGSVGElement}
+ */
+function buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatAria) {
+  const values = entries.map((entry) => valueFn(entry));
+  const numeric = values.filter((v) => v !== null && !Number.isNaN(v));
+  const maxValue = numeric.length > 0 ? Math.max(...numeric, 0) : 0;
+  // Zero-baseline, honest magnitude encoding (never truncated) — a touch
+  // of headroom above the tallest bar so it doesn't touch the chart's
+  // top edge. Falls back to 1 when every value is 0 (or there's no data
+  // at all) to avoid a divide-by-zero collapsing every bar to 0 height.
+  const domainMax = maxValue > 0 ? maxValue * 1.08 : 1;
+
+  const trackW = ENTRY_BAR_VIEW_W - ENTRY_BAR_PAD_X * 2;
+  const plotH = ENTRY_BAR_VIEW_H - ENTRY_BAR_PAD_TOP - ENTRY_BAR_AXIS_AREA_H;
+  const baselineY = ENTRY_BAR_PAD_TOP + plotH;
+  const n = entries.length;
+  const barW = n > 0 ? Math.max((trackW - (n - 1) * ENTRY_BAR_GAP) / n, 0.75) : 0;
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${ENTRY_BAR_VIEW_W} ${ENTRY_BAR_VIEW_H}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("class", "entry-bar-svg");
+  svg.setAttribute("role", "img");
+  svg.setAttribute(
+    "aria-label",
+    n === 0
+      ? `${ariaTitle}: no entries yet`
+      : `${ariaTitle} by entry position, position 1 through ${n}: ${values
+          .map((v, i) => `position ${i + 1}: ${v === null ? "no data" : formatAria(v)}`)
+          .join(", ")}`
+  );
+
+  // Hairline baseline axis — the chart's only axis line (no gridlines,
+  // no per-bar value labels, matching the box-and-whisker chart's own
+  // restrained style).
+  const axisLine = document.createElementNS(SVG_NS, "line");
+  axisLine.setAttribute("x1", ENTRY_BAR_PAD_X);
+  axisLine.setAttribute("y1", baselineY);
+  axisLine.setAttribute("x2", ENTRY_BAR_VIEW_W - ENTRY_BAR_PAD_X);
+  axisLine.setAttribute("y2", baselineY);
+  axisLine.setAttribute("class", "entry-bar-axis-line");
+  svg.appendChild(axisLine);
+
+  // Thin the x-axis position labels out so they don't collide when there
+  // are a lot of entries — always keep the first and last position, plus
+  // an evenly spaced handful in between.
+  const labelStep = Math.max(1, Math.ceil(n / ENTRY_BAR_MAX_AXIS_LABELS));
+
+  values.forEach((v, i) => {
+    const x = ENTRY_BAR_PAD_X + i * (barW + ENTRY_BAR_GAP);
+    if (v !== null && !Number.isNaN(v)) {
+      const barH = (v / domainMax) * plotH;
+      const rect = document.createElementNS(SVG_NS, "rect");
+      rect.setAttribute("x", x);
+      rect.setAttribute("y", baselineY - barH);
+      rect.setAttribute("width", barW);
+      rect.setAttribute("height", Math.max(barH, 0.5));
+      rect.setAttribute("rx", Math.min(1.5, barW / 2));
+      rect.setAttribute("class", barClass);
+      svg.appendChild(rect);
+    }
+    const showLabel = i === 0 || i === n - 1 || i % labelStep === 0;
+    if (showLabel) {
+      const text = document.createElementNS(SVG_NS, "text");
+      text.setAttribute("x", x + barW / 2);
+      text.setAttribute("y", ENTRY_BAR_VIEW_H - 4);
+      text.setAttribute("class", "entry-bar-axis-label");
+      text.setAttribute("text-anchor", "middle");
+      text.textContent = String(i + 1);
+      svg.appendChild(text);
+    }
+  });
+
+  return svg;
+}
+
+/**
+ * A standalone card — same "window" pattern as the Dry Yield Summary
+ * card right above it — for one entry-position bar chart, per explicit
+ * request: "add the Yield by Position and Moisture by Position graphs,
+ * each in a separate window, below the Dry Yield Summary window."
+ * @param {import('../../core/models.js').PlotEntry[]} entries
+ * @param {(entry: import('../../core/models.js').PlotEntry) => number|null} valueFn
+ * @param {string} barClass
+ * @param {string} title
+ * @param {(v: number) => string} formatCaption
+ * @param {string} ariaTitle
+ * @param {(v: number) => string} formatAria
+ * @returns {HTMLElement}
+ */
+function buildEntryPositionCard(entries, valueFn, barClass, title, formatCaption, ariaTitle, formatAria) {
+  const numeric = entries.map((entry) => valueFn(entry)).filter((v) => v !== null && !Number.isNaN(v));
+  const caption =
+    numeric.length > 0
+      ? `Low ${formatCaption(Math.min(...numeric))} • High ${formatCaption(Math.max(...numeric))}`
+      : "No entries with complete data yet.";
+  return h("section", { className: "card" }, [
+    h("h3", { className: "section-header" }, title),
+    buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatAria),
+    h("p", { className: "box-plot-caption" }, caption),
   ]);
 }
 
@@ -661,6 +794,35 @@ export function render(container, params) {
       : null,
   ]);
 
+  // ---- Yield by Position / Moisture by Position cards ----
+  // Two standalone full-width cards, each below the Dry Yield Summary
+  // card — per explicit request. Gated on the same summary.boxPlot check
+  // as the box-and-whisker chart above (there's no point showing an
+  // entry-position chart when there isn't even enough data for a
+  // distribution chart).
+  const yieldPositionCard = summary.boxPlot
+    ? buildEntryPositionCard(
+        displayEntries,
+        dryYield,
+        "entry-bar-yield",
+        "Yield by Position",
+        (v) => `${v.toFixed(1)} bu/ac`,
+        "Dry yield",
+        (v) => `${v.toFixed(1)} bushels per acre`
+      )
+    : null;
+  const moisturePositionCard = summary.boxPlot
+    ? buildEntryPositionCard(
+        displayEntries,
+        moisture,
+        "entry-bar-moisture",
+        "Moisture by Position",
+        (v) => `${v.toFixed(1)}%`,
+        "Moisture",
+        (v) => `${v.toFixed(1)} percent`
+      )
+    : null;
+
   // ---- Ranked Results ----
   const meta = rankingMetricMeta[metric];
   const ranked = computeRanked(displayEntries, metric, header);
@@ -735,6 +897,8 @@ export function render(container, params) {
       detailsPanel,
       segmented,
       summaryCard,
+      yieldPositionCard,
+      moisturePositionCard,
       h("h3", { className: "section-header" }, "Ranked Results"),
       significanceLegend,
       rankedList,
