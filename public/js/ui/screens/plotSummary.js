@@ -860,17 +860,24 @@ export function render(container, params) {
         (v) => `${v.toFixed(1)} bushels per acre`
       )
     : null;
-  const moisturePositionCard = summary.boxPlot
-    ? buildEntryPositionCard(
-        displayEntries,
-        moisture,
-        "entry-bar-moisture",
-        "Moisture by Position",
-        (v) => `${v.toFixed(1)}%`,
-        "Moisture",
-        (v) => `${v.toFixed(1)} percent`
-      )
-    : null;
+  // Additionally gated on there being at least one actual moisture
+  // reading — per explicit request, a plot with no moistures at all
+  // (e.g. manual dry yields only) skips this card entirely rather than
+  // showing an empty chart. Same rule as the PDF export (see
+  // drawSummaryBlock() in pdfBuilder.js).
+  const hasAnyMoisture = displayEntries.some((entry) => moisture(entry) !== null);
+  const moisturePositionCard =
+    summary.boxPlot && hasAnyMoisture
+      ? buildEntryPositionCard(
+          displayEntries,
+          moisture,
+          "entry-bar-moisture",
+          "Moisture by Position",
+          (v) => `${v.toFixed(1)}%`,
+          "Moisture",
+          (v) => `${v.toFixed(1)} percent`
+        )
+      : null;
 
   // ---- Ranked Results ----
   const meta = rankingMetricMeta[metric];

@@ -646,8 +646,16 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
         // per explicit request, to use less vertical space — so both
         // start at the same y and the block only advances past whichever
         // one ends up taller.
+        // The moisture chart is skipped entirely when the plot has no
+        // moisture readings at all (e.g. manual dry yields only) — per
+        // explicit request, no empty "No data yet." box. Same rule as
+        // the Plot Summary screen's own Moisture by Position card (see
+        // hasAnyMoisture in plotSummary.js's render()). When it's
+        // skipped, the yield chart takes the full table width by itself
+        // instead of sitting alone in a half-width left column.
+        const hasAnyMoisture = allEntries.some((entry) => moisture(entry) !== null);
         const entryChartGap = 16;
-        const entryChartColWidth = (tableWidth - entryChartGap) / 2;
+        const entryChartColWidth = hasAnyMoisture ? (tableWidth - entryChartGap) / 2 : tableWidth;
         const yieldChartEndY = drawEntryPositionBarChart(
           y,
           MARGIN,
@@ -658,16 +666,18 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
           YIELD_BAR_RGB,
           (v) => `${v.toFixed(1)} bu/ac`
         );
-        const moistureChartEndY = drawEntryPositionBarChart(
-          y,
-          MARGIN + entryChartColWidth + entryChartGap,
-          entryChartColWidth,
-          allEntries,
-          moisture,
-          "Moisture by Entry Position",
-          MOISTURE_BAR_RGB,
-          (v) => `${v.toFixed(1)}%`
-        );
+        const moistureChartEndY = hasAnyMoisture
+          ? drawEntryPositionBarChart(
+              y,
+              MARGIN + entryChartColWidth + entryChartGap,
+              entryChartColWidth,
+              allEntries,
+              moisture,
+              "Moisture by Entry Position",
+              MOISTURE_BAR_RGB,
+              (v) => `${v.toFixed(1)}%`
+            )
+          : y;
         y = Math.max(yieldChartEndY, moistureChartEndY);
       }
 
