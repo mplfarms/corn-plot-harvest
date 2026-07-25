@@ -772,7 +772,29 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     for (let i = 0; i < cellValues.length; i++) {
+      if (i === 3) continue; // Trait — drawn separately below (may shrink/wrap)
       doc.text(cellValues[i], columnX(i + 1), y + 10 * 0.8);
+    }
+
+    // Trait cell: normally a single 10pt line like every other cell, but
+    // a long trait name (e.g. "Drought Gard VT2PRO RIB") used to overflow
+    // its 83pt column and run into the Moisture % value next to it — per
+    // explicit request, when it doesn't fit at the normal size it drops
+    // to a smaller font and wraps onto up to 2 lines inside the same row
+    // instead. Measured at the normal 10pt size (getTextWidth reads the
+    // current font), with a small right gap so even a full-width line
+    // never touches the next column.
+    const traitText = cellValues[3];
+    const traitMaxWidth = COLUMN_WIDTHS[4] - 6;
+    if (doc.getTextWidth(traitText) <= traitMaxWidth) {
+      doc.text(traitText, columnX(4), y + 10 * 0.8);
+    } else {
+      doc.setFontSize(7.5);
+      const traitLines = doc.splitTextToSize(traitText, traitMaxWidth).slice(0, 2);
+      traitLines.forEach((line, li) => {
+        doc.text(line, columnX(4), y + 6.5 + li * 8);
+      });
+      doc.setFontSize(10);
     }
     y += ROW_HEIGHT;
 
