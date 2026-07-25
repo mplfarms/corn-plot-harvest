@@ -240,6 +240,17 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     drawLogo();
 
     y = Math.max(y, MARGIN + LOGO_MAX_HEIGHT + 6);
+
+    // Light gray anchor line under the title/subtitle/logo header —
+    // originally drawn only by drawPlotDetailsHeader() (so it appeared
+    // only when "Include Plot Details" was selected); per explicit
+    // request it now prints on every PDF, details or not, as part of
+    // the header itself. drawPlotDetailsHeader() no longer draws its
+    // own line, so the two never stack.
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(MARGIN, y, MARGIN + tableWidth, y);
+    y += 10;
   }
 
   // Optional compact "Plot Details" block — only drawn when the user
@@ -258,10 +269,9 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     const fields = plotDetailsFields(header);
     if (fields.length === 0) return;
 
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.5);
-    doc.line(MARGIN, y, MARGIN + tableWidth, y);
-    y += 10;
+    // (The gray anchor line that used to lead this block moved into
+    // drawTitleAndSubtitle(), where it now prints on every PDF — see
+    // the comment there.)
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
