@@ -89,6 +89,19 @@ export function render(container) {
       p("Put simply: the shorter and narrower this whole shape is, the more consistently your hybrids performed against each other in this plot. A long whisker or wide box just means bigger differences between your best and worst — worth knowing, not necessarily a problem."),
     ]),
 
+    helpSection("The Yield & Moisture by Position Charts", [
+      p("These two bar charts show your plot in PLANTING ORDER — one bar per entry, position 1 on the left through your last entry on the right, exactly as they sit in the field. The gold chart is each entry's Dry Yield; the blue chart is its Moisture reading. An entry missing that measurement keeps its numbered slot but shows no bar, and if no entries have a moisture reading at all, the moisture chart is left out entirely."),
+      p("Where the ranked list tells you WHICH hybrids won, these charts tell you WHERE the results happened — so a run of tall bars at one end of the plot, or moisture climbing steadily from one side to the other, jumps out in a way a sorted list can't show."),
+      p("The dashed line across each chart is the trend line — a statistical best-fit through all the bars, showing the overall drift from the first entry to the last. Its caption reads like “Trend: +0.7 bu/ac per entry (R² 0.20)”:"),
+      ul([
+        "The +/- number is the average change per entry position — for example, +0.7 bu/ac per entry over 16 entries means roughly an 11 bu/ac climb from one end of the plot to the other.",
+        "R² (0 to 1) is how tightly the bars actually follow that line. Near 1, the drift is strong and steady; near 0, the line is barely a pattern at all and individual hybrids explain most of what you see.",
+        "Only the line's TILT and direction carry meaning — it's drawn across the middle of the chart for visibility, so its height above the baseline doesn't represent a value.",
+      ]),
+      p("What a trend implies: a clear slope (steeper line, higher R²) suggests something about the field itself — soil, drainage, compaction, planting conditions — changed from one end of the plot to the other, which means position, not just genetics, influenced the results. That's a reason to lean on the CV and read close rankings a little more cautiously."),
+      p("The honest caveat printed under each chart: every position holds a DIFFERENT hybrid, not a repeated check, so the trend can't fully separate field variation from the genetics of whichever hybrids happen to sit at each end. Treat it as a useful flag about the plot ground, not a soil measurement. The trend line needs at least 3 entries with data before it's drawn at all."),
+    ]),
+
     helpSection("Average By Brand", [
       p("When two or more hybrids from the same brand are entered in this plot, you'll see an average for that brand — a single-hybrid brand doesn't get an average of its own, since averaging one number isn't meaningful."),
       p("Your own selected Brand View (Midwest Seed Genetics, NC+, or Crow's) is always listed first, regardless of how its average actually compares to the others — every other brand present follows in order by average."),

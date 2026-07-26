@@ -21,6 +21,7 @@ import { promptEditUserDetails } from "../components/editUserDetailsModal.js";
 import { showToast } from "../components/toast.js";
 import { APP_VERSION } from "../../version.js";
 import { navigate, rememberedOriginFor } from "../router.js";
+import { createHybridCatalogUploadSection } from "../components/hybridCatalogUpload.js";
 
 const DELETE_ACCOUNT_ENDPOINT = "/.netlify/functions/deleteAccount";
 
@@ -256,6 +257,10 @@ export function render(container) {
           },
           "Manage Users"
         ),
+        // Hybrid Catalog upload — moved here from the All Plots (Admin)
+        // screen per explicit request (see
+        // components/hybridCatalogUpload.js for the shared section).
+        createHybridCatalogUploadSection(),
       ])
     : null;
 
