@@ -46,6 +46,20 @@ import { downloadBlob, shareOrDownload, shareOrDownloadFiles, openMailto } from 
 // ENTRY_NUM member at all.
 const METRIC_ORDER = [RankingMetric.DRY_YIELD, RankingMetric.GROSS];
 
+// Top-bar share icon (the classic box-with-up-arrow share glyph) for the
+// "share as a web page" button that sits next to the "i" help badge —
+// per explicit request. stroke="currentColor" so it matches the top
+// bar's white icon color in both themes, same convention as topBar.js's
+// barn icon (see BARN_ICON_SVG there for why this is a raw string
+// rather than createElementNS).
+const SHARE_ICON_SVG = `
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M12 3 L12 14" />
+  <path d="M8 6.5 L12 3 L16 6.5" />
+  <path d="M7 10 H5 V21 H19 V10 H17" />
+</svg>
+`.trim();
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 const BOX_PLOT_VIEW_W = 320;
 const BOX_PLOT_VIEW_H = 56;
@@ -616,10 +630,140 @@ export function render(container, params) {
     }
   }
 
+  // ---- Share as a scrollable web page (top-bar share icon) ----
+  // Builds a fully self-contained .html snapshot of THIS screen — the
+  // header card (with its plot-details recap pre-expanded), Dry Yield
+  // Summary (box-and-whisker), both entry-position charts (bars +
+  // trendline + captions), and the full Ranked Results list — and hands
+  // it straight to the OS share sheet, one tap, no menu. Per explicit
+  // request: a phone-friendly alternative to the PDF that a recipient
+  // can scroll through in any browser, with no app and no internet —
+  // the whole app stylesheet is inlined and the brand logo becomes a
+  // data: URL, so the single file is complete on its own.
+  function escapeHtml(text) {
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  async function handleShareHtml() {
+    try {
+      const freshHeader = await resolveHeaderForExport();
+
+      // The app's own stylesheet, inlined verbatim so the snapshot looks
+      // exactly like the screen. Served cache-first by the service
+      // worker, so this works fully offline too.
+      const cssResponse = await fetch("/css/styles.css");
+      if (!cssResponse.ok) throw new Error(`stylesheet returned ${cssResponse.status}`);
+      const cssText = await cssResponse.text();
+
+      const liveBody = container.querySelector(".plot-summary-screen .screen-body");
+      if (!liveBody) throw new Error("the summary is not on screen");
+      const clone = liveBody.cloneNode(true);
+
+      // Strip everything interactive-only: action buttons (Edit Plot /
+      // Share This Plot / Edit Plot Details / Assign Plot ID), the Dry
+      // Yield-Gross segmented control, the admin-edit banner, and the
+      // header card's expand chevron — none of them can do anything in
+      // a static file, so leaving them would only invite dead taps.
+      for (const selector of [".btn", ".segmented-control", ".preview-owner-banner", ".chooser-row-chevron"]) {
+        clone.querySelectorAll(selector).forEach((el) => el.remove());
+      }
+
+      // The plot-details recap is tap-to-expand on screen, which a
+      // static page can't do — ship it pre-expanded when it has real
+      // rows, drop it entirely when it'd only say "nothing entered".
+      const detailsPanelClone = clone.querySelector(".plot-details-summary-panel");
+      if (detailsPanelClone) {
+        if (detailsPanelClone.querySelector(".empty-state")) {
+          detailsPanelClone.remove();
+        } else {
+          detailsPanelClone.style.display = "";
+          detailsPanelClone.classList.add("plot-details-summary-panel-expanded");
+        }
+      }
+
+      // The header card is a real <button> on screen (it toggles that
+      // recap); neutralize the affordance in the static copy.
+      const headerCardClone = clone.querySelector(".summary-header-card");
+      if (headerCardClone) {
+        headerCardClone.removeAttribute("aria-expanded");
+        headerCardClone.removeAttribute("aria-label");
+        headerCardClone.setAttribute("disabled", "");
+      }
+
+      // The brand logo's src is an app-relative path that can't resolve
+      // from a standalone file — inline it as a data: URL (same helper
+      // the PDF export uses), or drop the image if that fails.
+      const logoImg = clone.querySelector(".summary-header-logo");
+      if (logoImg) {
+        const logoDataUrl = await getLogoDataUrl(brand).catch(() => null);
+        if (logoDataUrl) logoImg.setAttribute("src", logoDataUrl);
+        else logoImg.remove();
+      }
+
+      // Carry the CURRENT brand + theme over: applyBrandTheme() sets the
+      // brand's CSS custom properties as inline style on <html>, and
+      // theme.js sets data-theme there — copying both attributes onto
+      // the snapshot's own <html> reproduces this exact Brand View's
+      // colors (or the no-brand default) without any JS in the file.
+      const rootStyle = document.documentElement.getAttribute("style") || "";
+      const themeAttr = document.documentElement.getAttribute("data-theme");
+
+      const pageTitle = `${filenameYear(freshHeader)} Plot Summary — ${freshHeader.cooperatorName.trim() || "Untitled Plot"}`;
+      const footerBits = [
+        `Generated by Republic Regional Seed Network on ${new Date().toLocaleString()}`,
+        freshHeader.formId ? `Form ID: ${freshHeader.formId}` : null,
+      ]
+        .filter(Boolean)
+        .join("  •  ");
+
+      const html = [
+        "<!DOCTYPE html>",
+        `<html${themeAttr ? ` data-theme="${escapeHtml(themeAttr)}"` : ""} style="${escapeHtml(rootStyle)}">`,
+        "<head>",
+        '<meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        `<title>${escapeHtml(pageTitle)}</title>`,
+        `<style>${cssText}</style>`,
+        "<style>",
+        "/* snapshot-only adjustments — see handleShareHtml() in plotSummary.js */",
+        ".plot-summary-screen .screen-body { max-width: 680px; margin: 0 auto; }",
+        ".summary-header-card { cursor: default; }",
+        ".share-snapshot-footer { margin: 18px 0 8px; font-size: 0.72rem; font-style: italic; color: var(--text-muted); text-align: center; }",
+        "</style>",
+        "</head>",
+        "<body>",
+        '<div class="screen plot-summary-screen"><div class="screen-body">',
+        clone.innerHTML,
+        `<p class="share-snapshot-footer">${escapeHtml(footerBits)}</p>`,
+        "</div></div>",
+        "</body>",
+        "</html>",
+      ].join("\n");
+
+      const blob = new Blob([html], { type: "text/html" });
+      const filename = pdfFilename(freshHeader).replace(/\.pdf$/i, ".html");
+      await shareOrDownload(blob, filename, "text/html");
+    } catch (e) {
+      showToast(`Couldn't build the shareable summary: ${e.message}`, { type: "error" });
+    }
+  }
+
   const shareBtn = h(
     "button",
     { type: "button", className: "btn btn-secondary btn-block", onclick: openShareModal },
     "Share This Plot"
+  );
+
+  const shareHtmlBtn = h(
+    "button",
+    {
+      type: "button",
+      className: "top-bar-btn top-bar-btn-share",
+      "aria-label": "Share this summary as a web page",
+      title: "Share this summary as a web page",
+      onclick: handleShareHtml,
+    },
+    h("span", { className: "top-bar-share-icon", html: SHARE_ICON_SVG })
   );
 
   const helpBtn = h(
@@ -645,7 +789,9 @@ export function render(container, params) {
     title: "Plot Summary",
     onBack: () => navigate(rememberedOriginFor("plot-summary") || "workspace"),
     backLabel: "Back",
-    right: helpBtn,
+    // Share-as-web-page icon first, then the "i" help badge — the
+    // Settings gear (added by createTopBar itself) stays rightmost.
+    right: [shareHtmlBtn, helpBtn],
   });
 
   // ---- Header card ----

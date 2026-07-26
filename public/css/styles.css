@@ -298,6 +298,16 @@ a {
   line-height: 1;
 }
 
+/* Plot Summary's share-as-web-page icon (box-with-up-arrow SVG — see
+   SHARE_ICON_SVG in plotSummary.js), sitting to the LEFT of the "i"
+   help badge in the same top-bar-right slot. Same inline-flex wrapper
+   pattern as .top-bar-home-icon above. */
+.top-bar-share-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .sync-icon-synced {
   color: #4ade80;
 }
