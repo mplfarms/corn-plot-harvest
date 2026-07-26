@@ -121,6 +121,43 @@ export function companies() {
 }
 
 /**
+ * @returns {boolean} true when any catalog data at all is present
+ *   (fetched or cached). The pickers use this as the switch between
+ *   "the uploaded catalog is the source of truth" and "fall back to the
+ *   built-in default lists" — per explicit request, the original
+ *   built-in company/hybrid/trait lists (from the source xlsx this app
+ *   was originally built around) are disregarded entirely once an
+ *   uploaded catalog exists (see listsStore.js's items()).
+ */
+export function hasData() {
+  return state.rows.length > 0;
+}
+
+/**
+ * @returns {string[]} distinct trait package names across the whole
+ *   catalog, in first-seen (upload) order.
+ */
+export function traits() {
+  const seen = [];
+  for (const r of state.rows) {
+    if (!seen.some((v) => v.toLowerCase() === r.trait.toLowerCase())) seen.push(r.trait);
+  }
+  return seen;
+}
+
+/**
+ * @returns {string[]} distinct hybrid names across the whole catalog
+ *   (all companies), in first-seen (upload) order.
+ */
+export function allHybrids() {
+  const seen = [];
+  for (const r of state.rows) {
+    if (!seen.some((v) => v.toLowerCase() === r.hybrid.toLowerCase())) seen.push(r.hybrid);
+  }
+  return seen;
+}
+
+/**
  * @param {string} company
  * @returns {string[]} distinct hybrid names for that company, in
  *   first-seen (upload) order.

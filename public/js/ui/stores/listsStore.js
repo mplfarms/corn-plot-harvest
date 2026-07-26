@@ -231,17 +231,35 @@ function setCustom(next) {
 export function items(category) {
   const d = state.defaults;
   const c = state.custom;
+  // Per explicit request: once ANY admin-uploaded Hybrid Catalog data
+  // exists, the catalog is the single source of truth for the Company,
+  // Hybrid, and Trait lists — the original built-in lists (from the
+  // source xlsx this app was first built around, shipped in
+  // DefaultLists.json) are disregarded entirely. Hand-added "+ Add New"
+  // custom entries always remain. The built-in lists survive ONLY as a
+  // fallback on a device that has never had any catalog data cached
+  // (first offline run), so the pickers are never empty in the field.
+  // Seed Treatment / Collected By and the Plot Details option lists are
+  // untouched — the catalog has no data for those.
+  const catalogIsSourceOfTruth = catalogStore.hasData();
   switch (category) {
     case CATEGORY.BRAND_COMPANY:
       return orderCompaniesForBrandView(
-        dedupeCaseInsensitive([...d.companies, ...c.companies, ...catalogStore.companies()])
+        dedupeCaseInsensitive([
+          ...(catalogIsSourceOfTruth ? [] : d.companies),
+          ...c.companies,
+          ...catalogStore.companies(),
+        ])
       );
     case CATEGORY.HYBRID: {
       const allCustomHybrids = Object.values(c.hybridsByBrand).flat();
-      return [...d.hybrids, ...allCustomHybrids];
+      return dedupeCaseInsensitive([
+        ...(catalogIsSourceOfTruth ? catalogStore.allHybrids() : d.hybrids),
+        ...allCustomHybrids,
+      ]);
     }
     case CATEGORY.TRAIT:
-      return [...d.traits, ...c.traits];
+      return dedupeCaseInsensitive([...(catalogIsSourceOfTruth ? catalogStore.traits() : d.traits), ...c.traits]);
     case CATEGORY.SEED_TREATMENT:
       return [...d.seedTreatments, ...c.seedTreatments];
     case CATEGORY.COLLECTED_BY:
@@ -264,16 +282,26 @@ export function hybridItems(forBrand) {
     (b) => b.toLowerCase() === brand.toLowerCase()
   );
   let base = isDefaultBrand ? d.hybrids : [];
+  const fromCatalog = catalogStore.hybridsForCompany(brand);
+  // Per explicit request, once the admin-uploaded Hybrid Catalog covers
+  // a house brand (via the "MW / NC / CR" alias expansion — see
+  // hybridCatalogImport.js), the catalog REPLACES the built-in default
+  // hybrid list for that brand entirely — only the upload's hybrids are
+  // offered, so every pickable house hybrid has real Trait/RM data
+  // behind it. The built-in list remains ONLY as an offline-safe
+  // fallback for a device that has never had any catalog data cached.
+  if (isDefaultBrand && fromCatalog.length > 0) base = [];
   // Midwest Seed Genetics / NC+ Hybrids' shared catalog mixes a few
   // different in-house numbering schemes; only the "<RM>-<sequence>"
   // coded entries are kept for these two brands (see
   // HYBRID_HYPHEN_ONLY_BRANDS and parseHybridRelativeMaturity below) so
   // the list — and RM defaulting — only surfaces hybrids whose RM is
-  // actually known.
+  // actually known. Applies to the built-in fallback list only — an
+  // uploaded catalog's own names are trusted as-is (e.g. "EX8636
+  // VT2PRIB" has no hyphen code but carries explicit RM/Trait data).
   const hyphenOnly = HYBRID_HYPHEN_ONLY_BRANDS.some((b) => b.toLowerCase() === brand.toLowerCase());
   if (hyphenOnly) base = base.filter((h) => h.includes("-"));
   const custom = c.hybridsByBrand[brand] || c.hybridsByBrand[forBrand] || [];
-  const fromCatalog = catalogStore.hybridsForCompany(brand);
   return dedupeCaseInsensitive([...base, ...custom, ...fromCatalog]);
 }
 
