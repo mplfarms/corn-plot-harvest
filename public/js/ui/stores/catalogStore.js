@@ -121,6 +121,62 @@ export function companies() {
 }
 
 /**
+ * Shared "RM first" display ordering for hybrid-name lists — per
+ * explicit request: primary sort is RM ascending; hybrids sharing the
+ * same base code (the part before the first space — e.g. "18-88 TRERIB"
+ * and "18-88 VT2PRIB" are two trait versions of the same 18-88 base)
+ * stay TOGETHER, ordered among themselves alphabetically by trait name;
+ * names with no known RM sink to the end in their original order. Used
+ * by hybridsForCompany()/allHybrids() below and by listsStore.js's
+ * hybridItems()/items(HYBRID) so every hybrid list in the app (pickers
+ * and the exported form's dropdown sheet alike) shares one ordering.
+ *
+ * @param {string[]} names distinct hybrid names
+ * @param {(name: string) => {rm: number|null, trait: string}} keyFor
+ *   resolves a name's RM (null when unknown) and its alphabetically
+ *   FIRST trait name ("" when unknown)
+ * @returns {string[]} a new sorted array
+ */
+export function sortHybridNamesForDisplay(names, keyFor) {
+  return names
+    .map((name, i) => {
+      const { rm, trait } = keyFor(name);
+      return {
+        name,
+        i,
+        rm: rm === null || rm === undefined || Number.isNaN(rm) ? Infinity : rm,
+        base: String(name).trim().split(/\s+/)[0].toLowerCase(),
+        trait: String(trait || ""),
+      };
+    })
+    .sort((a, b) => {
+      if (a.rm !== b.rm) return a.rm - b.rm;
+      if (a.base !== b.base) return a.base < b.base ? -1 : 1;
+      const t = a.trait.localeCompare(b.trait);
+      if (t !== 0) return t;
+      if (a.name !== b.name) return a.name < b.name ? -1 : 1;
+      return a.i - b.i; // stable fallback (also the unknown-RM tail's order)
+    })
+    .map((e) => e.name);
+}
+
+/**
+ * Any-company lookup for one hybrid name — the flat all-hybrids list
+ * (the exported form's dropdown sheet) has no company context, so its
+ * sort keys come from the name's first matching rows regardless of
+ * company.
+ * @param {string} name
+ * @returns {{rm: number|null, trait: string}}
+ */
+export function hybridNameSortInfo(name) {
+  const n = String(name || "").trim().toLowerCase();
+  const rows = state.rows.filter((r) => r.hybrid.toLowerCase() === n);
+  if (rows.length === 0) return { rm: null, trait: "" };
+  const traits = rows.map((r) => r.trait).sort((a, b) => a.localeCompare(b));
+  return { rm: rows[0].rm, trait: traits[0] };
+}
+
+/**
  * @returns {boolean} true when any catalog data at all is present
  *   (fetched or cached). The pickers use this as the switch between
  *   "the uploaded catalog is the source of truth" and "fall back to the
@@ -154,7 +210,8 @@ export function allHybrids() {
   for (const r of state.rows) {
     if (!seen.some((v) => v.toLowerCase() === r.hybrid.toLowerCase())) seen.push(r.hybrid);
   }
-  return seen;
+  // Same RM-first display order as every other hybrid list.
+  return sortHybridNamesForDisplay(seen, hybridNameSortInfo);
 }
 
 /**
@@ -170,7 +227,13 @@ export function hybridsForCompany(company) {
     if (r.company.toLowerCase() !== c) continue;
     if (!seen.some((v) => v.toLowerCase() === r.hybrid.toLowerCase())) seen.push(r.hybrid);
   }
-  return seen;
+  // RM-first display order (see sortHybridNamesForDisplay above) — per
+  // explicit request, replacing plain upload order.
+  return sortHybridNamesForDisplay(seen, (name) => {
+    const rows = rowsForHybrid(company, name);
+    const traits = rows.map((r) => r.trait).sort((a, b) => a.localeCompare(b));
+    return { rm: rows.length ? rows[0].rm : null, trait: traits[0] || "" };
+  });
 }
 
 /**

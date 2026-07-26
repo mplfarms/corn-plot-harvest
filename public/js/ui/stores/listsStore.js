@@ -253,10 +253,20 @@ export function items(category) {
       );
     case CATEGORY.HYBRID: {
       const allCustomHybrids = Object.values(c.hybridsByBrand).flat();
-      return dedupeCaseInsensitive([
-        ...(catalogIsSourceOfTruth ? catalogStore.allHybrids() : d.hybrids),
-        ...allCustomHybrids,
-      ]);
+      // RM-first display order across the whole flat list too (per
+      // explicit request, "all hybrid lists") — custom names fall back
+      // to the RM parsed from the name itself, and sink to the end when
+      // even that's unknown.
+      return catalogStore.sortHybridNamesForDisplay(
+        dedupeCaseInsensitive([
+          ...(catalogIsSourceOfTruth ? catalogStore.allHybrids() : d.hybrids),
+          ...allCustomHybrids,
+        ]),
+        (name) => {
+          const info = catalogStore.hybridNameSortInfo(name);
+          return { rm: info.rm !== null ? info.rm : parseHybridRelativeMaturity(name), trait: info.trait };
+        }
+      );
     }
     case CATEGORY.TRAIT:
       return dedupeCaseInsensitive([...(catalogIsSourceOfTruth ? catalogStore.traits() : d.traits), ...c.traits]);
@@ -302,7 +312,23 @@ export function hybridItems(forBrand) {
   const hyphenOnly = HYBRID_HYPHEN_ONLY_BRANDS.some((b) => b.toLowerCase() === brand.toLowerCase());
   if (hyphenOnly) base = base.filter((h) => h.includes("-"));
   const custom = c.hybridsByBrand[brand] || c.hybridsByBrand[forBrand] || [];
-  return dedupeCaseInsensitive([...base, ...custom, ...fromCatalog]);
+  // RM-first display order (see catalogStore.sortHybridNamesForDisplay
+  // — RM ascending; same-base trait versions kept together, ordered by
+  // trait name) — per explicit request, "all hybrid lists". Catalog RM/
+  // trait data drives the key when this brand has catalog rows; the
+  // built-in fallback list and custom names fall back to the RM parsed
+  // from the name itself, and sink to the end when even that's unknown.
+  return catalogStore.sortHybridNamesForDisplay(
+    dedupeCaseInsensitive([...base, ...custom, ...fromCatalog]),
+    (name) => {
+      const catalogRm = catalogStore.rmForHybrid(brand, name);
+      const traits = catalogStore.traitsForHybrid(brand, name).slice().sort((a, b) => a.localeCompare(b));
+      return {
+        rm: catalogRm !== null ? catalogRm : parseHybridRelativeMaturity(name),
+        trait: traits[0] || "",
+      };
+    }
+  );
 }
 
 /**
