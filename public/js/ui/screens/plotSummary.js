@@ -417,13 +417,17 @@ export function render(container, params) {
     );
   }
 
+  // Trimmed to 3 actions per explicit request: the PDF and XLSX rows
+  // were relabeled ("Share / Print ..."), Seedware kept as-is, and the
+  // separate "Print Ranked Results" and "Email XLSX to ... Operations"
+  // rows removed outright (their handlers — handlePrint/handleEmailXlsx
+  // — are kept below in case they're wanted back; the share sheet
+  // reachable from the PDF/XLSX rows covers printing and emailing).
   function openShareModal() {
     const body = h("div", { className: "share-menu-panel share-menu-panel-modal" }, [
-      menuAction("Export / Share PDF (Ranked Results)", handleExportPdf),
-      menuAction("Export / Share XLSX (Full Form)", handleExportXlsx),
+      menuAction("Share / Print PDF Summary", handleExportPdf),
+      menuAction("Share / Print Excel Plot Form", handleExportXlsx),
       menuAction("Export for Seedware", handleExportSeedware),
-      menuAction("Print Ranked Results", handlePrint),
-      menuAction(`Email XLSX to ${brand ? brand.displayName : "Operations"} Operations`, handleEmailXlsx),
     ]);
     activeShareModal = showCustomModal({
       title: "Share This Plot",
