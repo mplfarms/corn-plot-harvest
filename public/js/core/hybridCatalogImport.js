@@ -28,6 +28,37 @@ const HYBRID_HEADER_KEYWORDS = ["hybrid"];
 const TRAIT_HEADER_KEYWORDS = ["trait"];
 const RM_HEADER_KEYWORDS = ["maturity", "rm", "crm"];
 
+// "MW / NC / CR" house-brand alias — per explicit request, the shared
+// house hybrid lineup is maintained ONCE in the source spreadsheet
+// under this single Brand value, and expands on import into all three
+// Brand Views' catalog company names (Midwest Seed Genetics, NC+
+// Hybrids, and Crow's sell the same lineup — the names below must match
+// brand.js's catalogBrandName values exactly). This is what makes
+// picking a house hybrid under any of the three pre-fill Trait/RM
+// exactly like a competitive brand's hybrids do (see
+// applyCatalogHybridDefaults() in entryEditor.js — it keys the catalog
+// by the entry's own Brand, so the rows have to exist under each real
+// brand name, not under the alias). SuperCrost is deliberately NOT part
+// of this alias — it's an ordinary competitor brand, per the same
+// request.
+const HOUSE_BRAND_ALIAS_KEY = "mwnccr";
+export const HOUSE_BRAND_EXPANSION = ["Midwest Seed Genetics", "NC+ Hybrids", "Crow's"];
+
+/**
+ * @param {string} company a Brand/Company cell value
+ * @returns {boolean} true when the cell is the "MW / NC / CR" house
+ *   alias — tolerant of spacing/separator differences ("MW/NC/CR",
+ *   "mw - nc - cr", …), since a hand-maintained spreadsheet won't
+ *   always type it identically.
+ */
+export function isHouseBrandAlias(company) {
+  return (
+    String(company || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "") === HOUSE_BRAND_ALIAS_KEY
+  );
+}
+
 function findColumnIndex(headerRow, keywords) {
   for (let i = 0; i < headerRow.length; i++) {
     const cell = String(headerRow[i] || "").trim().toLowerCase();
@@ -78,7 +109,15 @@ export function rowsFromAOA(aoa) {
       skippedCount++;
       continue;
     }
-    rows.push({ company, hybrid, trait, rm });
+    if (isHouseBrandAlias(company)) {
+      // One source row -> three catalog rows, one per house Brand View
+      // (see HOUSE_BRAND_EXPANSION's comment above).
+      for (const houseCompany of HOUSE_BRAND_EXPANSION) {
+        rows.push({ company: houseCompany, hybrid, trait, rm });
+      }
+    } else {
+      rows.push({ company, hybrid, trait, rm });
+    }
   }
 
   return { rows, skippedCount, headerError: null };
