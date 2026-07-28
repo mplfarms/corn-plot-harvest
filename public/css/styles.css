@@ -522,6 +522,13 @@ h3.section-header:first-child {
   color: var(--danger);
 }
 
+/* The required-fields note on the new-user Welcome! form (see
+   newUserDetailsModal.js — every field is required, per explicit
+   request). Same danger color as the sign-in form's own error note. */
+.new-user-details-error {
+  color: var(--danger);
+}
+
 .settings-version-footer {
   margin: 8px 0 0;
   text-align: center;
@@ -2296,6 +2303,25 @@ button.summary-header-card {
   margin: 2px 0 0;
   font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+/* Badge column: the colored rank badge with "(Entry n)" — the entry's
+   original plot/planting position — stacked directly beneath it, per
+   explicit request. The text deliberately matches .ranked-row-moisture
+   above exactly (same size, color, inherited font). */
+.ranked-row-badge-col {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.ranked-row-entry-pos {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .ranked-row-comment {

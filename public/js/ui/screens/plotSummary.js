@@ -1076,7 +1076,15 @@ export function render(container, params) {
     const significance = dryYieldSignificance(result.entry, summary);
     rankedList.appendChild(
       h("div", { className: "ranked-row card" }, [
-        h("span", { className: significanceBadgeClass(significance) }, String(rank)),
+        // Badge + the entry's original plot/planting position stacked
+        // under it — per explicit request, "(Entry n)" in the same
+        // color/size/font as the Moisture line (see
+        // .ranked-row-entry-pos in styles.css), so a ranked row can be
+        // matched back to its bar in the position charts at a glance.
+        h("div", { className: "ranked-row-badge-col" }, [
+          h("span", { className: significanceBadgeClass(significance) }, String(rank)),
+          h("p", { className: "ranked-row-entry-pos" }, `(Entry ${result.originalNumber})`),
+        ]),
         rowBody,
         h("span", { className: "ranked-row-value" }, meta.formatValue(result.value)),
       ])

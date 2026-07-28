@@ -100,15 +100,13 @@ export function render(container) {
     // Brand-new account (auto-created by the signIn call above, with its
     // name defaulted to the email itself) — ask for First Name, Last
     // Name, and Mobile Number once, so admin screens (Manage Users, All
-    // Plots) show something more useful than an email address. Skipping
-    // is fine: the account already works either way, just with name ===
-    // email and no phone on file until they're updated (there's no
-    // separate "edit my details" UI yet — signing in again from a device
-    // whose session was cleared is the only way, and that's an
-    // acceptable gap for a low-stakes internal tool).
+    // Plots) show something more useful than an email address. Every
+    // field is REQUIRED now (per explicit request — see
+    // newUserDetailsModal.js): the form can't be skipped or dismissed,
+    // so this promise only resolves with a complete set of details.
     if (result.isNewUser) {
       const details = await promptNewUserDetails({ email });
-      if (details && (details.firstName || details.lastName || details.mobileNumber)) {
+      if (details) {
         await authStore.signIn({ email, ...details });
       }
     }

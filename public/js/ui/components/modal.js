@@ -143,21 +143,29 @@ export function showCustomModal(opts) {
     closeModal();
     if (opts.onClose) opts.onClose();
   };
+  // dismissable: false removes every way OUT other than what the body
+  // itself provides (no ✕ button, overlay taps ignored) — for the rare
+  // modal whose answers are REQUIRED before the app can continue (e.g.
+  // the new-user Welcome! form, per explicit request — see
+  // newUserDetailsModal.js). Default remains dismissable.
+  const dismissable = !opts || opts.dismissable !== false;
   const card = h("div", { className: "modal-card modal-card-large" }, [
     h("div", { className: "modal-header" }, [
       h("h3", { className: "modal-title" }, opts.title),
-      h(
-        "button",
-        { type: "button", className: "modal-close-btn", "aria-label": "Close", onclick: close },
-        "✕"
-      ),
+      dismissable
+        ? h(
+            "button",
+            { type: "button", className: "modal-close-btn", "aria-label": "Close", onclick: close },
+            "✕"
+          )
+        : null,
     ]),
     opts.bodyNode,
   ]);
   mount(overlay, card);
   overlay.classList.remove("hidden");
   overlay.onclick = (e) => {
-    if (e.target === overlay) close();
+    if (e.target === overlay && dismissable) close();
   };
   return { close };
 }
