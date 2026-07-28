@@ -525,23 +525,6 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
       const barH = (v / domainMax) * chartH;
       const barX = x + i * (barW + gap);
       doc.rect(barX, baselineY - barH, barW, Math.max(barH, 0.5), "F");
-
-      // Check-mark on a repeated ("check") hybrid's bar — per explicit
-      // request; the same hand-drawn two-stroke white check as the Plot
-      // Summary screen's SVG version (see buildEntryPositionBarSvg() in
-      // plotSummary.js — jsPDF's built-in fonts can't render a "✓"
-      // glyph, so both renderers draw the mark from line segments).
-      // Skipped when the bar is too short to hold it legibly.
-      if (checkFlags[i] && barH >= 12) {
-        const cx = barX + barW / 2;
-        const cy = baselineY - barH + 7;
-        const s = Math.min(3.5, barW * 0.35);
-        doc.setDrawColor(255, 255, 255);
-        doc.setLineWidth(1.2);
-        doc.line(cx - s, cy, cx - s * 0.25, cy + s * 0.75);
-        doc.line(cx - s * 0.25, cy + s * 0.75, cx + s, cy - s * 0.75);
-        doc.setDrawColor(0, 0, 0);
-      }
     });
 
     // Least-squares trendline overlay (see computeLinearTrend() in
@@ -577,7 +560,23 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     doc.setTextColor(120, 120, 120);
     values.forEach((v, i) => {
       const labelX = x + i * (barW + gap) + barW / 2;
-      doc.text(String(i + 1), labelX, baselineY + 8, { align: "center" });
+      if (checkFlags[i]) {
+        // A repeated ("check") hybrid's position shows a check mark in
+        // place of its entry number — per explicit request, drawn at
+        // the label's own spot in the label's own gray (jsPDF's
+        // built-in fonts can't render a "✓" glyph, so it's hand-drawn
+        // from two line segments sized to match the 6.5pt digits; the
+        // Plot Summary screen's SVG uses a real ✓ text glyph in the
+        // same class — see buildEntryPositionBarSvg()).
+        const cy = baselineY + 8; // the digits' text baseline
+        doc.setDrawColor(120, 120, 120);
+        doc.setLineWidth(0.9);
+        doc.line(labelX - 2.4, cy - 2.4, labelX - 0.7, cy - 0.5);
+        doc.line(labelX - 0.7, cy - 0.5, labelX + 2.5, cy - 4.4);
+        doc.setDrawColor(0, 0, 0);
+      } else {
+        doc.text(String(i + 1), labelX, baselineY + 8, { align: "center" });
+      }
     });
     doc.setTextColor(0, 0, 0);
 

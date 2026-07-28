@@ -257,32 +257,16 @@ function buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatA
       rect.setAttribute("rx", Math.min(1.5, barW / 2));
       rect.setAttribute("class", barClass);
       svg.appendChild(rect);
-
-      // Check-mark on a repeated ("check") hybrid's bar — per explicit
-      // request, a small hand-drawn two-stroke check in white near the
-      // bar's top (white reads on both the gold and blue fills; a text
-      // "✓" glyph is avoided so the screen and the PDF — whose built-in
-      // fonts can't render ✓ — draw the identical mark). Skipped when
-      // the bar is too short to hold it legibly.
-      if (checkFlags && checkFlags[i] && barH >= 14) {
-        const cx = x + barW / 2;
-        const cy = baselineY - barH + 8;
-        const s = Math.min(4, barW * 0.35);
-        const mark = document.createElementNS(SVG_NS, "polyline");
-        mark.setAttribute(
-          "points",
-          `${cx - s},${cy} ${cx - s * 0.25},${cy + s * 0.75} ${cx + s},${cy - s * 0.75}`
-        );
-        mark.setAttribute("class", "entry-bar-check-mark");
-        svg.appendChild(mark);
-      }
     }
     const text = document.createElementNS(SVG_NS, "text");
     text.setAttribute("x", x + barW / 2);
     text.setAttribute("y", ENTRY_BAR_VIEW_H - 4);
     text.setAttribute("class", "entry-bar-axis-label");
     text.setAttribute("text-anchor", "middle");
-    text.textContent = String(i + 1);
+    // A repeated ("check") hybrid's position shows a check mark in
+    // place of its entry number — per explicit request, same size and
+    // color as the other labels (it's the same text element/class).
+    text.textContent = checkFlags && checkFlags[i] ? "✓" : String(i + 1);
     svg.appendChild(text);
   });
 
@@ -1073,6 +1057,15 @@ export function render(container, params) {
     ]),
   ]);
 
+  // Which hybrid names are repeated ("check") hybrids in this plot —
+  // their ranked rows say "Check n" instead of "Entry n" below the rank
+  // badge, per explicit request (mirrors the check marks in the
+  // position charts' axis labels).
+  const displayCheckFlags = repeatedHybridFlags(displayEntries);
+  const repeatedHybridKeys = new Set(
+    displayEntries.filter((e, i) => displayCheckFlags[i]).map((e) => String(e.hybrid || "").trim().toLowerCase())
+  );
+
   const rankedList = h("div", { className: "ranked-list" });
   if (ranked.length === 0) {
     rankedList.appendChild(h("p", { className: "empty-state" }, "No entries yet — add plot entries to see ranked results."));
@@ -1105,7 +1098,11 @@ export function render(container, params) {
         // a glance.
         h("div", { className: "ranked-row-badge-col" }, [
           h("span", { className: significanceBadgeClass(significance) }, String(rank)),
-          h("p", { className: "ranked-row-entry-pos" }, `Entry ${result.originalNumber}`),
+          h(
+            "p",
+            { className: "ranked-row-entry-pos" },
+            `${repeatedHybridKeys.has(String(result.entry.hybrid || "").trim().toLowerCase()) ? "Check" : "Entry"} ${result.originalNumber}`
+          ),
         ]),
         rowBody,
         h("span", { className: "ranked-row-value" }, meta.formatValue(result.value)),
