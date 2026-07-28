@@ -490,12 +490,28 @@ export function render(container) {
   // does NOT touch the location status line — that's the soil lookup's
   // to finish (racing the two lookups' completion order over one status
   // line would make its final text a coin flip).
+  // A brand-new plot's State defaults to "IA" (see models.js's header
+  // default) — for the state-fill rule below, that untouched default is
+  // treated as fillable, NOT as a manual entry (real field report: a
+  // Nebraska capture filled County/City correctly but left State stuck
+  // on the Iowa default, which also made the county snap against the
+  // wrong state's list).
+  const DEFAULT_NEW_PLOT_STATE = "IA";
+
   async function attemptRegionLookup(lat, lon) {
     const before = trialStore.getState().header;
-    const needState = !(before.state || "").trim();
+    // State counts as fillable when it's blank OR still the untouched
+    // new-plot default with the whole location group (county/city/zip)
+    // untouched too — a deliberately-picked State always has SOMETHING
+    // filled around it, or differs from the default. A GPS capture in
+    // Iowa overwrites IA with IA harmlessly either way.
+    const stateVal = (before.state || "").trim();
+    const locationGroupUntouched =
+      !(before.county || "").trim() && !(before.city || "").trim() && !(before.zip || "").trim();
+    const stateFillable = !stateVal || (stateVal === DEFAULT_NEW_PLOT_STATE && locationGroupUntouched);
     const needCounty = !(before.county || "").trim();
     const needCity = !(before.city || "").trim();
-    if (!needState && !needCounty && !needCity) return;
+    if (!stateFillable && !needCounty && !needCity) return;
 
     const region = await fetchRegionForCoordinates(lat, lon, { wantCity: needCity });
     await geoData.ensureLoaded();
@@ -506,33 +522,60 @@ export function render(container) {
     const now = trialStore.getState().header;
     const patch = {};
 
-    if (needState && region.stateCode && !(now.state || "").trim()) {
+    const nowStateVal = (now.state || "").trim();
+    const nowStateStillFillable =
+      !nowStateVal ||
+      (nowStateVal === DEFAULT_NEW_PLOT_STATE &&
+        !(now.county || "").trim() &&
+        !(now.city || "").trim() &&
+        !(now.zip || "").trim());
+    if (stateFillable && region.stateCode && nowStateStillFillable && region.stateCode !== nowStateVal) {
       patch.state = region.stateCode;
       currentState = region.stateCode;
       stateWheel.setValue(region.stateCode);
       refreshCountyOptions();
     }
 
-    // County/City snap against whichever state is in effect now — a
-    // manual pick if there is one, else the one just auto-filled.
-    const effectiveState = (now.state || "").trim() || patch.state || "";
+    // County/City snap against whichever state is in effect now — the
+    // state just auto-filled from this same coordinate when there is
+    // one, else whatever the field already held.
+    const effectiveState = patch.state || nowStateVal || "";
 
     if (needCounty && region.countyName && !(now.county || "").trim() && effectiveState) {
-      const countyValue = snapToKnownName(region.countyName, geoData.getCountiesForState(effectiveState)) || region.countyName;
+      // Snap to the state's own county list; when nothing matches, fall
+      // back to the raw name minus any " County" suffix (the app's
+      // lists don't carry the suffix — a real capture once stored "Hall
+      // County" verbatim because it snapped against the wrong state).
+      const countyValue =
+        snapToKnownName(region.countyName, geoData.getCountiesForState(effectiveState)) ||
+        region.countyName.replace(/\s+county$/i, "").trim();
       patch.county = countyValue;
       countyWheel.setValue(countyValue);
     }
 
-    if (needCity && region.cityName && !(now.city || "").trim() && effectiveState) {
-      const cityValue = snapToKnownName(region.cityName, geoData.getCityNamesForState(effectiveState)) || region.cityName;
-      patch.city = cityValue;
-      cityInput.value = cityValue;
-      // Kick the existing city->zip auto-fill, but only when Zip is
-      // still blank too — the fill-blanks-only rule applies to it as
-      // much as to the fields above.
-      if (!(now.zip || "").trim()) {
-        lastCityLookup = null;
-        runCityZipLookup();
+    if (needCity && !(now.city || "").trim() && effectiveState) {
+      // The FIRST candidate that matches the app's own city list for
+      // this state wins — that list is real postal towns, which is
+      // exactly the "nearest incorporated town, not a township" filter
+      // (per explicit field report: "Township of South Loup" is not a
+      // useful City). NO raw fallback here: a name that matches nothing
+      // leaves City blank for manual entry rather than storing a
+      // township label.
+      let cityValue = null;
+      for (const candidate of region.cityCandidates || []) {
+        cityValue = snapToKnownName(candidate, geoData.getCityNamesForState(effectiveState));
+        if (cityValue) break;
+      }
+      if (cityValue) {
+        patch.city = cityValue;
+        cityInput.value = cityValue;
+        // Kick the existing city->zip auto-fill, but only when Zip is
+        // still blank too — the fill-blanks-only rule applies to it as
+        // much as to the fields above.
+        if (!(now.zip || "").trim()) {
+          lastCityLookup = null;
+          runCityZipLookup();
+        }
       }
     }
 

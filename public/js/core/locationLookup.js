@@ -65,22 +65,66 @@ export async function fetchStateCountyForCoordinates(lat, lon) {
 }
 
 /**
- * Nearest city/town from BigDataCloud's free client reverse-geocoder.
+ * Strips rural-place labeling a reverse-geocoder attaches to
+ * unincorporated spots ("Township of South Loup" -> "South Loup",
+ * "Custer Township" -> "Custer") — in open farm country the nearest
+ * NAMED place is often a township, not the town the user would name.
+ * The caller only ever accepts a candidate that matches the app's own
+ * city list (real postal towns), so this cleanup just gives a township
+ * name whose base IS a real town a chance to match.
+ * @param {string} name
+ * @returns {string}
+ */
+export function cleanCityCandidate(name) {
+  return String(name || "")
+    .trim()
+    .replace(/^township of\s+/i, "")
+    .replace(/\s+township$/i, "")
+    .trim();
+}
+
+/**
+ * Nearest city/town CANDIDATES from BigDataCloud's free client
+ * reverse-geocoder, best-first: the primary city/locality fields, then
+ * any other place names the response carries (its localityInfo
+ * sections). The caller walks this list and keeps the FIRST name that
+ * matches the app's own city list for the state — per explicit request,
+ * the goal is the nearest incorporated town, not whatever township the
+ * point happens to sit in, and the app's city/zip list (built from
+ * postal data) is exactly the "real towns" filter for that.
  * @param {number} lat
  * @param {number} lon
- * @returns {Promise<string|null>}
+ * @returns {Promise<string[]>}
  */
-export async function fetchNearestCityForCoordinates(lat, lon) {
+export async function fetchNearestCityCandidates(lat, lon) {
   try {
     const url = `${REVERSE_GEOCODE_URL}?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&localityLanguage=en`;
     const res = await fetch(url);
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const body = await res.json();
-    const city = (body && (body.city || body.locality)) || "";
-    const trimmed = String(city).trim();
-    return trimmed || null;
+    const raw = [];
+    if (body) {
+      raw.push(body.city, body.locality);
+      const info = body.localityInfo || {};
+      // administrative entries include state/county levels too — those
+      // never match a city list, so including them is harmless, but
+      // keep them AFTER the primary fields and the informative names.
+      for (const group of [info.informative, info.administrative]) {
+        if (Array.isArray(group)) for (const item of group) raw.push(item && item.name);
+      }
+    }
+    const seen = new Set();
+    const candidates = [];
+    for (const name of raw) {
+      const cleaned = cleanCityCandidate(name);
+      const key = cleaned.toLowerCase();
+      if (!cleaned || seen.has(key)) continue;
+      seen.add(key);
+      candidates.push(cleaned);
+    }
+    return candidates;
   } catch (e) {
-    return null;
+    return [];
   }
 }
 
@@ -91,13 +135,13 @@ export async function fetchNearestCityForCoordinates(lat, lon) {
  * @param {number} lat
  * @param {number} lon
  * @param {{wantCity?: boolean}} [opts]
- * @returns {Promise<{stateCode: string|null, countyName: string|null, cityName: string|null}>}
+ * @returns {Promise<{stateCode: string|null, countyName: string|null, cityCandidates: string[]}>}
  */
 export async function fetchRegionForCoordinates(lat, lon, opts) {
   const wantCity = !opts || opts.wantCity !== false;
-  const [stateCounty, cityName] = await Promise.all([
+  const [stateCounty, cityCandidates] = await Promise.all([
     fetchStateCountyForCoordinates(lat, lon),
-    wantCity ? fetchNearestCityForCoordinates(lat, lon) : Promise.resolve(null),
+    wantCity ? fetchNearestCityCandidates(lat, lon) : Promise.resolve([]),
   ]);
-  return { ...stateCounty, cityName };
+  return { ...stateCounty, cityCandidates };
 }

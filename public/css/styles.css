@@ -117,6 +117,17 @@ textarea {
   color: inherit;
 }
 
+/* Kills the browser's double-tap-to-zoom gesture on every button
+   app-wide (pinch-zoom and scrolling are unaffected — "manipulation"
+   only removes the double-tap special-case). Without this, two quick
+   taps on the SAME control — the date picker's month arrows were the
+   reported case (backing up more than one month), but any
+   rapid-repeat-tap control has the same exposure — register as a
+   double-tap and ZOOM the page instead of stepping twice. */
+button {
+  touch-action: manipulation;
+}
+
 a {
   color: var(--accent-strong);
 }
