@@ -2153,6 +2153,18 @@ button.summary-header-card {
    plotSummary.js) — a neutral ink color (not either bar's own hue) and
    dashed, so it reads as a statistical overlay on top of the bars rather
    than a 3rd data series. */
+/* Check-hybrid marker: a small white two-stroke check drawn near the
+   top of any bar whose hybrid appears 2+ times in the plot (see
+   repeatedHybridFlags() in yieldCalculator.js) — per explicit request,
+   so the repeated "check" entries jump out of both position charts. */
+.entry-bar-check-mark {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .entry-bar-trend-line {
   stroke: var(--text);
   stroke-width: 1.75;

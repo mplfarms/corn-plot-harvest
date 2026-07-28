@@ -16,6 +16,7 @@ import {
   brandAveragesForDisplay,
   computeLinearTrend,
   recenterTrendLineY,
+  repeatedHybridFlags,
 } from "./yieldCalculator.js";
 import { filenameYear, harvestedYear, formatHeaderDate, gpsCellText } from "./models.js";
 import { exportFilename } from "./xlsxBuilder.js";
@@ -518,11 +519,29 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
     doc.line(x, baselineY, x + width, baselineY);
 
     doc.setFillColor(barRgb[0], barRgb[1], barRgb[2]);
+    const checkFlags = repeatedHybridFlags(entries);
     values.forEach((v, i) => {
       if (v === null || v === undefined || Number.isNaN(v)) return;
       const barH = (v / domainMax) * chartH;
       const barX = x + i * (barW + gap);
       doc.rect(barX, baselineY - barH, barW, Math.max(barH, 0.5), "F");
+
+      // Check-mark on a repeated ("check") hybrid's bar — per explicit
+      // request; the same hand-drawn two-stroke white check as the Plot
+      // Summary screen's SVG version (see buildEntryPositionBarSvg() in
+      // plotSummary.js — jsPDF's built-in fonts can't render a "✓"
+      // glyph, so both renderers draw the mark from line segments).
+      // Skipped when the bar is too short to hold it legibly.
+      if (checkFlags[i] && barH >= 12) {
+        const cx = barX + barW / 2;
+        const cy = baselineY - barH + 7;
+        const s = Math.min(3.5, barW * 0.35);
+        doc.setDrawColor(255, 255, 255);
+        doc.setLineWidth(1.2);
+        doc.line(cx - s, cy, cx - s * 0.25, cy + s * 0.75);
+        doc.line(cx - s * 0.25, cy + s * 0.75, cx + s, cy - s * 0.75);
+        doc.setDrawColor(0, 0, 0);
+      }
     });
 
     // Least-squares trendline overlay (see computeLinearTrend() in

@@ -28,6 +28,7 @@ import {
   brandAveragesForDisplay,
   computeLinearTrend,
   recenterTrendLineY,
+  repeatedHybridFlags,
 } from "../../core/yieldCalculator.js";
 import { buildPdf, pdfFilename } from "../../core/pdfBuilder.js";
 import { buildXlsx, createEffectiveLists } from "../../core/xlsxBuilder.js";
@@ -199,7 +200,7 @@ function buildBoxPlotSection(boxPlot) {
  * @param {{slope: number, intercept: number, n: number, r2: number}|null} trend
  * @returns {SVGSVGElement}
  */
-function buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatAria, trend) {
+function buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatAria, trend, checkFlags) {
   const values = entries.map((entry) => valueFn(entry));
   const numeric = values.filter((v) => v !== null && !Number.isNaN(v));
   const maxValue = numeric.length > 0 ? Math.max(...numeric, 0) : 0;
@@ -256,6 +257,25 @@ function buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatA
       rect.setAttribute("rx", Math.min(1.5, barW / 2));
       rect.setAttribute("class", barClass);
       svg.appendChild(rect);
+
+      // Check-mark on a repeated ("check") hybrid's bar — per explicit
+      // request, a small hand-drawn two-stroke check in white near the
+      // bar's top (white reads on both the gold and blue fills; a text
+      // "✓" glyph is avoided so the screen and the PDF — whose built-in
+      // fonts can't render ✓ — draw the identical mark). Skipped when
+      // the bar is too short to hold it legibly.
+      if (checkFlags && checkFlags[i] && barH >= 14) {
+        const cx = x + barW / 2;
+        const cy = baselineY - barH + 8;
+        const s = Math.min(4, barW * 0.35);
+        const mark = document.createElementNS(SVG_NS, "polyline");
+        mark.setAttribute(
+          "points",
+          `${cx - s},${cy} ${cx - s * 0.25},${cy + s * 0.75} ${cx + s},${cy - s * 0.75}`
+        );
+        mark.setAttribute("class", "entry-bar-check-mark");
+        svg.appendChild(mark);
+      }
     }
     const text = document.createElementNS(SVG_NS, "text");
     text.setAttribute("x", x + barW / 2);
@@ -329,10 +349,11 @@ function buildEntryPositionCard(entries, valueFn, barClass, title, formatCaption
   const trendCaption = trend
     ? `Trend: ${trend.slope >= 0 ? "+" : "−"}${formatCaption(Math.abs(trend.slope))} per entry (R² ${trend.r2.toFixed(2)})`
     : null;
+  const checkFlags = repeatedHybridFlags(entries);
 
   return h("section", { className: "card" }, [
     h("h3", { className: "section-header" }, title),
-    buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatAria, trend),
+    buildEntryPositionBarSvg(entries, valueFn, barClass, ariaTitle, formatAria, trend, checkFlags),
     h("p", { className: "box-plot-caption" }, caption),
     trendCaption ? h("p", { className: "box-plot-caption entry-bar-trend-caption" }, trendCaption) : null,
     trendCaption

@@ -289,6 +289,30 @@ export function brandAveragesForDisplay(byBrand, leadBrandName) {
   );
 }
 
+/**
+ * Flags each entry whose Hybrid appears 2+ times in this plot — a
+ * repeated "check" hybrid planted at multiple positions (e.g. both ends
+ * and the middle) to separate field variation from genetics. Matching
+ * is by hybrid name, trimmed and case-insensitive; entries with no
+ * hybrid never match each other. Shared by the Plot Summary screen's
+ * entry-position bar charts and the PDF export's (see the check-mark
+ * drawing at both call sites) so the two mark the same bars.
+ * @param {import('./models.js').PlotEntry[]} entries
+ * @returns {boolean[]} same length/order as entries
+ */
+export function repeatedHybridFlags(entries) {
+  const counts = new Map();
+  for (const e of entries) {
+    const key = String(e.hybrid || "").trim().toLowerCase();
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return entries.map((e) => {
+    const key = String(e.hybrid || "").trim().toLowerCase();
+    return Boolean(key) && (counts.get(key) || 0) >= 2;
+  });
+}
+
 // A trendline needs at least this many (position, value) points before
 // it's worth fitting/drawing at all — 2 points always fit a line
 // perfectly (slope is meaningless, R² is always 1), so 3 is the minimum

@@ -91,6 +91,7 @@ export function render(container) {
 
     helpSection("The Yield & Moisture by Position Charts", [
       p("These two bar charts show your plot in PLANTING ORDER — one bar per entry, position 1 on the left through your last entry on the right, exactly as they sit in the field. The gold chart is each entry's Dry Yield; the blue chart is its Moisture reading. An entry missing that measurement keeps its numbered slot but shows no bar, and if no entries have a moisture reading at all, the moisture chart is left out entirely."),
+      p("A small white check mark near the top of a bar means that hybrid is entered at more than one position in this plot — a repeated \"check\" hybrid. Since those bars share the same genetics, differences BETWEEN them are almost purely the field talking, which makes them the best reference for judging how much a trend is ground versus genetics."),
       p("Where the ranked list tells you WHICH hybrids won, these charts tell you WHERE the results happened — so a run of tall bars at one end of the plot, or moisture climbing steadily from one side to the other, jumps out in a way a sorted list can't show."),
       p("The dashed line across each chart is the trend line — a statistical best-fit through all the bars, showing the overall drift from the first entry to the last. Its caption reads like “Trend: +0.7 bu/ac per entry (R² 0.20)”:"),
       ul([
