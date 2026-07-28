@@ -2305,16 +2305,19 @@ button.summary-header-card {
   color: var(--text-muted);
 }
 
-/* Badge column: the colored rank badge with "(Entry n)" — the entry's
+/* Badge column: the colored rank badge with "Entry n" — the entry's
    original plot/planting position — stacked directly beneath it, per
-   explicit request. The text deliberately matches .ranked-row-moisture
-   above exactly (same size, color, inherited font). */
+   explicit request (no parentheses, per follow-up). The text
+   deliberately matches .ranked-row-moisture above exactly (same size,
+   color, inherited font). The 7px gap (widened from an initial 2px,
+   per the same follow-up) keeps the badge and the label from reading
+   as one cramped unit and balances the column vertically. */
 .ranked-row-badge-col {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 7px;
 }
 
 .ranked-row-entry-pos {

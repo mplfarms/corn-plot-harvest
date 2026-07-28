@@ -60,6 +60,20 @@ export function getCountiesForState(stateCode) {
  * @param {string} cityName
  * @returns {string[]} matching ZIP codes, [] if no match/not loaded
  */
+/**
+ * @param {string} stateCode e.g. "IA"
+ * @returns {string[]} known city names for that state, [] if not
+ *   loaded/unknown — used by trialDetails.js's region auto-fill to snap
+ *   a reverse-geocoded "nearest city" onto this app's own city list
+ *   (see locationLookup.js's snapToKnownName), keeping the zip
+ *   auto-fill working on the snapped value.
+ */
+export function getCityNamesForState(stateCode) {
+  if (!stateCode) return [];
+  const entries = cityZipsByState[stateCode];
+  return entries ? entries.map((e) => e.city) : [];
+}
+
 export function getZipsForCity(stateCode, cityName) {
   if (!stateCode || !cityName) return [];
   const entries = cityZipsByState[stateCode];

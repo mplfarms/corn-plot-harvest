@@ -20,6 +20,7 @@ import { createDatePicker } from "../components/datePicker.js";
 import { openSearchListPicker } from "../components/searchListPicker.js";
 import { navigate } from "../router.js";
 import { fetchSoilTypeForCoordinates } from "../../core/soilLookup.js";
+import { fetchRegionForCoordinates, snapToKnownName } from "../../core/locationLookup.js";
 import { ensureFormIdAssignedWithFeedback } from "../formIdAssign.js";
 
 // Above this many ZIP matches for a city, an inline row of tappable
@@ -473,6 +474,71 @@ export function render(container) {
     }
   }
 
+  // Runs alongside attemptSoilLookup() after GPS succeeds — per explicit
+  // request: reverse-geocodes the captured coordinate into State +
+  // County (FCC Area API) and the nearest City (BigDataCloud), and
+  // pre-fills ONLY the fields that are still blank. A value the user
+  // already picked/typed is never overwritten — GPS reflects where the
+  // phone is standing, which isn't necessarily the plot being entered
+  // (e.g. entering last week's plot from the kitchen table). County and
+  // City are snapped onto this app's own lists for that state (see
+  // snapToKnownName) so an auto-filled value matches what the pickers
+  // would offer — and the snapped City keeps the zip auto-fill working.
+  // Fails soft in every direction (see locationLookup.js): no
+  // connection or an inconclusive answer just leaves the fields for
+  // manual entry, exactly as before this feature existed. Deliberately
+  // does NOT touch the location status line — that's the soil lookup's
+  // to finish (racing the two lookups' completion order over one status
+  // line would make its final text a coin flip).
+  async function attemptRegionLookup(lat, lon) {
+    const before = trialStore.getState().header;
+    const needState = !(before.state || "").trim();
+    const needCounty = !(before.county || "").trim();
+    const needCity = !(before.city || "").trim();
+    if (!needState && !needCounty && !needCity) return;
+
+    const region = await fetchRegionForCoordinates(lat, lon, { wantCity: needCity });
+    await geoData.ensureLoaded();
+
+    // Re-read AFTER the network round-trip — the user may have filled
+    // something in by hand while the lookup was in flight, and a manual
+    // entry always wins.
+    const now = trialStore.getState().header;
+    const patch = {};
+
+    if (needState && region.stateCode && !(now.state || "").trim()) {
+      patch.state = region.stateCode;
+      currentState = region.stateCode;
+      stateWheel.setValue(region.stateCode);
+      refreshCountyOptions();
+    }
+
+    // County/City snap against whichever state is in effect now — a
+    // manual pick if there is one, else the one just auto-filled.
+    const effectiveState = (now.state || "").trim() || patch.state || "";
+
+    if (needCounty && region.countyName && !(now.county || "").trim() && effectiveState) {
+      const countyValue = snapToKnownName(region.countyName, geoData.getCountiesForState(effectiveState)) || region.countyName;
+      patch.county = countyValue;
+      countyWheel.setValue(countyValue);
+    }
+
+    if (needCity && region.cityName && !(now.city || "").trim() && effectiveState) {
+      const cityValue = snapToKnownName(region.cityName, geoData.getCityNamesForState(effectiveState)) || region.cityName;
+      patch.city = cityValue;
+      cityInput.value = cityValue;
+      // Kick the existing city->zip auto-fill, but only when Zip is
+      // still blank too — the fill-blanks-only rule applies to it as
+      // much as to the fields above.
+      if (!(now.zip || "").trim()) {
+        lastCityLookup = null;
+        runCityZipLookup();
+      }
+    }
+
+    if (Object.keys(patch).length > 0) trialStore.updateHeader(patch);
+  }
+
   // Shared by both the "Use Device Location or Enter Manually" button and
   // the automatic attempt (see the bottom of render()) that fires on its
   // own for a plot that doesn't have GPS coordinates yet — "default to
@@ -507,6 +573,7 @@ export function render(container) {
         lonInput.value = String(lon);
         setLocationStatus(`Location captured (±${Math.round(pos.coords.accuracy)}m). Looking up soil type…`, "success");
         attemptSoilLookup(lat, lon, pos.coords.accuracy);
+        attemptRegionLookup(lat, lon);
       },
       (err) => {
         setLocationStatus(err.message || "Unable to determine location.", "failure");
