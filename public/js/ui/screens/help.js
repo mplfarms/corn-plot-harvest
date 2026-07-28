@@ -80,7 +80,7 @@ export function render(container) {
       "Signing In",
       [
         p("This app only ever asks for your email — no password, no code to remember. Type it in and tap Sign In."),
-        p("The first time you sign in, it'll ask your name. This just helps your admin tell everyone's saved plots apart later — it's fine to skip it, but worth taking a second to fill in."),
+        p("The first time you sign in, a one-time Welcome form asks your First Name, Last Name, and Mobile Number — all required (your email is already filled in from the sign-in itself). This helps your admin tell everyone's saved plots apart later, and you can update any of it afterward under Settings → Edit My Info."),
         p("Always sign in with the SAME email every time. Your email is how the app knows which saved plots are yours — signing in with a different email (even by accident) shows you an empty list instead of your usual plots. If that happens to you, see “I don't see any of my plots” under Troubleshooting below."),
         p("You'll stay signed in on this device until you tap Sign Out in Settings — there's no timeout."),
       ],
