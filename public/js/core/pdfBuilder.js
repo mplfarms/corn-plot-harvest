@@ -723,14 +723,37 @@ export async function buildPdf({ header, results, metric, allEntries, brand, log
         doc.text("Average Dry Yield by Brand:", MARGIN, y + 9 * 0.8);
         y += 9 * 1.15 + 4;
 
-        const brandLineHeight = 9 * 1.3;
+        // 3-column grid in the exact same style as the Plot Details
+        // header block (see drawPlotDetailsHeader(): bold gray 8pt
+        // "Label: " + normal dark 8pt value, tableWidth/3 columns,
+        // 8*1.6 row height) — per explicit request, for a better use
+        // of the space and a consistent look. Was a single bold 9pt
+        // line per brand before.
+        const NUM_BRAND_COLS = 3;
+        const colWidth = tableWidth / NUM_BRAND_COLS;
+        const rowHeight = 8 * 1.6;
+        let col = 0;
+        let rowStartY = y;
+        doc.setFontSize(8);
         for (const b of brandsToShow) {
+          const xPos = MARGIN + col * colWidth;
+          const labelText = `${b.brand}: `;
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(9);
-          doc.text(`${b.brand}: ${b.average.toFixed(1)} bu/ac (n=${b.count})`, MARGIN, y + 9 * 0.8);
-          y += brandLineHeight;
+          doc.setTextColor(90, 90, 90);
+          doc.text(labelText, xPos, rowStartY + 8 * 0.8);
+          const labelWidth = doc.getTextWidth(labelText);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(26, 26, 25);
+          doc.text(`${b.average.toFixed(1)} bu/ac (n=${b.count})`, xPos + labelWidth, rowStartY + 8 * 0.8);
+          col += 1;
+          if (col >= NUM_BRAND_COLS) {
+            col = 0;
+            rowStartY += rowHeight;
+          }
         }
-        y += 3;
+        if (col > 0) rowStartY += rowHeight;
+        doc.setTextColor(0, 0, 0);
+        y = rowStartY + 3;
       }
     }
 
