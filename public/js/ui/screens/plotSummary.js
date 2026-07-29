@@ -635,48 +635,27 @@ export function render(container, params) {
     }
   }
 
-  // ---- Share as a PDF (top-bar share icon) ----
-  // One tap hands the ranked-results PDF straight to the OS share sheet
-  // — no menu, no prompts. Per explicit request this went back to a PDF
-  // (after an .html-file version and then a picture version): a PDF is
-  // easy for everyone to open, and rides through a group text with
-  // mixed Android/iOS recipients as a proper file attachment — it never
-  // gets recompressed the way carrier messaging mangles images. Plot
-  // Details are always included (this button is the "hand someone
-  // everything" format; the share MENU's PDF row keeps its
-  // include-details question), and the file is named
-  // "<Cooperator>_<year>_Corn Plot.pdf" — per explicit request — so
-  // it's recognizable in a thread, unlike the menu's Form-ID-named PDF.
-  async function handleShareTopBarPdf() {
-    try {
-      const freshHeader = await resolveHeaderForExport();
-      const blob = await buildRankedPdfBlob(freshHeader, true);
-      const coopForName = (freshHeader.cooperatorName || "")
-        .trim()
-        .replace(/[\\/:*?"<>|]+/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-      const filename = `${[coopForName, String(filenameYear(freshHeader)), "Corn Plot"].filter(Boolean).join("_")}.pdf`;
-      await shareOrDownload(blob, filename, "application/pdf");
-    } catch (e) {
-      showToast(`Couldn't build the shareable PDF: ${e.message}`, { type: "error" });
-    }
-  }
-
   const shareBtn = h(
     "button",
     { type: "button", className: "btn btn-secondary btn-block", onclick: openShareModal },
     "Share This Plot"
   );
 
-  const shareHtmlBtn = h(
+  // Top-bar share icon: opens the SAME "Share This Plot" menu as the
+  // button at the bottom of the screen — per explicit request (replacing
+  // its earlier direct one-tap PDF behavior, which itself replaced an
+  // .html-file version and a picture version). One menu, reachable from
+  // both ends of the screen, so there's a single consistent set of share
+  // actions (PDF / Excel / Seedware) no matter which entry point is
+  // tapped.
+  const shareTopBarBtn = h(
     "button",
     {
       type: "button",
       className: "top-bar-btn top-bar-btn-share",
-      "aria-label": "Share this summary as a PDF",
-      title: "Share this summary as a PDF",
-      onclick: handleShareTopBarPdf,
+      "aria-label": "Share this plot",
+      title: "Share this plot",
+      onclick: openShareModal,
     },
     h("span", { className: "top-bar-share-icon", html: SHARE_ICON_SVG })
   );
@@ -706,7 +685,7 @@ export function render(container, params) {
     backLabel: "Back",
     // Share-as-web-page icon first, then the "i" help badge — the
     // Settings gear (added by createTopBar itself) stays rightmost.
-    right: [shareHtmlBtn, helpBtn],
+    right: [shareTopBarBtn, helpBtn],
   });
 
   // ---- Header card ----

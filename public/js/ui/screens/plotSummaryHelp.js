@@ -123,8 +123,8 @@ export function render(container) {
     ]),
 
     helpSection("Sharing These Results", [
-      p("Once everything looks right, tap “Share This Plot” at the bottom of this screen for a printable PDF, the full spreadsheet, printing, or emailing your results — see Settings → Help for the full walkthrough of those options."),
-      p("Fastest option: the share icon at the very top of this screen (next to the “i”) sends the full PDF summary in one tap — straight to your share sheet, Plot Details always included, no questions asked. A PDF opens easily for everyone (iPhone, Android, or computer, using each device's built-in viewer) and travels through a group text as a proper file attachment, so it never gets blurred the way texted pictures can be. It's named after the cooperator and year — like “Larson Family Farms_2026_Corn Plot.pdf” — so it's easy to spot in a thread."),
+      p("Once everything looks right, open the Share menu — either the share icon at the very top of this screen (next to the “i”) or the “Share This Plot” button at the bottom; both open the same menu. From there you can share or print the PDF summary, share the full Excel plot form, or export for Seedware — see Settings → Help for the full walkthrough of those options."),
+      p("The PDF is the easiest format to pass around: it opens for everyone (iPhone, Android, or computer, using each device's built-in viewer) and travels through a group text as a proper file attachment, so it never gets blurred the way texted pictures can be."),
     ]),
   ];
 
