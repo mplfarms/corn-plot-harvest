@@ -451,7 +451,15 @@ export function render(container) {
             type: "button",
             className:
               "zip-choice-btn" + (town.name.toLowerCase() === current ? " zip-choice-btn-selected" : ""),
-            onclick: () => commitNearbyTownChoice(town),
+            // preventDefault/stopPropagation: belt-and-suspenders against
+            // any label-activation forwarding (see the cooperatorSection
+            // comment) — tapping a chip must ONLY pick the town, never
+            // also open the City selection list, per explicit request.
+            onclick: (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              commitNearbyTownChoice(town);
+            },
           },
           `${town.name} — ${town.distanceMiles.toFixed(1)} mi`
         )
@@ -555,7 +563,15 @@ export function render(container) {
     h("p", { className: "field-note trial-details-address-note" }, "Leave blank if not known."),
     field("State", stateWheel.el),
     field("County", countyWheel.el),
-    field("City", h("div", {}, [cityRow, cityStatusEl, cityChoicesEl])),
+    // cityStatusEl/cityChoicesEl sit OUTSIDE the field()'s <label> on
+    // purpose: a click anywhere inside a label activates the label's
+    // first button — which here is the City picker row — so nearby-town
+    // chips nested inside the label would commit their town AND pop the
+    // full City selection list right after (real field report). As
+    // plain siblings, a chip tap just picks the town, nothing else.
+    field("City", cityRow),
+    cityStatusEl,
+    cityChoicesEl,
     field("Zip", h("div", {}, [zipInput, zipStatusEl, zipChoicesEl])),
   ]);
 
@@ -795,6 +811,7 @@ export function render(container) {
         trialStore.updateHeader({ gpsLatitude: lat, gpsLongitude: lon });
         latInput.value = String(lat);
         lonInput.value = String(lon);
+        markLocationEnabled();
         setLocationStatus(`Location captured (±${Math.round(pos.coords.accuracy)}m). Looking up soil type…`, "success");
         attemptSoilLookup(lat, lon, pos.coords.accuracy);
         attemptRegionLookup(lat, lon);
@@ -815,6 +832,19 @@ export function render(container) {
     },
     "Use Device for Location & Soil Type"
   );
+
+  // Once a device location is in (this tap, or a plot that already has
+  // coordinates from an earlier capture), the button flips to the
+  // brand's darker color and reads "Device Location Enabled" — per
+  // explicit request. It stays tappable as a re-capture (e.g. after
+  // moving to a different field).
+  function markLocationEnabled() {
+    useLocationBtn.textContent = "Device Location Enabled";
+    useLocationBtn.classList.add("location-capture-btn-enabled");
+  }
+  if (Number.isFinite(header.gpsLatitude) && Number.isFinite(header.gpsLongitude)) {
+    markLocationEnabled();
+  }
 
   // The device-location capture lives in its own card at the very TOP of
   // the screen (above Cooperator Details) — per explicit request — since
@@ -1005,16 +1035,9 @@ export function render(container) {
 
   mount(container, screen);
 
-  // "Default to the device location" — for a plot that doesn't have GPS
-  // coordinates yet, go get them automatically rather than waiting for
-  // the user to tap "Use Device Location or Enter Manually" first (that
-  // button still exists for a manual re-trigger, e.g. after moving to a
-  // different field, or retrying after an earlier denial). Never
-  // re-triggers once coordinates exist — same "don't overwrite what's
-  // already there" rule as the State-defaults-to-Iowa behavior — so this
-  // only fires for a genuinely new/not-yet-located plot, not every time
-  // this screen is revisited for one that already has a location.
-  if (!Number.isFinite(header.gpsLatitude) && !Number.isFinite(header.gpsLongitude)) {
-    runLocationCapture();
-  }
+  // NO automatic location request — per explicit request (reversing the
+  // earlier auto-locate-on-open behavior), location and soil type only
+  // ever pre-populate when the user actually taps "Use Device for
+  // Location & Soil Type" at the top of the screen. Opening Plot
+  // Details does nothing on its own.
 }

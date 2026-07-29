@@ -2595,3 +2595,12 @@ button.summary-header-card {
   margin: 0;
   text-align: center;
 }
+
+/* "Device Location Enabled" state (per explicit request): once a
+   location is captured, the top capture button flips from the outlined
+   secondary style to the brand's darker solid color. */
+.location-capture-btn-enabled {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: #ffffff;
+}

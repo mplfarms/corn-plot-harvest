@@ -43,7 +43,7 @@ const STEPS = [
   {
     title: "Tap “Enter a New Plot”",
     text: "This opens a new, blank plot and takes you to Plot Details — cooperator name, location, and planting info. Fill in what you know; nothing here is required to keep going.",
-    tip: "Recommended: on a phone or tablet, allow location access when it's asked for. It fills in your GPS coordinates and looks up your Soil Type automatically — much faster than typing them in by hand.",
+    tip: "Recommended: standing at the plot, tap “Use Device for Location & Soil Type” at the top of Plot Details (and allow location access when asked). One tap fills GPS, State, County, City, Zip, and Soil Type — much faster than typing them in by hand.",
   },
   {
     title: "Add your hybrids",
