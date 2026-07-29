@@ -810,18 +810,33 @@ export function render(container) {
     "button",
     {
       type: "button",
-      className: "btn btn-secondary",
+      className: "btn btn-secondary btn-block",
       onclick: runLocationCapture,
     },
-    "Use Device Location or Enter Manually"
+    "Use Device for Location & Soil Type"
   );
+
+  // The device-location capture lives in its own card at the very TOP of
+  // the screen (above Cooperator Details) — per explicit request — since
+  // it's the natural first move standing in the field: one tap fills
+  // GPS, State, County, City, Zip, and Soil Type at once. The status
+  // line rides with the button, so capture/soil-lookup feedback shows
+  // where the tap happened. The GPS Location card below keeps the
+  // Latitude/Longitude fields themselves for manual entry/corrections.
+  const locationCaptureSection = h("section", { className: "card location-capture-card" }, [
+    useLocationBtn,
+    h(
+      "p",
+      { className: "field-note location-capture-note" },
+      "One tap fills GPS, State, County, City, Zip, and Soil Type from where you're standing — or skip it and enter everything manually below."
+    ),
+    locationStatusEl,
+  ]);
 
   const gpsSection = h("section", { className: "card" }, [
     sectionHeader("GPS Location"),
     field("Latitude", latInput),
     field("Longitude", lonInput),
-    useLocationBtn,
-    locationStatusEl,
     h("p", { className: "field-note" }, "Latitude is always stored as positive (N), longitude as negative (W)."),
   ]);
 
@@ -978,6 +993,7 @@ export function render(container) {
   const screen = h("div", { className: "screen trial-details-screen" }, [
     topBar,
     h("div", { className: "screen-body" }, [
+      locationCaptureSection,
       cooperatorSection,
       gpsSection,
       plantingSection,

@@ -2580,3 +2580,18 @@ button.summary-header-card {
 .hybrid-catalog-upload-section .field-note {
   margin: 0;
 }
+
+/* ---------- Plot Details: top-of-screen location capture card ---------- */
+
+/* Sits above Cooperator Details (per explicit request) — one tap fills
+   location + soil type; the note under the button explains it. */
+.location-capture-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.location-capture-note {
+  margin: 0;
+  text-align: center;
+}
