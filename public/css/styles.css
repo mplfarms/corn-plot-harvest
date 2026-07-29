@@ -2560,3 +2560,23 @@ button.summary-header-card {
 .help-contact-row {
   font-size: 1rem;
 }
+
+/* ---------- Settings > Admin: Hybrid Catalog split uploads ---------- */
+
+/* Same stacked-button rhythm as the Account card right above (see
+   .account-card's gap) — per explicit request, the two upload buttons
+   ("Upload Company Hybrids" / "Upload Alt. Variety Hybrids") get the
+   same breathing room as every other button stack on this screen. */
+.hybrid-catalog-upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* The section's own flex gap handles all spacing — strip the
+   field-notes' default top margin so the status line and the
+   which-file-goes-where note don't double up. */
+.hybrid-catalog-upload-section .field-note {
+  margin: 0;
+}
