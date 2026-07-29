@@ -124,7 +124,7 @@ export function render(container) {
 
     helpSection("Sharing These Results", [
       p("Once everything looks right, tap “Share This Plot” at the bottom of this screen for a printable PDF, the full spreadsheet, printing, or emailing your results — see Settings → Help for the full walkthrough of those options."),
-      p("Fastest option: the share icon at the very top of this screen (next to the “i”) sends this whole summary as a single PICTURE of exactly what you see here — the same cards and charts, top to bottom, with Plot Details included. It previews right inside a text thread on any phone, no app needed on the other end: the recipient zooms it to full width once, then scrolls through — it's rendered in high resolution, so every number stays sharp zoomed in. If this plot has a GPS location recorded, it's embedded in the picture's photo info too, so the plot's location travels with the results."),
+      p("Fastest option: the share icon at the very top of this screen (next to the “i”) sends the full PDF summary in one tap — straight to your share sheet, Plot Details always included, no questions asked. A PDF opens easily for everyone (iPhone, Android, or computer, using each device's built-in viewer) and travels through a group text as a proper file attachment, so it never gets blurred the way texted pictures can be. It's named after the cooperator and year — like “Larson Family Farms_2026_Corn Plot.pdf” — so it's easy to spot in a thread."),
     ]),
   ];
 

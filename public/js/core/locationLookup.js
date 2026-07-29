@@ -19,6 +19,13 @@
 
 const FCC_AREA_URL = "https://geo.fcc.gov/api/census/block/find";
 const REVERSE_GEOCODE_URL = "https://api.bigdatacloud.net/data/reverse-geocode-client";
+// OpenStreetMap's Overpass API (free, no-key, CORS-enabled) — used for
+// "what towns are NEAR here" radius queries, which is the question a
+// farm plot actually needs answered (a point reverse-geocode only says
+// what unincorporated township the point sits IN). Primary endpoint
+// plus one public mirror, tried in order.
+const OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
+const METERS_PER_MILE = 1609.344;
 
 /**
  * Case-insensitive, whitespace-trimmed exact match of `value` against a
@@ -126,6 +133,65 @@ export async function fetchNearestCityCandidates(lat, lon) {
   } catch (e) {
     return [];
   }
+}
+
+/**
+ * Great-circle distance in miles (haversine).
+ * @param {number} lat1
+ * @param {number} lon1
+ * @param {number} lat2
+ * @param {number} lon2
+ * @returns {number}
+ */
+export function distanceMiles(lat1, lon1, lat2, lon2) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const R = 3958.7613; // earth radius, miles
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/**
+ * Every named city/town/village within `radiusMiles` of the point, from
+ * OpenStreetMap via Overpass, sorted nearest-first with distances.
+ * These are OSM "place" nodes — real communities, not townships or
+ * survey areas — but callers should STILL snap each name against the
+ * app's own city list for the state (see snapToKnownName), which is
+ * what enforces "incorporated town in the right state" per explicit
+ * request. Fails soft to [] like every other lookup in this file.
+ * @param {number} lat
+ * @param {number} lon
+ * @param {number} radiusMiles
+ * @returns {Promise<Array<{name: string, distanceMiles: number}>>}
+ */
+export async function fetchNearbyCityCandidatesByRadius(lat, lon, radiusMiles) {
+  const radiusMeters = Math.round(radiusMiles * METERS_PER_MILE);
+  const query = `[out:json][timeout:10];node(around:${radiusMeters},${lat},${lon})[place~"^(city|town|village)$"][name];out body 80;`;
+  for (const endpoint of OVERPASS_URLS) {
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `data=${encodeURIComponent(query)}`,
+      });
+      if (!res.ok) continue;
+      const body = await res.json();
+      const elements = body && Array.isArray(body.elements) ? body.elements : [];
+      const places = [];
+      for (const el of elements) {
+        const name = el && el.tags && typeof el.tags.name === "string" ? el.tags.name.trim() : "";
+        if (!name || typeof el.lat !== "number" || typeof el.lon !== "number") continue;
+        places.push({ name, distanceMiles: distanceMiles(lat, lon, el.lat, el.lon) });
+      }
+      places.sort((a, b) => a.distanceMiles - b.distanceMiles);
+      return places;
+    } catch (e) {
+      // try the next endpoint
+    }
+  }
+  return [];
 }
 
 /**

@@ -20,7 +20,12 @@ import { createDatePicker } from "../components/datePicker.js";
 import { openSearchListPicker } from "../components/searchListPicker.js";
 import { navigate } from "../router.js";
 import { fetchSoilTypeForCoordinates } from "../../core/soilLookup.js";
-import { fetchRegionForCoordinates, snapToKnownName } from "../../core/locationLookup.js";
+import {
+  fetchRegionForCoordinates,
+  snapToKnownName,
+  cleanCityCandidate,
+  fetchNearbyCityCandidatesByRadius,
+} from "../../core/locationLookup.js";
 import { ensureFormIdAssignedWithFeedback } from "../formIdAssign.js";
 
 // Above this many ZIP matches for a city, an inline row of tappable
@@ -224,8 +229,9 @@ export function render(container) {
       currentState = v;
       trialStore.updateHeader({ state: v });
       refreshCountyOptions();
+      refreshCityDisabled();
       lastCityLookup = null;
-      if (cityInput.value.trim() !== "") runCityZipLookup();
+      if (cityValue.trim() !== "") runCityZipLookup();
     },
   });
 
@@ -315,7 +321,7 @@ export function render(container) {
   }
 
   function runCityZipLookup() {
-    const cityVal = cityInput.value.trim();
+    const cityVal = cityValue.trim();
     if (cityVal === "" || cityVal === lastCityLookup) return;
     lastCityLookup = cityVal;
     clearZipChoices();
@@ -336,11 +342,163 @@ export function render(container) {
     }
   }
 
-  const cityInput = textInput({
-    value: header.city,
-    oninput: (v) => trialStore.updateHeader({ city: v }),
-  });
-  cityInput.addEventListener("change", () => runCityZipLookup());
+  // ---- City: a searchable selection list (per explicit request) ----
+  // Works exactly like the Company/Hybrid pickers on the Entry Editor:
+  // tap to open a scrollable list of every town in the selected State,
+  // start typing to filter down, tap to pick — so details can be
+  // entered for a distant location without GPS. A town that's somehow
+  // missing from the list can still be typed and added inline (the
+  // picker's `+ Add "…"` row), same as adding a custom Hybrid.
+  let cityValue = header.city || "";
+
+  const cityValueEl = h(
+    "span",
+    { className: "wheel-row-value" + (cityValue ? "" : " wheel-row-placeholder") },
+    cityValue || "Select"
+  );
+
+  function setCityDisplay(v) {
+    cityValue = v || "";
+    cityValueEl.textContent = cityValue || "Select";
+    cityValueEl.classList.toggle("wheel-row-placeholder", !cityValue);
+  }
+
+  // A city chosen by hand (picker tap or inline add) drives Zip the same
+  // way a nearby-town chip tap does: the Zip re-fills to follow the new
+  // town (single zip fills directly, multiple zips show chooser chips).
+  function commitCityChoice(v) {
+    setCityDisplay(v);
+    trialStore.updateHeader({ city: cityValue });
+    zipInput.value = "";
+    trialStore.updateHeader({ zip: "" });
+    lastCityLookup = null;
+    runCityZipLookup();
+    renderNearbyTownChoices();
+  }
+
+  const cityDisabledReasonEl = h("p", { className: "wheel-disabled-reason" }, "Select a state first");
+
+  const cityRowBtn = h(
+    "button",
+    {
+      type: "button",
+      className: "wheel-row-header",
+      onclick: () => {
+        if (!currentState) return;
+        openSearchListPicker({
+          title: "City",
+          value: cityValue,
+          options: geoData.getCityNamesForState(currentState),
+          onChange: (v) => commitCityChoice(v),
+          onAddNew: (raw) => raw.trim(),
+          addNewHint: "Not finding the town? Type its name and tap Add.",
+        });
+      },
+    },
+    [cityValueEl, h("span", { className: "wheel-chevron" }, "›")]
+  );
+
+  const cityRow = h("div", { className: "wheel-row" }, [cityRowBtn, cityDisabledReasonEl]);
+
+  function refreshCityDisabled() {
+    const disabled = !currentState;
+    cityRowBtn.disabled = disabled;
+    cityRow.classList.toggle("wheel-row-disabled", disabled);
+    cityDisabledReasonEl.style.display = disabled ? "" : "none";
+  }
+  refreshCityDisabled();
+
+  // ---- Nearby-towns selection box (GPS city autofill) ----
+  // After a GPS capture, the nearest incorporated town pre-populates the
+  // City field and this list shows every qualifying town found within
+  // the search radius, nearest first with distances — tap one to adjust,
+  // per explicit request ("Pre populate nearest but allow user to adjust
+  // in selection box"). Reuses the zip-choice chip styling on purpose:
+  // same "auto-filled, tap to change" interaction the Zip field already
+  // has right below.
+  const cityStatusEl = h("p", { className: "field-status" }, "");
+  const cityChoicesEl = h("div", { className: "zip-choice-list city-nearby-list" });
+
+  function setCityStatus(text, active) {
+    cityStatusEl.textContent = text;
+    cityStatusEl.className = "field-status" + (active ? " field-status-active" : "");
+  }
+
+  function commitNearbyTownChoice(town) {
+    setCityDisplay(town.name);
+    trialStore.updateHeader({ city: town.name });
+    // The town choice drives Zip: re-run the city->zip lookup fresh so
+    // the Zip follows the newly picked town (single zip fills directly,
+    // multiple zips show the existing chooser chips).
+    zipInput.value = "";
+    trialStore.updateHeader({ zip: "" });
+    lastCityLookup = null;
+    runCityZipLookup();
+    renderNearbyTownChoices();
+  }
+
+  let nearbyTowns = [];
+
+  function renderNearbyTownChoices() {
+    clear(cityChoicesEl);
+    if (nearbyTowns.length === 0) return;
+    const current = cityValue.trim().toLowerCase();
+    for (const town of nearbyTowns) {
+      cityChoicesEl.appendChild(
+        h(
+          "button",
+          {
+            type: "button",
+            className:
+              "zip-choice-btn" + (town.name.toLowerCase() === current ? " zip-choice-btn-selected" : ""),
+            onclick: () => commitNearbyTownChoice(town),
+          },
+          `${town.name} — ${town.distanceMiles.toFixed(1)} mi`
+        )
+      );
+    }
+  }
+
+  function showNearbyTowns(towns, radiusUsed) {
+    nearbyTowns = towns;
+    setCityStatus(
+      towns.length > 1
+        ? `Nearest town auto-filled — towns within ${radiusUsed} miles, tap to adjust:`
+        : `Nearest town auto-filled (only one found within ${radiusUsed} miles).`,
+      true
+    );
+    renderNearbyTownChoices();
+  }
+
+  // Finds incorporated towns near the point: every OSM place within the
+  // radius, snapped against the app's own city list for the state (the
+  // "real incorporated towns, not townships" filter), deduped keeping
+  // each town's closest distance, nearest first. Starts at 10 miles per
+  // explicit request and widens once to 25 when open country turns up
+  // nothing incorporated that close.
+  const NEARBY_TOWN_RADII_MILES = [10, 25];
+
+  async function findNearbyTowns(lat, lon, cityNames) {
+    for (const radius of NEARBY_TOWN_RADII_MILES) {
+      const places = await fetchNearbyCityCandidatesByRadius(lat, lon, radius);
+      const byName = new Map();
+      for (const place of places) {
+        const snapped = snapToKnownName(cleanCityCandidate(place.name), cityNames);
+        if (!snapped) continue;
+        const existing = byName.get(snapped);
+        if (existing === undefined || place.distanceMiles < existing) byName.set(snapped, place.distanceMiles);
+      }
+      if (byName.size > 0) {
+        return {
+          radiusUsed: radius,
+          towns: [...byName.entries()]
+            .map(([name, d]) => ({ name, distanceMiles: d }))
+            .sort((a, b) => a.distanceMiles - b.distanceMiles),
+        };
+      }
+    }
+    return { radiusUsed: null, towns: [] };
+  }
 
   // County options and any pending city/zip lookup both depend on the
   // geo dataset, which loads asynchronously (and may still be loading
@@ -348,7 +506,7 @@ export function render(container) {
   geoData.ensureLoaded().then(() => {
     refreshCountyOptions();
     lastCityLookup = null;
-    if (cityInput.value.trim() !== "") runCityZipLookup();
+    if (cityValue.trim() !== "") runCityZipLookup();
   });
 
   // Form ID — a short, permanent reference number for this exact plot
@@ -397,7 +555,7 @@ export function render(container) {
     h("p", { className: "field-note trial-details-address-note" }, "Leave blank if not known."),
     field("State", stateWheel.el),
     field("County", countyWheel.el),
-    field("City", cityInput),
+    field("City", h("div", {}, [cityRow, cityStatusEl, cityChoicesEl])),
     field("Zip", h("div", {}, [zipInput, zipStatusEl, zipChoicesEl])),
   ]);
 
@@ -554,27 +712,50 @@ export function render(container) {
     }
 
     if (needCity && !(now.city || "").trim() && effectiveState) {
-      // The FIRST candidate that matches the app's own city list for
-      // this state wins — that list is real postal towns, which is
-      // exactly the "nearest incorporated town, not a township" filter
-      // (per explicit field report: "Township of South Loup" is not a
-      // useful City). NO raw fallback here: a name that matches nothing
-      // leaves City blank for manual entry rather than storing a
-      // township label.
-      let cityValue = null;
-      for (const candidate of region.cityCandidates || []) {
-        cityValue = snapToKnownName(candidate, geoData.getCityNamesForState(effectiveState));
-        if (cityValue) break;
+      const cityNames = geoData.getCityNamesForState(effectiveState);
+
+      // PRIMARY: a radius search for incorporated towns near the point
+      // (10 miles, widening once to 25) — per explicit request/field
+      // report, a rural GPS point often isn't "in" any incorporated
+      // place, so asking "what towns are NEAR here" beats asking "what
+      // place is here". The nearest one pre-populates City and the full
+      // nearest-first list renders as a tap-to-adjust selection box
+      // under the field.
+      const nearby = await findNearbyTowns(lat, lon, cityNames);
+
+      let autoCity = null;
+      if (nearby.towns.length > 0) {
+        autoCity = nearby.towns[0].name;
+      } else {
+        // FALLBACK (radius service unreachable or nothing incorporated
+        // within 25 miles): the reverse-geocode candidate walk — the
+        // FIRST candidate that matches the app's own city list for this
+        // state wins; that list is real postal towns, which is exactly
+        // the "nearest incorporated town, not a township" filter (per
+        // explicit field report: "Township of South Loup" is not a
+        // useful City). NO raw fallback below that: a name that matches
+        // nothing leaves City blank for manual entry rather than
+        // storing a township label.
+        for (const candidate of region.cityCandidates || []) {
+          autoCity = snapToKnownName(candidate, cityNames);
+          if (autoCity) break;
+        }
       }
-      if (cityValue) {
-        patch.city = cityValue;
-        cityInput.value = cityValue;
-        // Kick the existing city->zip auto-fill, but only when Zip is
-        // still blank too — the fill-blanks-only rule applies to it as
-        // much as to the fields above.
-        if (!(now.zip || "").trim()) {
-          lastCityLookup = null;
-          runCityZipLookup();
+
+      if (autoCity) {
+        // Guard against the user having picked a City while the radius
+        // lookup was in flight — a manual entry always wins.
+        if (cityValue.trim() === "") {
+          patch.city = autoCity;
+          setCityDisplay(autoCity);
+          if (nearby.towns.length > 0) showNearbyTowns(nearby.towns, nearby.radiusUsed);
+          // Kick the existing city->zip auto-fill, but only when Zip is
+          // still blank too — the fill-blanks-only rule applies to it as
+          // much as to the fields above.
+          if (!(now.zip || "").trim() && !zipInput.value.trim()) {
+            lastCityLookup = null;
+            runCityZipLookup();
+          }
         }
       }
     }

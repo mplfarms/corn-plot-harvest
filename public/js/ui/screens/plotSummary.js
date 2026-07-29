@@ -31,8 +31,6 @@ import {
   repeatedHybridFlags,
 } from "../../core/yieldCalculator.js";
 import { buildPdf, pdfFilename } from "../../core/pdfBuilder.js";
-import { captureElementToCanvas, canvasToPngBlob } from "../summarySnapshot.js";
-import { embedGpsMetadata } from "../../core/pngMetadata.js";
 import { buildXlsx, createEffectiveLists } from "../../core/xlsxBuilder.js";
 import { buildSeedwareExport } from "../../core/seedwareExportBuilder.js";
 import { getLogoDataUrl } from "../logoCache.js";
@@ -637,86 +635,31 @@ export function render(container, params) {
     }
   }
 
-  // ---- Share as a PICTURE (top-bar share icon) ----
-  // Captures the SCREEN view of this summary — the actual on-screen
-  // cards, theme colors, and charts, via summarySnapshot.js's DOM
-  // painter — into a single tall PNG and hands it straight to the OS
-  // share sheet, one tap, no menu, no prompts. Per explicit request
-  // (replacing the earlier PDF-layout version of this picture, which
-  // itself replaced an .html-file share): the picture should match what
-  // the user is looking at, and previews inline in any text thread/
-  // AirDrop on iOS and Android. Interactive-only controls (buttons, the
-  // Dry Yield/Gross toggle, the header chevron) are left out — they'd
-  // read as broken UI in a static picture — and the Plot Details recap
-  // panel is expanded for the capture (then restored), since the
-  // picture is the "hand someone everything" format. The plot's GPS
-  // location, when recorded, is embedded in the PNG's metadata (EXIF
-  // GPS + a text chunk — see pngMetadata.js), per explicit request.
-  // NOTE: SVG-foreignObject DOM rasterization is deliberately NOT used —
-  // it taints the canvas in several engines (including iOS WebKit),
-  // which blocks PNG export entirely. summarySnapshot.js repaints from
-  // computed styles/layout instead.
-  const SNAPSHOT_EXCLUDE = ".btn, .segmented-control, .chooser-row-chevron, .preview-owner-banner";
-
-  // Puts the screen into "picture form" for the few milliseconds of the
-  // capture: interactive controls hidden (display:none, so the layout
-  // closes up around them — merely skipping them while painting would
-  // leave button-shaped blank holes in the picture) and the Plot
-  // Details recap expanded. Returns a restore function that puts every
-  // touched element back exactly as the user had it.
-  function prepareForSnapshot() {
-    const undos = [];
-    screenBody.querySelectorAll(SNAPSHOT_EXCLUDE).forEach((el) => {
-      const prev = el.style.display;
-      if (prev === "none") return;
-      el.style.display = "none";
-      undos.push(() => {
-        el.style.display = prev;
-      });
-    });
-    if (detailsPanel.style.display === "none") {
-      detailsPanel.style.display = "";
-      undos.push(() => {
-        detailsPanel.style.display = "none";
-      });
-    }
-    return () => undos.reverse().forEach((undo) => undo());
-  }
-
-  async function handleSharePng() {
+  // ---- Share as a PDF (top-bar share icon) ----
+  // One tap hands the ranked-results PDF straight to the OS share sheet
+  // — no menu, no prompts. Per explicit request this went back to a PDF
+  // (after an .html-file version and then a picture version): a PDF is
+  // easy for everyone to open, and rides through a group text with
+  // mixed Android/iOS recipients as a proper file attachment — it never
+  // gets recompressed the way carrier messaging mangles images. Plot
+  // Details are always included (this button is the "hand someone
+  // everything" format; the share MENU's PDF row keeps its
+  // include-details question), and the file is named
+  // "<Cooperator>_<year>_Corn Plot.pdf" — per explicit request — so
+  // it's recognizable in a thread, unlike the menu's Form-ID-named PDF.
+  async function handleShareTopBarPdf() {
     try {
       const freshHeader = await resolveHeaderForExport();
-      const restore = prepareForSnapshot();
-      let canvas;
-      try {
-        // scale 4 = high resolution, per explicit request — a recipient
-        // zooming the picture to full width on any phone sees text as
-        // sharp as the app itself. captureElementToCanvas() automatically
-        // steps the scale down for very long plots so the canvas never
-        // exceeds mobile Safari's ~16.7M-pixel ceiling.
-        canvas = await captureElementToCanvas(screenBody, { scale: 4, padding: 4 });
-      } finally {
-        restore();
-      }
-      const blob = await canvasToPngBlob(canvas);
-      // Embed the plot's GPS location in the picture's metadata (no-op
-      // when this plot has no GPS recorded).
-      const bytes = embedGpsMetadata(new Uint8Array(await blob.arrayBuffer()), {
-        latitude: freshHeader.gpsLatitude,
-        longitude: freshHeader.gpsLongitude,
-      });
-      const outBlob = new Blob([bytes], { type: "image/png" });
-      // "<Cooperator>_<year>_Corn Plot.png" — per explicit request
-      // (unlike the PDF/XLSX, which stay named by Form ID).
+      const blob = await buildRankedPdfBlob(freshHeader, true);
       const coopForName = (freshHeader.cooperatorName || "")
         .trim()
         .replace(/[\\/:*?"<>|]+/g, "")
         .replace(/\s+/g, " ")
         .trim();
-      const filename = `${[coopForName, String(filenameYear(freshHeader)), "Corn Plot"].filter(Boolean).join("_")}.png`;
-      await shareOrDownload(outBlob, filename, "image/png");
+      const filename = `${[coopForName, String(filenameYear(freshHeader)), "Corn Plot"].filter(Boolean).join("_")}.pdf`;
+      await shareOrDownload(blob, filename, "application/pdf");
     } catch (e) {
-      showToast(`Couldn't build the shareable picture: ${e.message}`, { type: "error" });
+      showToast(`Couldn't build the shareable PDF: ${e.message}`, { type: "error" });
     }
   }
 
@@ -731,9 +674,9 @@ export function render(container, params) {
     {
       type: "button",
       className: "top-bar-btn top-bar-btn-share",
-      "aria-label": "Share this summary as a picture",
-      title: "Share this summary as a picture",
-      onclick: handleSharePng,
+      "aria-label": "Share this summary as a PDF",
+      title: "Share this summary as a PDF",
+      onclick: handleShareTopBarPdf,
     },
     h("span", { className: "top-bar-share-icon", html: SHARE_ICON_SVG })
   );

@@ -163,9 +163,9 @@ export async function buildPdf(args) {
  * text/rect/line/circle, saveGraphicsState/setGState,
  * splitTextToSize/getTextWidth, getImageProperties/addImage, addPage.
  * (An earlier build routed a share-as-picture PNG through here via a
- * canvas adapter; the picture now captures the on-screen summary view
- * instead — see ui/summarySnapshot.js — so the PDF is this layout's
- * only consumer again.)
+ * canvas adapter; the top-bar share is a one-tap PDF again — see
+ * plotSummary.js's handleShareTopBarPdf() — so the PDF is this
+ * layout's only consumer.)
  * @param {any} doc
  * @param {{
  *   header: import('./models.js').TrialHeader,
