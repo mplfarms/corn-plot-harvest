@@ -39,10 +39,45 @@ const RM_HEADER_KEYWORDS = ["maturity", "rm", "crm"];
 // applyCatalogHybridDefaults() in entryEditor.js — it keys the catalog
 // by the entry's own Brand, so the rows have to exist under each real
 // brand name, not under the alias). SuperCrost is deliberately NOT part
-// of this alias — it's an ordinary competitor brand, per the same
-// request.
+// of this alias — its rows never expand into the three Brand Views —
+// but per a later explicit request it DOES belong to the "Company
+// Hybrids" upload group below, alongside the three house brands.
 const HOUSE_BRAND_ALIAS_KEY = "mwnccr";
 export const HOUSE_BRAND_EXPANSION = ["Midwest Seed Genetics", "NC+ Hybrids", "Crow's"];
+
+// ---- Upload-group split ----
+// Per explicit request the Hybrid Catalog is maintained as TWO separate
+// upload files: "Company Hybrids" (Midwest Seed Genetics, NC+ Hybrids,
+// Crow's — including the MW / NC / CR alias — plus SuperCrost) and
+// "Alt. Variety Hybrids" (every other brand). Each upload replaces ONLY
+// its own group's rows; rows belonging to the other group are ignored
+// with a notice rather than routed or uploaded, so a mixed/wrong file
+// can never overwrite the half it wasn't meant to touch. This
+// classifier is the single definition of that split — keep
+// netlify/functions/hybridCatalog.js's CommonJS copy in sync with it.
+export const CATALOG_GROUP = { COMPANY: "company", ALT: "alt" };
+
+const COMPANY_GROUP_BRAND_KEYS = new Set([
+  "midwestseedgenetics",
+  "nchybrids",
+  "crows",
+  "supercrost",
+]);
+
+/**
+ * @param {string} company a catalog Brand/Company value
+ * @returns {boolean} true when the brand belongs to the "Company
+ *   Hybrids" upload group — matched with the same punctuation/spacing
+ *   tolerance as the house alias ("Crow's"/"Crows", "SuperCrost"/
+ *   "Supercrost", and the MW / NC / CR alias itself all count).
+ */
+export function isCompanyGroupBrand(company) {
+  if (isHouseBrandAlias(company)) return true;
+  const key = String(company || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  return COMPANY_GROUP_BRAND_KEYS.has(key);
+}
 
 /**
  * @param {string} company a Brand/Company cell value
@@ -109,14 +144,20 @@ export function rowsFromAOA(aoa) {
       skippedCount++;
       continue;
     }
+    // sourceLine ties every emitted row back to its spreadsheet row —
+    // an alias row expands into 3 catalog rows that SHARE one
+    // sourceLine, so callers counting "how many of YOUR rows" (e.g. the
+    // split-upload skipped-rows notice) can count source rows rather
+    // than confusing the user with post-expansion counts. Strip it
+    // before uploading (see hybridCatalogUpload.js).
     if (isHouseBrandAlias(company)) {
       // One source row -> three catalog rows, one per house Brand View
       // (see HOUSE_BRAND_EXPANSION's comment above).
       for (const houseCompany of HOUSE_BRAND_EXPANSION) {
-        rows.push({ company: houseCompany, hybrid, trait, rm });
+        rows.push({ company: houseCompany, hybrid, trait, rm, sourceLine: i });
       }
     } else {
-      rows.push({ company, hybrid, trait, rm });
+      rows.push({ company, hybrid, trait, rm, sourceLine: i });
     }
   }
 

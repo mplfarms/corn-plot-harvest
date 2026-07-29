@@ -16,17 +16,26 @@
 //   the same trust level as the statically-served DefaultLists.json.
 //   -> {updatedAt: string|null, rows: Array<{company, hybrid, trait, rm}>}
 //
-// POST body: {email, rows: Array<{company, hybrid, trait, rm}>}
+// POST body: {email, rows: Array<{company, hybrid, trait, rm}>, group?}
 //   Admin-only (requireAdmin(), identical pattern to
-//   backfillFormIds.js). REPLACES the entire catalog — this is a full
-//   re-upload each time, by design: the admin's source spreadsheet is
-//   the single source of truth, and always re-parsing it fresh from
-//   scratch means there's never a question of what merged with what
-//   from a previous upload. Company-name de-duplication against the
-//   app's existing brand list happens client-side before this is ever
-//   called (see public/js/core/companyMatch.js) — this function trusts
-//   whatever rows it's given and only validates their basic shape.
-//   -> {rowCount, companyCount, updatedAt}
+//   backfillFormIds.js).
+//   With group ("company" | "alt") — the split-upload mode, per
+//   explicit request: replaces ONLY that group's rows (Company Hybrids
+//   = Midwest Seed Genetics / NC+ Hybrids / Crow's / SuperCrost; Alt.
+//   Variety Hybrids = every other brand) and keeps the other group's
+//   stored rows untouched, so the two halves are maintained as two
+//   separate source files. Incoming rows that belong to the OTHER
+//   group are dropped here too (defense in depth — the client already
+//   filters them out with a notice before uploading).
+//   Without group — the original full-replace, kept for backward
+//   compatibility: the whole catalog is swapped for the uploaded rows.
+//   Either way the response carries the complete merged catalog so the
+//   uploading device can reflect it immediately.
+//   Company-name de-duplication against the app's existing brand list
+//   happens client-side before this is ever called (see
+//   public/js/core/companyMatch.js) — this function trusts whatever
+//   rows it's given and only validates their basic shape.
+//   -> {rowCount, companyCount, totalRowCount, updatedAt, rows}
 //
 // Row validation is deliberately light (matching this app's overall
 // "small trusted team" simplicity — see _shared.js's top comment): each
@@ -39,6 +48,24 @@ const { getStore, connectLambda } = require("@netlify/blobs");
 const { json, normalizeEmail, requireAdmin } = require("./_shared");
 
 const STATE_KEY = "catalog.json";
+
+// "Company Hybrids" upload-group membership — CommonJS copy of
+// isCompanyGroupBrand() in public/js/core/hybridCatalogImport.js; keep
+// the two in sync (same normalization, same brand keys).
+const COMPANY_GROUP_BRAND_KEYS = new Set([
+  "midwestseedgenetics",
+  "nchybrids",
+  "crows",
+  "supercrost",
+  "mwnccr", // the MW / NC / CR house alias (normally expanded client-side)
+]);
+
+function isCompanyGroupBrand(company) {
+  const key = String(company || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  return COMPANY_GROUP_BRAND_KEYS.has(key);
+}
 
 function sanitizeRows(rawRows) {
   if (!Array.isArray(rawRows)) return [];
@@ -88,9 +115,42 @@ exports.handler = async (event) => {
     return json(400, { error: "No valid rows in upload — expected company, hybrid, trait, and rm on every row." });
   }
 
-  const updatedAt = new Date().toISOString();
-  await store.setJSON(STATE_KEY, { updatedAt, rows });
+  const group = payload.group === "company" || payload.group === "alt" ? payload.group : null;
 
-  const companyCount = new Set(rows.map((r) => r.company.toLowerCase())).size;
-  return json(200, { rowCount: rows.length, companyCount, updatedAt });
+  let uploaded;
+  let allRows;
+  if (group) {
+    // Split-upload mode: replace only this group's rows; keep the other
+    // group's stored rows exactly as they were. Company-group rows are
+    // stored first so the house brands stay ahead of the alt list in
+    // every first-seen-order picker.
+    const wantCompany = group === "company";
+    uploaded = rows.filter((r) => isCompanyGroupBrand(r.company) === wantCompany);
+    if (uploaded.length === 0) {
+      return json(400, {
+        error: `No ${wantCompany ? "Company Hybrids" : "Alt. Variety Hybrids"} rows in this upload.`,
+      });
+    }
+    const existing = (await store.get(STATE_KEY, { type: "json" })) || { rows: [] };
+    const keptOther = (existing.rows || []).filter((r) => isCompanyGroupBrand(r.company) !== wantCompany);
+    const companyRows = wantCompany ? uploaded : keptOther;
+    const altRows = wantCompany ? keptOther : uploaded;
+    allRows = [...companyRows, ...altRows];
+  } else {
+    // Legacy full replace (older clients).
+    uploaded = rows;
+    allRows = rows;
+  }
+
+  const updatedAt = new Date().toISOString();
+  await store.setJSON(STATE_KEY, { updatedAt, rows: allRows });
+
+  const companyCount = new Set(uploaded.map((r) => r.company.toLowerCase())).size;
+  return json(200, {
+    rowCount: uploaded.length,
+    companyCount,
+    totalRowCount: allRows.length,
+    updatedAt,
+    rows: allRows,
+  });
 };
