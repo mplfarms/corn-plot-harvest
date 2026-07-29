@@ -124,6 +124,7 @@ export function render(container) {
 
     helpSection("Sharing These Results", [
       p("Once everything looks right, tap “Share This Plot” at the bottom of this screen for a printable PDF, the full spreadsheet, printing, or emailing your results — see Settings → Help for the full walkthrough of those options."),
+      p("Fastest option: the share icon at the very top of this screen (next to the “i”) sends this whole summary as a single PICTURE of exactly what you see here — the same cards and charts, top to bottom, with Plot Details included. It previews right inside a text thread on any phone, no app needed on the other end: the recipient zooms it to full width once, then scrolls through — it's rendered in high resolution, so every number stays sharp zoomed in. If this plot has a GPS location recorded, it's embedded in the picture's photo info too, so the plot's location travels with the results."),
     ]),
   ];
 
