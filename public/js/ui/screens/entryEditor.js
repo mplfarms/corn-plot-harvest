@@ -163,11 +163,12 @@ export function render(container, params) {
   // CARRIED_IDENTITY_FIELDS in trialStore.js). Instead, once its Brand is
   // set, it defaults Hybrid and RM to the catalog's first RM-100 hybrid
   // so there's a sensible starting point instead of a blank field. Brand
-  // itself is now pre-filled at entry-creation time (see
-  // addEntryCarryingMeasurements() in trialStore.js), so this has to run
-  // both right away below (the user may never touch the Brand wheel at
-  // all) and again from the wheel's onChange (if they pick a different
-  // Brand while Hybrid/RM are still untouched).
+  // itself is pre-filled at entry-creation time (see
+  // addEntryCarryingMeasurements() in trialStore.js), so this runs once
+  // right away below. It deliberately does NOT run from the Brand
+  // wheel's onChange anymore — per explicit request, picking a
+  // DIFFERENT brand clears Hybrid/Trait/RM and leaves them blank (no
+  // new defaults) until a hybrid is deliberately picked.
   const isFirstEntryOfPlot = draft.entries.length > 0 && draft.entries[0].id === entryId;
   const DEFAULT_RM_FOR_NEW_PLOT = 100;
 
@@ -199,8 +200,20 @@ export function render(container, params) {
     options: listsStore.items(listsStore.CATEGORY.BRAND_COMPANY),
     showLabel: false,
     onChange: (v) => {
+      const prevBrand = (currentEntry().brand || "").trim();
       trialStore.updateEntry(entryId, { brand: v });
-      applyFirstEntryHybridRmDefault(v);
+      // Picking a DIFFERENT brand clears Hybrid/Trait/RM outright — per
+      // explicit request (real field report: switching the default
+      // Midwest entry to Dekalb left Midwest's "00-28 CONV" + RM 100
+      // sitting in the fields, which reads like a valid Dekalb pick).
+      // No defaults are re-applied either — the fields stay blank until
+      // a hybrid is deliberately picked (which then pre-fills Trait/RM
+      // from the catalog as usual). Re-picking the SAME brand changes
+      // nothing.
+      if (v.trim() !== prevBrand) {
+        trialStore.updateEntry(entryId, { hybrid: "", trait: "", relativeMaturity: "" });
+        rmWheel.setValue("");
+      }
       rebuildHybridWheel();
       refreshTraitOptionsForCurrentHybrid();
     },
@@ -318,10 +331,9 @@ export function render(container, params) {
   });
 
   // Brand is pre-filled by trialStore for a freshly created entry (see
-  // addEntryCarryingMeasurements()), so this has to run once up front —
-  // not just from brandRow's onChange — or the very first entry in a
-  // new plot would never get its Hybrid/RM default applied unless the
-  // user happened to touch the Brand / Company field themselves.
+  // addEntryCarryingMeasurements()), so this runs once up front — it's
+  // the ONLY place the first-entry default applies now (brand CHANGES
+  // clear the fields instead — see brandRow's onChange above).
   applyFirstEntryHybridRmDefault(currentEntry().brand);
   rebuildHybridWheel();
   // Matches the Trait picker's narrowed options to whatever Hybrid this
