@@ -290,11 +290,30 @@ export function render(container) {
     countyWheel.setOptions(geoData.getCountiesForState(currentState));
   }
 
-  const zipInput = textInput({
-    value: header.zip,
+  // Zip is the plain 5-digit code ONLY — per explicit request, no +4:
+  // non-digits are stripped as they're typed and anything past the 5th
+  // digit is dropped (so pasting "50010-1234" or typing 9 digits both
+  // land as "50010"), same live-reformat pattern as phoneInput().
+  function formatZip(raw) {
+    return String(raw || "").replace(/\D/g, "").slice(0, 5);
+  }
+
+  const zipInput = h("input", {
+    type: "text",
     inputmode: "numeric",
-    oninput: (v) => trialStore.updateHeader({ zip: v }),
+    className: "text-input",
+    value: formatZip(header.zip),
+    oninput: (e) => {
+      const formatted = formatZip(e.target.value);
+      e.target.value = formatted;
+      trialStore.updateHeader({ zip: formatted });
+    },
   });
+  // A pre-existing saved zip that carried a +4 (typed before this rule)
+  // normalizes to its 5-digit form on open.
+  if ((header.zip || "") !== formatZip(header.zip)) {
+    trialStore.updateHeader({ zip: formatZip(header.zip) });
+  }
 
   const zipStatusEl = h("p", { className: "field-status" }, "");
   const zipChoicesEl = h("div", { className: "zip-choice-list" });

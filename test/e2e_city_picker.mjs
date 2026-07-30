@@ -141,6 +141,29 @@ async function openPlotDetails(page, header) {
   await page.close();
 }
 
+// ---- 4. Zip entry is 5 digits only — no +4 (per explicit request) ----
+{
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
+  await openPlotDetails(page, { cooperatorName: "Test Coop", state: "IA", county: "", city: "", zip: "50010-1234" });
+
+  const zipInput = fieldByLabel(page, "Zip").locator("input");
+  check((await zipInput.inputValue()) === "50010", `a saved zip carrying a +4 opens normalized to 5 digits (got "${await zipInput.inputValue()}")`);
+
+  await zipInput.fill("");
+  await zipInput.type("500101234");
+  check((await zipInput.inputValue()) === "50010", `typing 9 digits keeps only the first 5 (got "${await zipInput.inputValue()}")`);
+
+  await zipInput.fill("");
+  await zipInput.type("5 00-1a0");
+  check((await zipInput.inputValue()) === "50010", `non-digits are stripped as typed (got "${await zipInput.inputValue()}")`);
+
+  await page.waitForTimeout(600);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("cph.draftTrial")).header.zip);
+  check(stored === "50010", `the stored zip is the clean 5-digit code (got "${stored}")`);
+  await page.close();
+}
+
 await browser.close();
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
