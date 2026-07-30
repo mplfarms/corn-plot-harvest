@@ -514,9 +514,10 @@ export function render(container) {
   // radius, snapped against the app's own city list for the state (the
   // "real incorporated towns, not townships" filter), deduped keeping
   // each town's closest distance, nearest first. Starts at 10 miles per
-  // explicit request and widens once to 25 when open country turns up
-  // nothing incorporated that close.
-  const NEARBY_TOWN_RADII_MILES = [10, 25];
+  // explicit request and widens once to 15 (was 25 — tightened per
+  // explicit follow-up: the 25-mile list pulled in towns too far out)
+  // when open country turns up nothing incorporated that close.
+  const NEARBY_TOWN_RADII_MILES = [10, 15];
 
   async function findNearbyTowns(lat, lon, cityNames) {
     for (const radius of NEARBY_TOWN_RADII_MILES) {
@@ -792,7 +793,7 @@ export function render(container) {
         autoCity = nearby.towns[0].name;
       } else {
         // FALLBACK (radius service unreachable or nothing incorporated
-        // within 25 miles): the reverse-geocode candidate walk — the
+        // within 15 miles): the reverse-geocode candidate walk — the
         // FIRST candidate that matches the app's own city list for this
         // state wins; that list is real postal towns, which is exactly
         // the "nearest incorporated town, not a township" filter (per

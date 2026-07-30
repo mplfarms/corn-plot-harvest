@@ -8,7 +8,7 @@
 //
 // City (per explicit follow-up request): PRIMARY is a 10-mile radius
 // search for incorporated towns (OpenStreetMap Overpass, widening once
-// to 25 miles) — the NEAREST pre-populates and the whole nearest-first
+// to 15 miles) — the NEAREST pre-populates and the whole nearest-first
 // list renders as a tap-to-adjust selection box under the City field.
 // The BigDataCloud reverse-geocode candidate walk remains as the
 // fallback when the radius service is unreachable.
@@ -237,7 +237,7 @@ async function stubGeoAndFetch(page) {
 }
 
 // ---- 1c. Nothing incorporated within 10 miles: the search widens ONCE
-//          to 25 miles and fills from there ----
+//          to 15 miles and fills from there ----
 {
   const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
@@ -261,7 +261,7 @@ async function stubGeoAndFetch(page) {
       if (u.includes("overpass")) {
         const body = options && options.body ? String(options.body) : "";
         window.__overpassBodies.push(body);
-        // 10-mile pass: only a township (snaps to nothing). 25-mile
+        // 10-mile pass: only a township (snaps to nothing). 15-mile
         // pass: a real town appears.
         const elements = body.includes("16093")
           ? [{ lat: LAT + 0.01, lon: LON, tags: { name: "Ticonderoga Township" } }]
@@ -298,11 +298,11 @@ async function stubGeoAndFetch(page) {
     { timeout: 8000 }
   );
   const header = await page.evaluate(() => JSON.parse(localStorage.getItem("cph.draftTrial")).header);
-  check(header.city === "Onawa", `the widened 25-mile pass fills the town the 10-mile pass couldn't (got "${header.city}")`);
+  check(header.city === "Onawa", `the widened 15-mile pass fills the town the 10-mile pass couldn't (got "${header.city}")`);
   const radii = await page.evaluate(() => window.__overpassBodies.map((b) => (b.match(/around%3A(\d+)/) || [])[1]));
-  check(radii.length === 2 && radii[0] === "16093" && radii[1] === "40234", `two radius queries: 10 miles then 25 (got ${JSON.stringify(radii)})`);
+  check(radii.length === 2 && radii[0] === "16093" && radii[1] === "24140", `two radius queries: 10 miles then 15 (got ${JSON.stringify(radii)})`);
   const statusText = await page.$eval(".city-nearby-list", (el) => el.previousElementSibling.textContent);
-  check(/25 miles/.test(statusText), `the status note reports the widened radius (got "${statusText}")`);
+  check(/15 miles/.test(statusText), `the status note reports the widened radius (got "${statusText}")`);
 
   await page.close();
 }
