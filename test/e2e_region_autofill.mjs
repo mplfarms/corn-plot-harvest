@@ -186,7 +186,9 @@ async function stubGeoAndFetch(page) {
   check(header.zip === "51040", `Zip follows the auto-filled town (got "${header.zip}")`);
 
   const overpassBodies = await page.evaluate(() => window.__overpassBodies);
-  check(overpassBodies.length === 1 && overpassBodies[0].includes("16093"), `one radius query, at 10 miles (~16093m) (got ${overpassBodies.length}: ${overpassBodies.map((b) => (b.match(/around%3A(\d+)/) || [])[1]).join(",")})`);
+  // SPEED-UP: ONE query at the wide 15-mile radius (~24140m); the
+  // 10-mile preference is applied locally from the computed distances.
+  check(overpassBodies.length === 1 && overpassBodies[0].includes("24140"), `a single radius query, at 15 miles (~24140m), filtered locally (got ${overpassBodies.length}: ${overpassBodies.map((b) => (b.match(/around%3A(\d+)/) || [])[1]).join(",")})`);
 
   const chips = await page.$$eval(".city-nearby-list .zip-choice-btn", (els) =>
     els.map((el) => ({ text: el.textContent, selected: el.className.includes("selected") }))
@@ -236,8 +238,8 @@ async function stubGeoAndFetch(page) {
   await page.close();
 }
 
-// ---- 1c. Nothing incorporated within 10 miles: the search widens ONCE
-//          to 15 miles and fills from there ----
+// ---- 1c. Nothing incorporated within 10 miles: the LOCAL filter falls
+//          back to the 15-mile results — no second network query ----
 {
   const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
@@ -261,11 +263,13 @@ async function stubGeoAndFetch(page) {
       if (u.includes("overpass")) {
         const body = options && options.body ? String(options.body) : "";
         window.__overpassBodies.push(body);
-        // 10-mile pass: only a township (snaps to nothing). 15-mile
-        // pass: a real town appears.
-        const elements = body.includes("16093")
-          ? [{ lat: LAT + 0.01, lon: LON, tags: { name: "Ticonderoga Township" } }]
-          : [{ lat: LAT + 0.25, lon: LON, tags: { name: "Onawa" } }];
+        // Single wide query: a township ~0.7mi out (snaps to nothing)
+        // plus a real town ~12.4mi out — beyond the 10-mile preference,
+        // inside the 15-mile fallback.
+        const elements = [
+          { lat: LAT + 0.01, lon: LON, tags: { name: "Ticonderoga Township" } },
+          { lat: LAT + 0.18, lon: LON, tags: { name: "Onawa" } },
+        ];
         return new Response(JSON.stringify({ elements }), { status: 200 });
       }
       if (u.includes("bigdatacloud.net")) {
@@ -298,9 +302,9 @@ async function stubGeoAndFetch(page) {
     { timeout: 8000 }
   );
   const header = await page.evaluate(() => JSON.parse(localStorage.getItem("cph.draftTrial")).header);
-  check(header.city === "Onawa", `the widened 15-mile pass fills the town the 10-mile pass couldn't (got "${header.city}")`);
+  check(header.city === "Onawa", `nothing within 10 miles -> the 15-mile fallback fills the town (got "${header.city}")`);
   const radii = await page.evaluate(() => window.__overpassBodies.map((b) => (b.match(/around%3A(\d+)/) || [])[1]));
-  check(radii.length === 2 && radii[0] === "16093" && radii[1] === "24140", `two radius queries: 10 miles then 15 (got ${JSON.stringify(radii)})`);
+  check(radii.length === 1 && radii[0] === "24140", `still only ONE radius query even in the fallback case — the old second round trip is gone (got ${JSON.stringify(radii)})`);
   const statusText = await page.$eval(".city-nearby-list", (el) => el.previousElementSibling.textContent);
   check(/15 miles/.test(statusText), `the status note reports the widened radius (got "${statusText}")`);
 

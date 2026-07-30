@@ -510,34 +510,38 @@ export function render(container) {
     renderNearbyTownChoices();
   }
 
-  // Finds incorporated towns near the point: every OSM place within the
-  // radius, snapped against the app's own city list for the state (the
-  // "real incorporated towns, not townships" filter), deduped keeping
-  // each town's closest distance, nearest first. Starts at 10 miles per
-  // explicit request and widens once to 15 (was 25 — tightened per
-  // explicit follow-up: the 25-mile list pulled in towns too far out)
-  // when open country turns up nothing incorporated that close.
-  const NEARBY_TOWN_RADII_MILES = [10, 15];
+  // Nearby-towns radii: prefer towns within 10 miles (per explicit
+  // request); fall back to 15 (tightened from 25 per follow-up) when
+  // open country has nothing incorporated that close.
+  const NEARBY_TOWN_NEAR_RADIUS_MILES = 10;
+  const NEARBY_TOWN_WIDE_RADIUS_MILES = 15;
 
-  async function findNearbyTowns(lat, lon, cityNames) {
-    for (const radius of NEARBY_TOWN_RADII_MILES) {
-      const places = await fetchNearbyCityCandidatesByRadius(lat, lon, radius);
-      const byName = new Map();
-      for (const place of places) {
-        const snapped = snapToKnownName(cleanCityCandidate(place.name), cityNames);
-        if (!snapped) continue;
-        const existing = byName.get(snapped);
-        if (existing === undefined || place.distanceMiles < existing) byName.set(snapped, place.distanceMiles);
-      }
-      if (byName.size > 0) {
-        return {
-          radiusUsed: radius,
-          towns: [...byName.entries()]
-            .map(([name, d]) => ({ name, distanceMiles: d }))
-            .sort((a, b) => a.distanceMiles - b.distanceMiles),
-        };
-      }
+  // SPEED-UP (per explicit request): ONE network query at the wide
+  // 15-mile radius, partitioned locally, instead of the old
+  // ask-at-10-then-ask-again-at-15 double round trip. The app computes
+  // every town's exact distance anyway, so the 10-mile preference is
+  // just a local filter: when anything incorporated sits within 10
+  // miles, only those towns show (exactly as before); otherwise the
+  // full within-15 list shows. Same lists, same chips, same status
+  // wording — the slowest case (open country, standing in the field)
+  // drops from two round trips to one. Places are snapped against the
+  // app's own city list for the state (the "real incorporated towns,
+  // not townships" filter), deduped keeping each town's closest
+  // distance, nearest first.
+  function partitionNearbyTowns(places, cityNames) {
+    const byName = new Map();
+    for (const place of places) {
+      const snapped = snapToKnownName(cleanCityCandidate(place.name), cityNames);
+      if (!snapped) continue;
+      const existing = byName.get(snapped);
+      if (existing === undefined || place.distanceMiles < existing) byName.set(snapped, place.distanceMiles);
     }
+    const all = [...byName.entries()]
+      .map(([name, d]) => ({ name, distanceMiles: d }))
+      .sort((a, b) => a.distanceMiles - b.distanceMiles);
+    const near = all.filter((t) => t.distanceMiles <= NEARBY_TOWN_NEAR_RADIUS_MILES);
+    if (near.length > 0) return { radiusUsed: NEARBY_TOWN_NEAR_RADIUS_MILES, towns: near };
+    if (all.length > 0) return { radiusUsed: NEARBY_TOWN_WIDE_RADIUS_MILES, towns: all };
     return { radiusUsed: null, towns: [] };
   }
 
@@ -736,6 +740,16 @@ export function render(container) {
     const needCity = !(before.city || "").trim();
     if (!stateFillable && !needCounty && !needCity) return;
 
+    // SPEED-UP (per explicit request): the nearby-towns radius query
+    // starts NOW, in parallel with the state/county reverse-geocode —
+    // the query itself doesn't need the state (only the snap-filter
+    // later does), so there's no reason to run the two in sequence.
+    // Fails soft to [] like every other lookup, so this promise never
+    // rejects.
+    const nearbyPlacesPromise = needCity
+      ? fetchNearbyCityCandidatesByRadius(lat, lon, NEARBY_TOWN_WIDE_RADIUS_MILES)
+      : Promise.resolve([]);
+
     const region = await fetchRegionForCoordinates(lat, lon, { wantCity: needCity });
     await geoData.ensureLoaded();
 
@@ -786,7 +800,11 @@ export function render(container) {
       // place is here". The nearest one pre-populates City and the full
       // nearest-first list renders as a tap-to-adjust selection box
       // under the field.
-      const nearby = await findNearbyTowns(lat, lon, cityNames);
+      // The radius query has been in flight since before the
+      // state/county lookup (see nearbyPlacesPromise above) — by now
+      // it's usually already resolved; snap-filter its places against
+      // this state's own city list.
+      const nearby = partitionNearbyTowns(await nearbyPlacesPromise, cityNames);
 
       let autoCity = null;
       if (nearby.towns.length > 0) {
