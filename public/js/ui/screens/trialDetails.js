@@ -16,6 +16,7 @@ import * as adminEditStore from "../stores/adminEditStore.js";
 import * as geoData from "../geoData.js";
 import { createTopBar } from "../components/topBar.js";
 import { showConfirm } from "../components/modal.js";
+import { openMapPicker } from "../mapPicker.js";
 import { createWheelSelect, createExtendableWheelSelect } from "../components/wheelSelect.js";
 import { createDatePicker } from "../components/datePicker.js";
 import { openSearchListPicker } from "../components/searchListPicker.js";
@@ -681,15 +682,17 @@ export function render(container) {
   // this only ever actually runs later, after render() has finished
   // building the whole screen (it's reached only from the capture
   // button's onclick; nothing auto-fires on open).
-  async function attemptSoilLookup(lat, lon, accuracy) {
-    const accuracyText = `Location captured (±${Math.round(accuracy)}m).`;
+  // statusPrefix: the "where these coordinates came from" lead-in for
+  // the status line — "Location captured (±8m)." from the device
+  // button, "Location set from the map." from the map picker.
+  async function attemptSoilLookup(lat, lon, statusPrefix) {
     const matched = await fetchSoilTypeForCoordinates(lat, lon, fixed.soilTypeOptions);
     if (matched) {
       trialStore.updateHeader({ soilType: matched });
       soilTypeWheel.setValue(matched);
-      setLocationStatus(`${accuracyText} Soil type set to ${matched}.`, "success");
+      setLocationStatus(`${statusPrefix} Soil type set to ${matched}.`, "success");
     } else {
-      setLocationStatus(`${accuracyText} Couldn't determine a soil type for this location — select manually.`, "success");
+      setLocationStatus(`${statusPrefix} Couldn't determine a soil type for this location — select manually.`, "success");
     }
   }
 
@@ -877,7 +880,7 @@ export function render(container) {
         lonInput.value = String(lon);
         markLocationEnabled();
         setLocationStatus(`Location captured (±${Math.round(pos.coords.accuracy)}m). Looking up soil type…`, "success");
-        attemptSoilLookup(lat, lon, pos.coords.accuracy);
+        attemptSoilLookup(lat, lon, `Location captured (±${Math.round(pos.coords.accuracy)}m).`);
         attemptRegionLookup(lat, lon);
       },
       (err) => {
@@ -887,15 +890,31 @@ export function render(container) {
     );
   }
 
+  // "Probably a desk computer, not a phone/tablet" — no touch screen
+  // AND a fine (mouse-style) pointer. A desktop browser has no GPS
+  // chip; it guesses location from the internet connection, which can
+  // be miles off — exactly the wrong input for the soil/region
+  // lookups. Deliberately a heuristic + WARNING rather than hiding the
+  // button (per explicit answered question): a misdetected tablet user
+  // in the field just answers Yes and carries on.
+  function isProbablyDesktop() {
+    const coarse = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+    const touch = (navigator.maxTouchPoints || 0) > 0;
+    return !coarse && !touch;
+  }
+
   const useLocationBtn = h(
     "button",
     {
       type: "button",
       className: "btn btn-secondary btn-block",
-      // When the stored coordinates were typed in MANUALLY, using the
-      // device would override them — ask first (Yes/No), per explicit
-      // request. A device-sourced (or pre-gpsSource legacy) location
-      // re-captures without asking, as before.
+      // Two possible confirmations, in order:
+      //  1. Stored coordinates were typed MANUALLY — using the device
+      //     would override them; ask first (per explicit request).
+      //  2. This looks like a desk computer — its location guess can be
+      //     miles off; warn first (per explicit request).
+      // A device-sourced (or pre-gpsSource legacy) location on a phone
+      // re-captures without any questions, as before.
       onclick: async () => {
         const hdr = trialStore.getState().header;
         const hasCoords = Number.isFinite(hdr.gpsLatitude) && Number.isFinite(hdr.gpsLongitude);
@@ -909,10 +928,55 @@ export function render(container) {
           });
           if (!ok) return;
         }
+        if (isProbablyDesktop()) {
+          const ok = await showConfirm({
+            title: "Not a Phone or Tablet?",
+            message:
+              "This computer estimates its location from the internet connection, not GPS — it can be miles off. For an exact spot, use “Pick Location on Map” below instead. Use the computer's location estimate anyway?",
+            confirmLabel: "Yes",
+            cancelLabel: "No",
+          });
+          if (!ok) return;
+        }
         runLocationCapture();
       },
     },
     "Use Device for Location & Soil Type"
+  );
+
+  // "Pick Location on Map" — the desk-friendly alternative: a satellite
+  // map (lazy-loaded, free/public-domain imagery — see mapPicker.js) to
+  // tap the exact field. A map pick counts as MANUAL coordinates
+  // (gpsSource "manual" — the device button un-lights and will ask
+  // before overriding), and runs the same soil/region autofill a device
+  // capture does.
+  const mapPickBtn = h(
+    "button",
+    {
+      type: "button",
+      className: "btn btn-secondary btn-block",
+      onclick: () => {
+        const hdr = trialStore.getState().header;
+        openMapPicker({
+          initialLat: hdr.gpsLatitude,
+          initialLon: hdr.gpsLongitude,
+          onPick: (lat, lon) => {
+            const rLat = round6(Math.abs(lat));
+            const rLon = round6(-Math.abs(lon));
+            trialStore.updateHeader({ gpsLatitude: rLat, gpsLongitude: rLon, gpsSource: "manual" });
+            latInput.value = String(rLat);
+            lonInput.value = String(rLon);
+            markLocationDisabled();
+            setLocationStatus("Location set from the map. Looking up soil type…", "success");
+            attemptSoilLookup(rLat, rLon, "Location set from the map.");
+            attemptRegionLookup(rLat, rLon);
+          },
+        }).catch((e) => {
+          setLocationStatus(e.message || "Couldn't open the map.", "failure");
+        });
+      },
+    },
+    "Pick Location on Map"
   );
 
   // Once a DEVICE location is in (this tap, or a plot whose coordinates
@@ -948,6 +1012,7 @@ export function render(container) {
   // Latitude/Longitude fields themselves for manual entry/corrections.
   const locationCaptureSection = h("section", { className: "card location-capture-card" }, [
     useLocationBtn,
+    mapPickBtn,
     h(
       "p",
       { className: "field-note location-capture-note" },

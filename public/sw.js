@@ -6,10 +6,21 @@
 // app shell is precached on install; old-versioned caches are purged on
 // activate.
 
-const CACHE_VERSION = "v26.147-beta";
+const CACHE_VERSION = "v26.148-beta";
 const CACHE_NAME = `corn-plot-harvest-${CACHE_VERSION}`;
 
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+// Leaflet (the lazy-loaded map library — see ui/mapPicker.js) gets the
+// same cache-first CDN treatment as jsPDF: best-effort cached at
+// install, always cached after its first successful on-demand load, so
+// the map LIBRARY opens instantly on repeat use. (The map's imagery
+// tiles are NOT cached — they're cross-origin, effectively unbounded in
+// number, and the map is an online-only feature by design.)
+const CDN_CACHED_URLS = [
+  JSPDF_URL,
+  "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css",
+];
 
 // Enumerated app-shell files (no wildcard support in the Cache API).
 // Keep this in sync with the actual contents of public/ — see the
@@ -30,6 +41,7 @@ const PRECACHE_URLS = [
   "/js/ui/formIdAssign.js",
   "/js/ui/geoData.js",
   "/js/ui/logoCache.js",
+  "/js/ui/mapPicker.js",
   "/js/ui/router.js",
   "/js/ui/theme.js",
   "/js/ui/xlsxLibLoader.js",
@@ -143,15 +155,16 @@ self.addEventListener("install", (event) => {
         })
       );
 
-      // Best-effort: cache jsPDF too, so the app works fully offline after
-      // the first successful load. This sandbox has no network access, so
-      // this will fail here — that's fine, it's wrapped so it never fails
-      // the whole install. In the real deployed app (with real internet)
-      // this succeeds and is cached for offline use thereafter.
-      try {
-        await cache.add(JSPDF_URL);
-      } catch (e) {
-        // Ignored on purpose — see comment above.
+      // Best-effort: cache the CDN libraries (jsPDF, Leaflet) too, so
+      // the app works fully offline after the first successful load.
+      // Wrapped per-URL so a failure never fails the whole install
+      // (and never fails in a sandbox with no CDN access).
+      for (const cdnUrl of CDN_CACHED_URLS) {
+        try {
+          await cache.add(cdnUrl);
+        } catch (e) {
+          // Ignored on purpose — see comment above.
+        }
       }
 
       await self.skipWaiting();
@@ -177,7 +190,7 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(req.url);
   const isSameOrigin = url.origin === self.location.origin;
-  const isCacheableCdnAsset = req.url === JSPDF_URL;
+  const isCacheableCdnAsset = CDN_CACHED_URLS.includes(req.url);
 
   // Cloud sync API calls must never be served from cache — they're the
   // live, per-user plot data, not app-shell assets. Let these fall

@@ -72,7 +72,7 @@ async function stubGeoAndFetch(page) {
 
 // ---- 1. Blank plot: State/County/City all auto-fill, snapped to the app's own spellings ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await stubGeoAndFetch(page);
 
@@ -116,7 +116,7 @@ async function stubGeoAndFetch(page) {
 //          renders as a tap-to-adjust selection box with distances, and
 //          tapping a different town switches City + Zip ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.addInitScript(() => {
     window.__overpassBodies = [];
@@ -239,7 +239,7 @@ async function stubGeoAndFetch(page) {
 // ---- 1c. Nothing incorporated within 10 miles: the search widens ONCE
 //          to 25 miles and fills from there ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.addInitScript(() => {
     window.__overpassBodies = [];
@@ -309,7 +309,7 @@ async function stubGeoAndFetch(page) {
 
 // ---- 2. Fill-blanks-only: manual values are never overwritten (and no lookups even fire) ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await stubGeoAndFetch(page);
 
@@ -357,7 +357,7 @@ async function stubGeoAndFetch(page) {
 //          township never lands in City — the first candidate matching
 //          the state's real town list wins ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "geolocation", {
@@ -425,7 +425,7 @@ async function stubGeoAndFetch(page) {
 
 // ---- 2c. All candidates are townships/unknown: City stays BLANK, never a township label ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "geolocation", {
@@ -480,7 +480,7 @@ async function stubGeoAndFetch(page) {
 
 // ---- 3. Reverse-geocode failure: fails soft, fields stay blank for manual entry ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "geolocation", {
@@ -535,7 +535,7 @@ async function stubGeoAndFetch(page) {
 //         slow radius lookup is in flight must win over the lookup's
 //         result — previously the lookup's patch silently reverted it ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "geolocation", {
@@ -594,7 +594,7 @@ async function stubGeoAndFetch(page) {
 //         approved fix) — a same-named survivor would be kept, but
 //         Story/Ames don't exist in Nebraska ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "geolocation", {

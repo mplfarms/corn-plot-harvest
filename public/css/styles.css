@@ -2549,3 +2549,30 @@ button.summary-header-card {
   border-color: var(--accent-strong);
   color: #ffffff;
 }
+
+/* ---------- Plot Details: Pick Location on Map modal ---------- */
+
+.map-picker-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.map-picker-map {
+  height: 55vh;
+  min-height: 280px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #dfe7dd; /* placeholder while tiles stream in */
+}
+
+.map-picker-readout {
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+}
+
+.map-picker-hint {
+  margin: 0;
+  text-align: center;
+}

@@ -65,7 +65,7 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
 // ---- Case 1: brand-new plot — nothing fires until the button is tapped;
 //              a tap fills GPS + soil type and flips the button state ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.addInitScript(MOCK_INIT_SCRIPT);
 
@@ -207,7 +207,7 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
 
 // ---- Case 2: an existing plot that already has GPS does NOT auto-relocate ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.addInitScript(MOCK_INIT_SCRIPT);
 
@@ -258,7 +258,7 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
 //              request: "toggle button off... alert them that turning on
 //              location device will override manual data") ----
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.addInitScript(MOCK_INIT_SCRIPT);
 
