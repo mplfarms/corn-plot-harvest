@@ -28,10 +28,14 @@ import { showCustomModal } from "./components/modal.js";
 const LEAFLET_JS_URL = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
 const LEAFLET_CSS_URL = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
 
-// USGS National Map imagery (public domain). z/y/x order per ArcGIS
-// tile services. maxNativeZoom 16 — USGS serves most rural areas to 16;
-// Leaflet upscales beyond that rather than showing broken tiles.
-const USGS_TILE_URL = "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}";
+// USGS National Map "Imagery Topo" (public domain): the same satellite
+// imagery PLUS reference layers — state/county boundaries, highways
+// with route shields, rivers/lakes, and town names — so a zoomed-out
+// user can orient quickly (per explicit request; plain ImageryOnly had
+// no labels at all). z/y/x order per ArcGIS tile services.
+// maxNativeZoom 16 — USGS serves most rural areas to 16; Leaflet
+// upscales beyond that rather than showing broken tiles.
+const USGS_TILE_URL = "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}";
 const USGS_ATTRIBUTION = "Imagery: USGS National Map";
 const ESRI_TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const ESRI_ATTRIBUTION = "Imagery: Esri, Maxar, Earthstar Geographics";

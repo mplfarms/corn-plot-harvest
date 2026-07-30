@@ -167,7 +167,7 @@ function mockLookups(page) {
   await page.waitForFunction(() => window.L && window.__mapStub && window.__mapStub.map, { timeout: 5000 });
   check(true, "tapping the button lazy-loads the map library and opens the modal");
   const tileUrl = await page.evaluate(() => window.__mapStub.tileLayers[0] || "");
-  check(/basemap\.nationalmap\.gov/.test(tileUrl), `the primary imagery layer is USGS (public domain, no fees) (got "${tileUrl}")`);
+  check(/basemap\.nationalmap\.gov.*USGSImageryTopo/.test(tileUrl), `the primary layer is USGS Imagery TOPO — satellite plus boundaries/highways/rivers/town names for orientation (got "${tileUrl}")`);
 
   const useBtnDisabled = await page.locator("button", { hasText: "Use This Location" }).isDisabled();
   check(useBtnDisabled, "with no coordinates yet, Use This Location starts disabled until a pin is dropped");
