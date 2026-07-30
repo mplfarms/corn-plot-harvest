@@ -6,6 +6,7 @@
 // prompt. Do not "clean up" or restructure this algorithm.
 
 import { cellInline, cellNum, formatNumber, parseNumber } from "./xmlHelpers.js";
+import { rmNumericValue } from "./yieldCalculator.js";
 import { formatHeaderDate, gpsCellText, filenameYear } from "./models.js";
 import { loadTemplateParts, CONTENT_TYPES, ROOT_RELS, WORKBOOK_XML, WORKBOOK_RELS, SHEET1_RELS, coreProperties, APP_PROPERTIES } from "./xlsxTemplateParts.js";
 import { ZipWriter } from "./zipWriter.js";
@@ -164,7 +165,11 @@ function formulaCells(r, c44Ref, c45Ref, c46Ref, mRange, oRange, manualDryYield)
   out += `<c r="P${r}" s="35" t="str"><f>IF(O${r}=0,"",RANK(O${r},${oRange},0))</f><v/></c>`;
   out += `<c r="Q${r}" s="18" t="b"><f>(+H${r}&gt;${c44Ref}+0.01)</f><v>0</v></c>`;
   out += `<c r="R${r}" s="12"><f>+H${r}-${c44Ref}</f></c>`;
-  out += `<c r="S${r}" s="11"><f>IF(Q${r},+((M${r}*${c46Ref})-((R${r}*${c45Ref})*M${r})),+H${r}*${c46Ref})</f></c>`;
+  // S's not-over-base branch is M (dry yield) * price — the ported
+  // Swift template had +H (moisture) * price here, a wrong-dollars
+  // landmine for anyone unhiding the helper columns; the VISIBLE Gross
+  // (O <- T) was always correct (audit finding).
+  out += `<c r="S${r}" s="11"><f>IF(Q${r},+((M${r}*${c46Ref})-((R${r}*${c45Ref})*M${r})),+M${r}*${c46Ref})</f></c>`;
   out += `<c r="T${r}" s="24" t="str"><f>IF((H${r}&gt;${c44Ref}+0.01),((M${r}*${c46Ref})-((R${r}*${c45Ref})*M${r})),((M${r}*${c46Ref})))</f><v/></c>`;
   out += `<c r="W${r}" s="19" t="str"><f>M${r}*${c46Ref}</f><v/></c>`;
   out += `<c r="Y${r}" s="1"><f>IF(H${r}&lt;=15.5,0,((H${r}-${c44Ref})*${c45Ref}))</f></c>`;
@@ -197,7 +202,9 @@ function entryRowXML(rowNum, entry, entryIndex, isBoundary, c44Ref, c45Ref, c46R
   cells += cellInline(`B${r}`, Style.entryBrandD, entry.brand);
   cells += cellInline(`C${r}`, Style.entryHybrid, entry.hybrid);
   cells += cellInline(`D${r}`, Style.entryBrandD, entry.trait);
-  cells += cellNum(`E${r}`, Style.entryMid, parseNumber(entry.relativeMaturity));
+  // rmNumericValue, not parseNumber: an RM like "111 CRM" exports its
+  // digits (111) rather than a silently blank cell (audit finding).
+  cells += cellNum(`E${r}`, Style.entryMid, rmNumericValue(entry.relativeMaturity));
   cells += cellInline(`F${r}`, Style.entryMid, entry.seedTreatment);
   cells += cellNum(`G${r}`, gs, parseNumber(entry.sampleNetWeightLbs));
   cells += cellNum(`H${r}`, hs, parseNumber(entry.moisturePercent));

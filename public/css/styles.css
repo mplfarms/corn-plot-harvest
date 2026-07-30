@@ -497,16 +497,6 @@ h3.section-header:first-child {
   margin-top: 8px;
 }
 
-.btn-link-block {
-  width: 100%;
-  min-height: 44px;
-  background: transparent;
-  border: none;
-  color: var(--accent-strong);
-  font-weight: 600;
-  text-decoration: underline;
-  cursor: pointer;
-}
 
 /* ---------- account / cloud sync ---------- */
 
@@ -516,12 +506,6 @@ h3.section-header:first-child {
   gap: 12px;
 }
 
-.account-status-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-}
 
 .account-status-text {
   margin: 0;
@@ -989,11 +973,6 @@ h3.section-header:first-child {
   width: 100%;
 }
 
-.chooser-row-primary {
-  background: var(--accent);
-  color: #ffffff;
-  border-color: var(--accent);
-}
 
 .chooser-row-text {
   display: flex;
@@ -1012,18 +991,7 @@ h3.section-header:first-child {
   color: var(--text-muted);
 }
 
-.chooser-row-primary .chooser-row-subtitle {
-  color: rgba(255, 255, 255, 0.8);
-}
 
-.chooser-row-badge {
-  background: var(--accent-pale);
-  color: #16241c;
-  font-weight: 700;
-  font-size: 0.8rem;
-  border-radius: 999px;
-  padding: 2px 9px;
-}
 
 .chooser-row-chevron {
   margin-left: auto;
@@ -1033,9 +1001,6 @@ h3.section-header:first-child {
   transition: transform 0.15s ease;
 }
 
-.chooser-row-primary .chooser-row-chevron {
-  color: rgba(255, 255, 255, 0.85);
-}
 
 /* Rotated to point downward while the panel it controls is expanded
    (see plotSummary.js's headerCard toggle) — the same "›" glyph used
@@ -1644,21 +1609,6 @@ h3.section-header:first-child {
   color: var(--danger);
 }
 
-.fab {
-  position: fixed;
-  right: calc(20px + env(safe-area-inset-right));
-  bottom: calc(24px + env(safe-area-inset-bottom));
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #ffffff;
-  font-size: 1.8rem;
-  line-height: 1;
-  border: none;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-}
 
 .badge-current {
   background: var(--highlight);
@@ -2352,11 +2302,6 @@ button.summary-header-card {
   white-space: nowrap;
 }
 
-/* ---------- share menu ---------- */
-
-.share-menu-wrapper {
-  position: relative;
-}
 
 .share-menu-panel {
   position: absolute;

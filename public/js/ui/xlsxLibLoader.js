@@ -1,7 +1,8 @@
 // src/ui/xlsxLibLoader.js
 //
 // Lazy-loads SheetJS (window.XLSX) from a CDN the moment it's actually
-// needed — the only caller is adminPlots.js's "Upload Hybrid Catalog"
+// needed — the only caller is the Hybrid Catalog upload section in
+// Settings' Admin card (components/hybridCatalogUpload.js)
 // button, an occasional admin-only action, so there's no reason to
 // bundle this (a few hundred KB) into the app shell or precache it for
 // every visitor. Mirrors pdfBuilder.js's own lazy-reference-a-CDN-global

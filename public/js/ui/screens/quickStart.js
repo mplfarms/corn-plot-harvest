@@ -47,7 +47,8 @@ const STEPS = [
   },
   {
     title: "Add your hybrids",
-    text: "From the Plot Workspace menu, tap “Enter Plot Hybrids,” then the + button to add each hybrid you're comparing.",
+    text: "From the Plot Workspace menu, tap “Enter Plot Hybrids,” then “Add Another Hybrid” to add each hybrid you're comparing.",
+    tip: "Tip: pick the Brand first, then the Hybrid — a hybrid that's on your admin's catalog fills in its RM and Trait for you automatically.",
   },
   {
     title: "Enter your yield numbers",
@@ -60,7 +61,7 @@ const STEPS = [
   },
   {
     title: "Share it",
-    text: "From Plot Summary, tap “Share This Plot” for a printable PDF, a full spreadsheet, printing, or emailing your results.",
+    text: "From Plot Summary, tap “Share This Plot” (or the share icon at the top) for a printable PDF summary, the full Excel plot form, or a Seedware export — printing and emailing are right on the share screen that opens.",
   },
   {
     title: "Don't worry about saving",

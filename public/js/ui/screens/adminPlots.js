@@ -38,7 +38,6 @@
 // internal round-trip doesn't overwrite the real origin recorded when
 // this screen was first opened.
 //
-// Also hosts the "Upload Hybrid Catalog" button — the only place the
 // shared Company/Hybrid/Trait/RM reference data (see catalogStore.js /
 // hybridCatalogImport.js / companyMatch.js / netlify/functions/
 // hybridCatalog.js) can be updated. Admin-only for the same reason

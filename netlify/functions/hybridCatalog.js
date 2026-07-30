@@ -8,7 +8,8 @@
 // is one shared reference table every signed-in device reads, same as
 // DefaultLists.json's static lists, except this one needs to be
 // updatable by an admin at any time without a new app build/deploy (see
-// adminPlots.js's "Upload Hybrid Catalog" button, the only place that
+// the two upload buttons in Settings' Admin card —
+// public/js/ui/components/hybridCatalogUpload.js, the only place that
 // ever POSTs here).
 //
 // GET: public, no auth required — this is non-sensitive shared
@@ -27,10 +28,11 @@
 //   separate source files. Incoming rows that belong to the OTHER
 //   group are dropped here too (defense in depth — the client already
 //   filters them out with a notice before uploading).
-//   Without group — the original full-replace, kept for backward
-//   compatibility: the whole catalog is swapped for the uploaded rows.
-//   Either way the response carries the complete merged catalog so the
-//   uploading device can reflect it immediately.
+//   group is REQUIRED — the legacy group-less full-replace was removed
+//   (per explicit request) so an out-of-date client can never wipe the
+//   other half of the catalog; a group-less POST gets a 400 telling the
+//   admin to update the app. The response carries the complete merged
+//   catalog so the uploading device can reflect it immediately.
 //   Company-name de-duplication against the app's existing brand list
 //   happens client-side before this is ever called (see
 //   public/js/core/companyMatch.js) — this function trusts whatever
@@ -116,31 +118,33 @@ exports.handler = async (event) => {
   }
 
   const group = payload.group === "company" || payload.group === "alt" ? payload.group : null;
-
-  let uploaded;
-  let allRows;
-  if (group) {
-    // Split-upload mode: replace only this group's rows; keep the other
-    // group's stored rows exactly as they were. Company-group rows are
-    // stored first so the house brands stay ahead of the alt list in
-    // every first-seen-order picker.
-    const wantCompany = group === "company";
-    uploaded = rows.filter((r) => isCompanyGroupBrand(r.company) === wantCompany);
-    if (uploaded.length === 0) {
-      return json(400, {
-        error: `No ${wantCompany ? "Company Hybrids" : "Alt. Variety Hybrids"} rows in this upload.`,
-      });
-    }
-    const existing = (await store.get(STATE_KEY, { type: "json" })) || { rows: [] };
-    const keptOther = (existing.rows || []).filter((r) => isCompanyGroupBrand(r.company) !== wantCompany);
-    const companyRows = wantCompany ? uploaded : keptOther;
-    const altRows = wantCompany ? keptOther : uploaded;
-    allRows = [...companyRows, ...altRows];
-  } else {
-    // Legacy full replace (older clients).
-    uploaded = rows;
-    allRows = rows;
+  if (!group) {
+    // The legacy no-group full-replace path is GONE — per explicit
+    // request ("we definitely want to proceed with 2 files, purge any
+    // legacy... so there is a non issue"): an out-of-date client must
+    // never be able to wipe the other half of the catalog with a
+    // group-less upload.
+    return json(400, {
+      error: "This app version is out of date — update to the current version before uploading the Hybrid Catalog.",
+    });
   }
+
+  // Split-upload mode: replace only this group's rows; keep the other
+  // group's stored rows exactly as they were. Company-group rows are
+  // stored first so the house brands stay ahead of the alt list in
+  // every first-seen-order picker.
+  const wantCompany = group === "company";
+  const uploaded = rows.filter((r) => isCompanyGroupBrand(r.company) === wantCompany);
+  if (uploaded.length === 0) {
+    return json(400, {
+      error: `No ${wantCompany ? "Company Hybrids" : "Alt. Variety Hybrids"} rows in this upload.`,
+    });
+  }
+  const existing = (await store.get(STATE_KEY, { type: "json" })) || { rows: [] };
+  const keptOther = (existing.rows || []).filter((r) => isCompanyGroupBrand(r.company) !== wantCompany);
+  const companyRows = wantCompany ? uploaded : keptOther;
+  const altRows = wantCompany ? keptOther : uploaded;
+  const allRows = [...companyRows, ...altRows];
 
   const updatedAt = new Date().toISOString();
   await store.setJSON(STATE_KEY, { updatedAt, rows: allRows });

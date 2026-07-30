@@ -6,7 +6,7 @@
 // app shell is precached on install; old-versioned caches are purged on
 // activate.
 
-const CACHE_VERSION = "v26.146-beta";
+const CACHE_VERSION = "v26.147-beta";
 const CACHE_NAME = `corn-plot-harvest-${CACHE_VERSION}`;
 
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
@@ -62,6 +62,7 @@ const PRECACHE_URLS = [
   "/js/ui/screens/trialDetails.js",
   "/js/ui/screens/workspaceMenu.js",
 
+  "/js/ui/stores/adminEditStore.js",
   "/js/ui/stores/brandStore.js",
   "/js/ui/stores/catalogStore.js",
   "/js/ui/stores/cloudSyncStore.js",
@@ -91,6 +92,7 @@ const PRECACHE_URLS = [
 
   "/logos/midwest.png",
   "/logos/ncplus.png",
+  "/logos/crows.png",
   "/logos/republic-shield.png",
   "/logos/brand-train.png",
 
@@ -198,7 +200,11 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       } catch (e) {
-        if (isSameOrigin) {
+        // Offline fallback ONLY for page NAVIGATIONS — serving
+        // index.html in place of a failed asset (a module, an image)
+        // hands the requester the wrong MIME type and turns one missing
+        // file into a cascade of confusing failures.
+        if (isSameOrigin && req.mode === "navigate") {
           const fallback = await cache.match("/index.html");
           if (fallback) return fallback;
         }

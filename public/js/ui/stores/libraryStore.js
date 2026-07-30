@@ -117,14 +117,6 @@ export function replaceAll(trials) {
   set(trials);
 }
 
-/**
- * @param {string} id
- * @returns {import('../../core/models.js').SavedTrial|undefined}
- */
-export function getById(id) {
-  return state.trials.find((t) => t.id === id);
-}
-
 // Both of these skip entirely while an admin-edit session is active
 // (see adminEditStore.js): trialStore's draft slot then holds a
 // TEAMMATE's trial, not the signed-in admin's own — auto-saving it here

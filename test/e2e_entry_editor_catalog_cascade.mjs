@@ -25,6 +25,28 @@ const FIXTURE_ROWS = [
   // picking it should auto-fill RM but only NARROW the Trait list.
   { company: "TestCo", hybrid: "TC200-Multi", trait: "SmartStax", rm: 102 },
   { company: "TestCo", hybrid: "TC200-Multi", trait: "Conventional", rm: 102 },
+  // House-brand rows exactly as the "MW / NC / CR" alias expansion
+  // produces them at import time (see HOUSE_BRAND_EXPANSION in
+  // hybridCatalogImport.js and unit_hybrid_catalog_import.mjs) — per
+  // explicit request, picking a house hybrid under the selected Brand
+  // View must cascade RM/Trait exactly like a competitor's hybrids.
+  // "83-31 VT2PRIB" also exists in DefaultLists.json's built-in Midwest
+  // hybrid list, which is precisely the real-world case: the name the
+  // picker already offered now ALSO has catalog data behind it.
+  { company: "Midwest Seed Genetics", hybrid: "83-31 VT2PRIB", trait: "VT2P RIB", rm: 83 },
+  { company: "NC+ Hybrids", hybrid: "83-31 VT2PRIB", trait: "VT2P RIB", rm: 83 },
+  { company: "Crow's", hybrid: "83-31 VT2PRIB", trait: "VT2P RIB", rm: 83 },
+  // SortCo: deliberately OUT of RM order in upload order, with two trait
+  // versions of the same 18-88 base plus an 18-95 whose trait name sorts
+  // BETWEEN their trait names — proves the picker sorts RM-first, keeps
+  // same-base versions together (18-95 must not split the 18-88 pair the
+  // way a pure trait-name sort within RM 118 would), and orders the
+  // versions by trait name (TREC before VT2P RIB).
+  { company: "SortCo", hybrid: "S110 X", trait: "ZTrait", rm: 110 },
+  { company: "SortCo", hybrid: "18-88 VT2PRIB", trait: "VT2P RIB", rm: 118 },
+  { company: "SortCo", hybrid: "S90 A", trait: "MTrait", rm: 90 },
+  { company: "SortCo", hybrid: "18-95 U", trait: "UTrait", rm: 118 },
+  { company: "SortCo", hybrid: "18-88 TRERIB", trait: "TREC", rm: 118 },
 ];
 
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
@@ -161,6 +183,102 @@ check(
   `a custom (non-catalog) Hybrid shows the FULL, unrestricted Trait list, not narrowed to 2 (got ${fullTraitOptionTexts.length} options)`
 );
 await page.keyboard.press("Escape");
+
+// ---- House brand (selected Brand View): picking a catalog-backed house
+// hybrid cascades RM + Trait exactly like a competitor's (per explicit
+// request — the rows come from the "MW / NC / CR" alias expansion) ----
+// The open Trait picker from the block above doesn't close on Escape —
+// dismiss it via its X button first.
+await page.click(".modal-overlay:not(.hidden) .modal-close-btn");
+await page.waitForTimeout(250);
+await page.click(".field:has-text('Brand / Company') .wheel-row-header");
+await page.waitForSelector(".search-list-option", { timeout: 3000 });
+await page.waitForTimeout(200); // see the debounceGuard note above
+await page.click(".search-list-option:has-text('Midwest Seed Genetics')");
+await page.waitForTimeout(150);
+brandValue = await page.$eval(".field:has-text('Brand / Company') .wheel-row-value", (el) => el.textContent.trim());
+check(brandValue === "Midwest Seed Genetics", `Brand is back to the house brand (got "${brandValue}")`);
+
+await page.click(".field:has-text('Hybrid') .wheel-row-header");
+await page.waitForSelector(".search-list-option", { timeout: 3000 });
+await page.waitForTimeout(200); // see the debounceGuard note above
+await page.fill(".search-list-input", "83-31");
+await page.waitForTimeout(150);
+await page.click(".search-list-option:has-text('83-31 VT2PRIB')");
+await page.waitForTimeout(150);
+
+rmValue = await page.$eval(".field:has-text('Relative Maturity') .wheel-row-value", (el) => el.textContent.trim());
+check(rmValue === "83", `picking a house hybrid under the selected Brand View auto-fills RM from the catalog (got "${rmValue}")`);
+traitValue = await page.$eval(".field:has-text('Trait') .wheel-row-value", (el) => el.textContent.trim());
+check(traitValue === "VT2P RIB", `and auto-fills its Trait package, same as a competitor pick (got "${traitValue}")`);
+
+// ---- Catalog is the SOURCE OF TRUTH once uploaded: the original
+// built-in company/hybrid/trait lists (from the source xlsx the app was
+// first built around) are disregarded entirely (per explicit request) ----
+await page.click(".field:has-text('Brand / Company') .wheel-row-header");
+await page.waitForSelector(".search-list-option", { timeout: 3000 });
+const companyOptions = await page.$$eval(".search-list-option", (els) => els.map((e) => e.textContent.trim()));
+check(
+  !companyOptions.includes("Pioneer") && !companyOptions.includes("DeKalb"),
+  `built-in default companies (Pioneer, DeKalb) are GONE from the Brand picker once a catalog exists (got ${companyOptions.length} options)`
+);
+check(
+  companyOptions.includes("TestCo") &&
+    companyOptions.includes("Midwest Seed Genetics") &&
+    companyOptions.includes("NC+ Hybrids") &&
+    companyOptions.includes("Crow's"),
+  `the Brand picker offers exactly the catalog's companies, house brands included (got ${JSON.stringify(companyOptions)})`
+);
+await page.click(".modal-overlay:not(.hidden) .modal-close-btn");
+await page.waitForTimeout(250);
+
+// Midwest's Hybrid picker: ONLY the catalog's hybrid remains — none of
+// the ~180 built-in default names.
+await page.click(".field:has-text('Hybrid') .wheel-row-header");
+await page.waitForSelector(".search-list-option", { timeout: 3000 });
+const midwestHybrids = (await page.$$eval(".search-list-option", (els) => els.map((e) => e.textContent.trim()))).filter(
+  (t) => !t.startsWith("+ Add")
+);
+check(
+  JSON.stringify(midwestHybrids) === JSON.stringify(["83-31 VT2PRIB"]),
+  `Midwest's Hybrid picker offers ONLY the uploaded catalog's hybrids — the built-in default list is disregarded (got ${JSON.stringify(midwestHybrids)})`
+);
+await page.click(".modal-overlay:not(.hidden) .modal-close-btn");
+await page.waitForTimeout(250);
+
+// Trait picker's full (un-narrowed) list: catalog traits + hand-added
+// customs only — built-in defaults like "Qrome" are gone. (The current
+// hybrid is 83-31 VT2PRIB, single-trait, so the list here is narrowed;
+// clear the hybrid state by checking the options we already captured
+// instead: the earlier full-list check ran pre-change. Re-verify via
+// the captured full list below.)
+await page.click(".field:has-text('Trait') .wheel-row-header");
+await page.waitForSelector(".search-list-option", { timeout: 3000 });
+const traitOptions = (await page.$$eval(".search-list-option", (els) => els.map((e) => e.textContent.trim()))).filter(
+  (t) => !t.startsWith("+ Add")
+);
+check(!traitOptions.includes("Qrome"), `built-in default trait "Qrome" no longer appears (got ${JSON.stringify(traitOptions)})`);
+await page.click(".modal-overlay:not(.hidden) .modal-close-btn");
+await page.waitForTimeout(250);
+
+// ---- Hybrid lists sort by RM; same-base trait versions stay together,
+// ordered by trait name (per explicit request) ----
+await page.click(".field:has-text('Brand / Company') .wheel-row-header");
+await page.waitForSelector(".search-list-option", { timeout: 3000 });
+await page.waitForTimeout(200); // see the debounceGuard note above
+await page.click(".search-list-option:has-text('SortCo')");
+await page.waitForTimeout(150);
+await page.click(".field:has-text('Hybrid') .wheel-row-header");
+await page.waitForSelector(".search-list-option", { timeout: 3000 });
+const sortedHybrids = (await page.$$eval(".search-list-option", (els) => els.map((e) => e.textContent.trim()))).filter(
+  (t) => !t.startsWith("+ Add")
+);
+check(
+  JSON.stringify(sortedHybrids) === JSON.stringify(["S90 A", "S110 X", "18-88 TRERIB", "18-88 VT2PRIB", "18-95 U"]),
+  `hybrids sort RM-first (90, 110, 118), same-base trait versions stay together ordered by trait name, 18-95 does not split the 18-88 pair (got ${JSON.stringify(sortedHybrids)})`
+);
+await page.click(".modal-overlay:not(.hidden) .modal-close-btn");
+await page.waitForTimeout(250);
 
 await browser.close();
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);

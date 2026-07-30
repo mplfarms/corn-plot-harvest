@@ -640,7 +640,12 @@ export function renderReport(doc, { header, results, metric, allEntries, brand, 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(90, 90, 90);
-      const sign = trend.slope >= 0 ? "+" : "−";
+      // ASCII "-" on purpose, NOT the typographic "−" (U+2212) the
+      // screen uses: jsPDF's built-in Helvetica is WinAnsi-only and
+      // can't render U+2212, which corrupted/hid the sign on DECLINING
+      // trends in the printed PDF (same font limitation as the "✓"
+      // check glyph above, which is hand-drawn for the same reason).
+      const sign = trend.slope >= 0 ? "+" : "-";
       const trendCaption = `Trend: ${sign}${formatValue(Math.abs(trend.slope))} per entry (R² ${trend.r2.toFixed(2)})`;
       doc.text(trendCaption, x + width / 2, localY, { align: "center" });
       doc.setTextColor(0, 0, 0);
@@ -816,6 +821,13 @@ export function renderReport(doc, { header, results, metric, allEntries, brand, 
   drawSummaryBlock();
   drawTableHeader();
 
+  // Which entry positions are repeated ("check") hybrids — their ranked
+  // rows get a small hand-drawn check next to the Entry number (per
+  // explicit request, mirroring the screen's "Check n" labels; the
+  // built-in PDF fonts can't render a "✓" glyph — same reason the bar
+  // charts hand-draw theirs).
+  const rankedCheckFlags = repeatedHybridFlags(allEntries);
+
   for (let idx = 0; idx < results.length; idx++) {
     const result = results[idx];
     const comment = (result.entry.comments || "").trim();
@@ -862,6 +874,19 @@ export function renderReport(doc, { header, results, metric, allEntries, brand, 
     for (let i = 0; i < cellValues.length; i++) {
       if (i === 3) continue; // Trait — drawn separately below (may shrink/wrap)
       doc.text(cellValues[i], columnX(i + 1), y + 10 * 0.8);
+    }
+
+    // "Check" hybrid marker in the Entry column (see rankedCheckFlags
+    // above): a small gray check drawn right after the entry number,
+    // sized to sit alongside the 10pt digits.
+    if (rankedCheckFlags[result.originalNumber - 1]) {
+      const checkX = columnX(1) + doc.getTextWidth(cellValues[0]) + 5;
+      const checkBaseY = y + 10 * 0.8;
+      doc.setDrawColor(120, 120, 120);
+      doc.setLineWidth(1.1);
+      doc.line(checkX - 2.8, checkBaseY - 2.8, checkX - 0.8, checkBaseY - 0.6);
+      doc.line(checkX - 0.8, checkBaseY - 0.6, checkX + 3.0, checkBaseY - 5.2);
+      doc.setDrawColor(0, 0, 0);
     }
 
     // Trait cell: normally a single 10pt line like every other cell, but

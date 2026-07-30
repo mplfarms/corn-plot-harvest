@@ -74,6 +74,12 @@ const JAMIE_TRIAL = {
   await page.waitForSelector(".admin-plots-screen", { timeout: 5000 });
   await page.waitForSelector(".card", { timeout: 5000 });
 
+  // Per explicit request: the plot row's cooperator name and its
+  // "FormID • n entries" text must not run together ("Rings
+  // StarAPP00028") — the value span carries a left gap.
+  const valueGap = await page.$eval(".admin-plot-row .brand-average-value", (el) => getComputedStyle(el).marginLeft);
+  check(valueGap === "8px", `a gap separates the cooperator name from the Form ID text on admin plot rows (got "${valueGap}")`);
+
   await page.click("text=Jamie's Farm");
   await page.waitForSelector(".workspace-menu-screen", { timeout: 5000 });
   const bannerText = await page.$eval(".preview-owner-banner", (el) => el.textContent).catch(() => null);

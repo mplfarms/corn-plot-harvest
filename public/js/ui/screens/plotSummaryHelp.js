@@ -54,6 +54,7 @@ export function render(container) {
 
   const intro = h("div", { className: "card help-intro-card" }, [
     p("A quick explanation of everything on the Plot Summary & Results screen — what each number means and how to read the chart."),
+    p("Tip: the card at the very top with the plot's name is tappable — it expands to show everything entered on Plot Details, with an “Edit Plot Details” shortcut at the bottom of the panel."),
   ]);
 
   const sections = [
@@ -91,7 +92,7 @@ export function render(container) {
 
     helpSection("The Yield & Moisture by Position Charts", [
       p("These two bar charts show your plot in PLANTING ORDER — one bar per entry, position 1 on the left through your last entry on the right, exactly as they sit in the field. The gold chart is each entry's Dry Yield; the blue chart is its Moisture reading. An entry missing that measurement keeps its numbered slot but shows no bar, and if no entries have a moisture reading at all, the moisture chart is left out entirely."),
-      p("A check mark in place of a position number under a bar means that hybrid is entered at more than one position in this plot — a repeated \"check\" hybrid (its rows in Ranked Results say \"Check\" instead of \"Entry\" too). Checks are recognized automatically: enter the same hybrid at two or more positions — both ends plus the middle is the classic layout — and the marks appear on both charts on their own."),
+      p("A check mark in place of a position number under a bar means that hybrid is entered at more than one position in this plot — a repeated \"check\" hybrid (its rows in Ranked Results say \"Check\" instead of \"Entry\" too). Checks are recognized automatically: enter the same hybrid at two or more positions — both ends plus the middle is the classic layout — and the marks appear on both charts on their own. The PDF export marks them the same way: a small check next to the Entry number in its ranked table, and on its position charts, so paper matches the screen."),
       p("What to expect from your checks: those bars share the same genetics, so differences BETWEEN them are almost purely the field talking. Checks that land close together say the ground is even — the differences between your other hybrids are then believable as genetics. Checks that spread apart MEASURE the position effect directly: say your checks read 250, 238, and 224 across the plot, that's roughly a 26 bu/ac end-to-end field swing — lean on the CV and mentally handicap hybrids sitting on the poor end. Checks also calibrate the trend line: when they drift about as much as the dashed line slopes, the trend really is the field; when they stay flat but the line slopes anyway, the slope is mostly genetics and can be discounted. The same reading applies to the moisture chart's checks (drying conditions across the plot)."),
       p("Where the ranked list tells you WHICH hybrids won, these charts tell you WHERE the results happened — so a run of tall bars at one end of the plot, or moisture climbing steadily from one side to the other, jumps out in a way a sorted list can't show."),
       p("The dashed line across each chart is the trend line — a statistical best-fit through all the bars, showing the overall drift from the first entry to the last. Its caption reads like “Trend: +0.7 bu/ac per entry (R² 0.20)”:"),
@@ -118,7 +119,7 @@ export function render(container) {
         "Gray — within 8 bu/ac of the plot's average either way — a fairly typical result for this plot.",
       ]),
       p("Because this color is based on actual yield versus the plot average — not rank position — a hybrid keeps the same badge color no matter which tab (Dry Yield or Gross) you're viewing. It's always describing the same thing: how that hybrid's Dry Yield compares to the rest of this plot."),
-      p("Below the moisture percentage on each row, any Comments typed in for that hybrid on the Plot Hybrids screen show up here too, so you don't have to go back and forth to see them."),
+      p("Below the moisture percentage on each row, any Comments typed in for that hybrid on the Hybrid Entries screen show up here too, so you don't have to go back and forth to see them."),
       p("This same colored-badge layout is used across all 3 Brand Views (Midwest Seed Genetics, NC+, and Crow's) and in every share option (PDF, print, etc.) — nothing about it changes based on your selected Brand View."),
     ]),
 

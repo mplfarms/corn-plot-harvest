@@ -15,6 +15,7 @@ import * as authStore from "../authStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
 import * as geoData from "../geoData.js";
 import { createTopBar } from "../components/topBar.js";
+import { showConfirm } from "../components/modal.js";
 import { createWheelSelect, createExtendableWheelSelect } from "../components/wheelSelect.js";
 import { createDatePicker } from "../components/datePicker.js";
 import { openSearchListPicker } from "../components/searchListPicker.js";
@@ -226,11 +227,41 @@ export function render(container) {
     placeholder: "Select",
     showLabel: false,
     onChange: (v) => {
+      const prevState = currentState;
       currentState = v;
       trialStore.updateHeader({ state: v });
       refreshCountyOptions();
       refreshCityDisabled();
       lastCityLookup = null;
+
+      // Switching to a DIFFERENT state clears out location fields that
+      // belonged to the old one — per audit finding/explicit approval:
+      // previously the old County (possibly not even a county of the
+      // new state) and City lingered, and the Zip silently re-filled
+      // for the old city under the NEW state's list. A County/City that
+      // happens to exist in the new state too is kept. Judged only when
+      // the geo lists are actually loaded — with no list there's
+      // nothing safe to judge against.
+      if (v !== prevState) {
+        const header2 = trialStore.getState().header;
+        const newCounties = geoData.getCountiesForState(v);
+        if ((header2.county || "").trim() && newCounties.length > 0 && !snapToKnownName(header2.county, newCounties)) {
+          trialStore.updateHeader({ county: "" });
+          countyWheel.setValue("");
+        }
+        const newCities = geoData.getCityNamesForState(v);
+        if (cityValue.trim() && newCities.length > 0 && !snapToKnownName(cityValue, newCities)) {
+          setCityDisplay("");
+          trialStore.updateHeader({ city: "", zip: "" });
+          zipInput.value = "";
+          setZipStatus("", false);
+          clearZipChoices();
+          nearbyTowns = [];
+          renderNearbyTownChoices();
+          setCityStatus("", false);
+        }
+      }
+
       if (cityValue.trim() !== "") runCityZipLookup();
     },
   });
@@ -584,23 +615,37 @@ export function render(container) {
     return Math.round(n * 1e6) / 1e6;
   }
 
+  // Typing coordinates by hand marks the location's source as "manual"
+  // — the capture button drops out of its "Device Location Enabled"
+  // state (per explicit request), and tapping it again first asks
+  // before overriding the manually entered data (see the button's
+  // onclick below).
+  function markGpsManual() {
+    trialStore.updateHeader({ gpsSource: "manual" });
+    markLocationDisabled();
+  }
+
   function commitLat(raw) {
     if (raw.trim() === "") {
       trialStore.updateHeader({ gpsLatitude: null });
+      markGpsManual();
       return;
     }
     const n = Number(raw);
     if (!Number.isFinite(n)) return;
     trialStore.updateHeader({ gpsLatitude: round6(Math.abs(n)) });
+    markGpsManual();
   }
   function commitLon(raw) {
     if (raw.trim() === "") {
       trialStore.updateHeader({ gpsLongitude: null });
+      markGpsManual();
       return;
     }
     const n = Number(raw);
     if (!Number.isFinite(n)) return;
     trialStore.updateHeader({ gpsLongitude: round6(-Math.abs(n)) });
+    markGpsManual();
   }
 
   const latInput = textInput({
@@ -634,8 +679,8 @@ export function render(container) {
   // before this feature existed. References `soilTypeWheel` and `fixed`,
   // both defined further down in this same render() call — safe since
   // this only ever actually runs later, after render() has finished
-  // building the whole screen (either from the button's onclick or from
-  // the auto-locate call at the end of render()).
+  // building the whole screen (it's reached only from the capture
+  // button's onclick; nothing auto-fires on open).
   async function attemptSoilLookup(lat, lon, accuracy) {
     const accuracyText = `Location captured (±${Math.round(accuracy)}m).`;
     const matched = await fetchSoilTypeForCoordinates(lat, lon, fixed.soilTypeOptions);
@@ -776,15 +821,34 @@ export function render(container) {
       }
     }
 
+    // FINAL race guard, re-read at commit time: the city radius search
+    // above is a second long await (Overpass, up to two 10s timeouts),
+    // and the `now` snapshot predates it — a State or County the user
+    // picked DURING that window must win over the lookup's result (the
+    // City field already had this guard; State/County were the gap —
+    // real probe: a county picked mid-lookup was silently reverted).
+    const latest = trialStore.getState().header;
+    if (patch.state && (latest.state || "").trim() !== nowStateVal) {
+      // The user changed State mid-lookup — drop the state patch AND the
+      // county that was snapped against the lookup's state.
+      delete patch.state;
+      delete patch.county;
+    }
+    if (patch.county && (latest.county || "").trim() !== "") {
+      // County was blank at the snapshot; the user filled it mid-lookup.
+      delete patch.county;
+    }
+    if (patch.city && (latest.city || "").trim() !== "" && (latest.city || "").trim() !== patch.city) {
+      delete patch.city;
+    }
     if (Object.keys(patch).length > 0) trialStore.updateHeader(patch);
   }
 
-  // Shared by both the "Use Device Location or Enter Manually" button and
-  // the automatic attempt (see the bottom of render()) that fires on its
-  // own for a plot that doesn't have GPS coordinates yet — "default to
-  // the device location" means the user shouldn't have to tap anything
-  // first, but the button still exists as a manual re-trigger (e.g. after
-  // moving to a different field, or after initially denying permission).
+  // Runs ONLY from the "Use Device for Location & Soil Type" button at
+  // the top of the screen (location capture is tap-only — per explicit
+  // request, nothing fires automatically on open). The button doubles
+  // as a re-capture after moving to a different field, or a retry after
+  // initially denying permission.
   async function runLocationCapture() {
     if (!("geolocation" in navigator)) {
       setLocationStatus("Geolocation isn't supported on this device.", "failure");
@@ -808,7 +872,7 @@ export function render(container) {
       (pos) => {
         const lat = round6(Math.abs(pos.coords.latitude));
         const lon = round6(-Math.abs(pos.coords.longitude));
-        trialStore.updateHeader({ gpsLatitude: lat, gpsLongitude: lon });
+        trialStore.updateHeader({ gpsLatitude: lat, gpsLongitude: lon, gpsSource: "device" });
         latInput.value = String(lat);
         lonInput.value = String(lon);
         markLocationEnabled();
@@ -828,21 +892,50 @@ export function render(container) {
     {
       type: "button",
       className: "btn btn-secondary btn-block",
-      onclick: runLocationCapture,
+      // When the stored coordinates were typed in MANUALLY, using the
+      // device would override them — ask first (Yes/No), per explicit
+      // request. A device-sourced (or pre-gpsSource legacy) location
+      // re-captures without asking, as before.
+      onclick: async () => {
+        const hdr = trialStore.getState().header;
+        const hasCoords = Number.isFinite(hdr.gpsLatitude) && Number.isFinite(hdr.gpsLongitude);
+        if (hasCoords && hdr.gpsSource === "manual") {
+          const ok = await showConfirm({
+            title: "Override Manual Location",
+            message:
+              "Turning on device location will replace the coordinates you entered manually (and re-run the region and soil type lookups). Are you sure?",
+            confirmLabel: "Yes",
+            cancelLabel: "No",
+          });
+          if (!ok) return;
+        }
+        runLocationCapture();
+      },
     },
     "Use Device for Location & Soil Type"
   );
 
-  // Once a device location is in (this tap, or a plot that already has
-  // coordinates from an earlier capture), the button flips to the
-  // brand's darker color and reads "Device Location Enabled" — per
-  // explicit request. It stays tappable as a re-capture (e.g. after
-  // moving to a different field).
+  // Once a DEVICE location is in (this tap, or a plot whose coordinates
+  // came from an earlier capture), the button flips to the brand's
+  // darker color and reads "Device Location Enabled" — per explicit
+  // request. It stays tappable as a re-capture (e.g. after moving to a
+  // different field). Coordinates typed by hand do NOT light it up
+  // (gpsSource "manual" — see markGpsManual()); a legacy plot with
+  // coordinates but no recorded source counts as device (that's how
+  // most existing plots got theirs).
   function markLocationEnabled() {
     useLocationBtn.textContent = "Device Location Enabled";
     useLocationBtn.classList.add("location-capture-btn-enabled");
   }
-  if (Number.isFinite(header.gpsLatitude) && Number.isFinite(header.gpsLongitude)) {
+  function markLocationDisabled() {
+    useLocationBtn.textContent = "Use Device for Location & Soil Type";
+    useLocationBtn.classList.remove("location-capture-btn-enabled");
+  }
+  if (
+    Number.isFinite(header.gpsLatitude) &&
+    Number.isFinite(header.gpsLongitude) &&
+    header.gpsSource !== "manual"
+  ) {
     markLocationEnabled();
   }
 
@@ -972,22 +1065,30 @@ export function render(container) {
     field(
       "Drying Shrink Rate",
       textInput({
-        value: String(header.dryingShrinkRate),
+        value: header.dryingShrinkRate === null || header.dryingShrinkRate === undefined ? "" : String(header.dryingShrinkRate),
         inputmode: "decimal",
         oninput: (v) => {
-          const n = Number(v);
-          if (Number.isFinite(n)) trialStore.updateHeader({ dryingShrinkRate: n });
+          // An EMPTY field stores null, never 0 — Number("") is 0, which
+          // silently committed a 0 shrink rate the instant a user
+          // cleared the field to retype it, corrupting every Gross
+          // value. null makes Gross show blank until a number is back
+          // (see gross()'s finite-check in yieldCalculator.js).
+          const t = v.trim();
+          const n = Number(t);
+          trialStore.updateHeader({ dryingShrinkRate: t !== "" && Number.isFinite(n) ? n : null });
         },
       })
     ),
     field(
       "Price per Bushel",
       textInput({
-        value: String(header.pricePerBushel),
+        value: header.pricePerBushel === null || header.pricePerBushel === undefined ? "" : String(header.pricePerBushel),
         inputmode: "decimal",
         oninput: (v) => {
-          const n = Number(v);
-          if (Number.isFinite(n)) trialStore.updateHeader({ pricePerBushel: n });
+          // Same empty-means-null rule as Drying Shrink Rate above.
+          const t = v.trim();
+          const n = Number(t);
+          trialStore.updateHeader({ pricePerBushel: t !== "" && Number.isFinite(n) ? n : null });
         },
       })
     ),

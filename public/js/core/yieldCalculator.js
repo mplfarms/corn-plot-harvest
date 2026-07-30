@@ -52,6 +52,23 @@ export function dryYield(entry) {
 }
 
 /**
+ * The numeric part of a Relative Maturity value — "111 CRM" -> 111,
+ * "104" -> 104, "unknown"/"" -> null. Used by the spreadsheet exports
+ * (xlsxBuilder/seedwareExportBuilder), whose RM cells are numeric: a
+ * plain parseNumber() silently exported BLANK for an RM like "111 CRM"
+ * that displays fine on screen (audit finding — approved fix: export
+ * the digits).
+ * @param {string} rm
+ * @returns {number|null}
+ */
+export function rmNumericValue(rm) {
+  const match = String(rm || "").match(/-?\d+(\.\d+)?/);
+  if (!match) return null;
+  const n = Number(match[0]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
  * @param {import('./models.js').PlotEntry} entry
  * @param {import('./models.js').TrialHeader} header
  * @returns {number|null}
@@ -64,6 +81,12 @@ export function gross(entry, header) {
   const base = header.baseMoisturePercent;
   const price = header.pricePerBushel;
   const drying = header.dryingShrinkRate;
+  // A header missing any of its three pricing inputs (an older/imported
+  // plot, or a field cleared mid-edit) returns null — a blank Gross —
+  // rather than silently computing with 0/NaN in place of the missing
+  // number, which produced "$NaN" and negative dollar values in the
+  // ranked list. Accuracy over availability: no number beats a wrong one.
+  if (!Number.isFinite(base) || !Number.isFinite(price) || !Number.isFinite(drying)) return null;
   if (h > base + 0.01) {
     const r = h - base;
     return m * price - r * drying * m;

@@ -108,7 +108,8 @@ function mockAuthOnce(page) {
   await page.close();
 }
 
-// ---- New user: Skip still lets sign-in continue, with no follow-up call ----
+// ---- New user: every field is REQUIRED (per explicit request) — no
+// Skip, no ✕, no overlay dismiss; Continue refuses until all filled ----
 {
   const page = await browser.newPage();
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
@@ -122,16 +123,51 @@ function mockAuthOnce(page) {
   await page.goto(`${BASE}/index.html?r=1#/account`);
   await page.waitForSelector(".launch-screen");
 
-  await page.fill("#account-email-input", "skipper@nc-plus.com");
+  await page.fill("#account-email-input", "required@nc-plus.com");
   await page.click(".launch-form-body .btn-primary");
 
   await page.waitForSelector(".modal-card", { timeout: 5000 });
-  await page.locator(".modal-actions .btn-secondary", { hasText: "Skip" }).click();
 
-  // Known domain -> straight to the Home Screen even without answering.
+  // No escape hatches: no Skip button, no ✕ close button, overlay
+  // clicks ignored.
+  const skipCount = await page.locator(".modal-actions .btn-secondary", { hasText: "Skip" }).count();
+  check(skipCount === 0, "there is no Skip button anymore");
+  const closeBtnCount = await page.locator(".modal-card .modal-close-btn").count();
+  check(closeBtnCount === 0, "the Welcome! form has no ✕ close button");
+  await page.mouse.click(5, 5); // overlay corner, well outside the card
+  await page.waitForTimeout(200);
+  const stillOpenAfterOverlay = await page.$eval(".modal-overlay", (el) => !el.classList.contains("hidden"));
+  check(stillOpenAfterOverlay, "clicking the overlay does NOT dismiss the form");
+
+  // Continue with everything blank: error shows, form stays, no
+  // follow-up auth call.
+  await page.locator(".modal-actions .btn-primary", { hasText: "Continue" }).click();
+  await page.waitForTimeout(200);
+  const errorVisible = await page.$eval(".new-user-details-error", (el) => !el.classList.contains("hidden"));
+  check(errorVisible, "Continue with blank fields shows the required-fields note");
+  const stillOpen = await page.$eval(".modal-overlay", (el) => !el.classList.contains("hidden"));
+  check(stillOpen, "the form stays open until every field is filled");
+  check(authCalls.length === 1, `no follow-up call was sent for an incomplete form (got ${authCalls.length})`);
+
+  // Partially filled is still refused.
+  const inputs = await page.$$(".new-user-details-body .text-input:not([disabled])");
+  await inputs[0].fill("Onlyfirst");
+  await page.locator(".modal-actions .btn-primary", { hasText: "Continue" }).click();
+  await page.waitForTimeout(200);
+  const stillOpenPartial = await page.$eval(".modal-overlay", (el) => !el.classList.contains("hidden"));
+  check(stillOpenPartial, "a partially-filled form is refused too");
+
+  // Complete it: sign-in proceeds normally (known domain -> Home).
+  await inputs[1].fill("Lastname");
+  await inputs[2].fill("(555) 999-8888");
+  await page.locator(".modal-actions .btn-primary", { hasText: "Continue" }).click();
   await page.waitForSelector(".home-screen", { timeout: 5000 });
-  check(true, "tapping Skip still continues sign-in normally (known-domain routing)");
-  check(authCalls.length === 1, `Skip sends no follow-up call — only the initial sign-in (got ${authCalls.length})`);
+  check(true, "once every field is filled, Continue proceeds to the Home Screen");
+  check(authCalls.length === 2, `the completed form sends exactly one follow-up call (got ${authCalls.length})`);
+  check(
+    authCalls[1] && authCalls[1].firstName === "Onlyfirst" && authCalls[1].lastName === "Lastname" && authCalls[1].mobileNumber === "(555) 999-8888",
+    `the follow-up call carries the completed details (got ${JSON.stringify(authCalls[1])})`
+  );
 
   await page.close();
 }

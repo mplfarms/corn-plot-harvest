@@ -96,6 +96,25 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   const colorBadges = await page.$$(".rank-badge");
   check(colorBadges.length === 3, `Crow's view now shows colored significance rank-badges, one per row (got ${colorBadges.length})`);
 
+  // "Entry n" (no parentheses, per follow-up request) — the entry's
+  // original plot position — sits under each rank badge, per explicit
+  // request, styled to match the Moisture line exactly, with breathing
+  // room between badge and label. Ranked by yield (240, 210, 180)
+  // these are plot entries 3, 2, 1 in that order.
+  const entryPosTexts = await page.$$eval(".ranked-row-entry-pos", (els) => els.map((e) => e.textContent));
+  check(
+    JSON.stringify(entryPosTexts) === JSON.stringify(["Entry 3", "Entry 2", "Entry 1"]),
+    `each rank badge shows the entry's original plot position beneath it, no parentheses (got ${JSON.stringify(entryPosTexts)})`
+  );
+  const badgeColGap = await page.$eval(".ranked-row-badge-col", (el) => getComputedStyle(el).rowGap);
+  check(badgeColGap === "7px", `a wider gap separates the rank badge from the Entry label (got "${badgeColGap}")`);
+  const posStyleMatches = await page.evaluate(() => {
+    const pos = getComputedStyle(document.querySelector(".ranked-row-entry-pos"));
+    const moist = getComputedStyle(document.querySelector(".ranked-row-moisture"));
+    return pos.fontSize === moist.fontSize && pos.color === moist.color && pos.fontFamily === moist.fontFamily;
+  });
+  check(posStyleMatches, "the (Entry n) label matches the Moisture line's exact size, color, and font");
+
   // The significance-color legend is shown, not hidden.
   const legend = await page.$(".significance-legend");
   check(Boolean(legend), "Crow's view now shows the significance-color legend");

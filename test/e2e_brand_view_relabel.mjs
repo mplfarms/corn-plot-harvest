@@ -192,9 +192,13 @@ await checkView("crows", "Crow's view", "Crow's", "CR");
     await buildPdf({ header, results, metric: "dryYield", allEntries: displayEntries, brand, logoDataUrl: null });
     return calls;
   }, ENTRIES);
+  // The brand average is now drawn plot-details-style — a "Brand: "
+  // label call followed by its value call (see the 3-column grid in
+  // pdfBuilder.js's drawSummaryBlock) — so the two halves are ADJACENT
+  // text calls rather than one combined string.
   check(
-    pdfCalls.text.some((t) => t.includes("NC+ Hybrids:") && t.includes("(n=6)")),
-    `PDF's brand-average section shows the combined n=6 NC+ Hybrids average (got ${JSON.stringify(pdfCalls.text.filter((t) => t.includes("bu/ac (n=")))})`
+    pdfCalls.text.some((t, i) => t.includes("NC+ Hybrids:") && String(pdfCalls.text[i + 1] || "").includes("(n=6)")),
+    `PDF's brand-average section shows the combined n=6 NC+ Hybrids average (got ${JSON.stringify(pdfCalls.text.filter((t) => t.includes("bu/ac (n=") || t.includes("Hybrids:")))})`
   );
   check(
     !pdfCalls.text.some((t) => t.startsWith("Midwest Seed Genetics:") || t.startsWith("Crow's:")),

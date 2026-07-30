@@ -47,9 +47,9 @@ import { downloadBlob, shareOrDownload, shareOrDownloadFiles, openMailto } from 
 // ENTRY_NUM member at all.
 const METRIC_ORDER = [RankingMetric.DRY_YIELD, RankingMetric.GROSS];
 
-// Top-bar share icon (the classic box-with-up-arrow share glyph) for the
-// "share as a web page" button that sits next to the "i" help badge —
-// per explicit request. stroke="currentColor" so it matches the top
+// Top-bar share icon (the classic box-with-up-arrow share glyph) for
+// the button that opens the Share This Plot menu, next to the "i" help
+// badge — per explicit request. stroke="currentColor" so it matches the top
 // bar's white icon color in both themes, same convention as topBar.js's
 // barn icon (see BARN_ICON_SVG there for why this is a raw string
 // rather than createElementNS).
@@ -357,15 +357,19 @@ function computeRanked(entries, metric, header) {
     entry,
     value: valueForMetric(entry, metric, header),
   }));
-  const withValue = all.filter((r) => r.value !== null);
-  const withoutValue = all.filter((r) => r.value === null);
+  // NaN treated like null (belt-and-suspenders — gross()/dryYield() now
+  // return null rather than NaN for bad inputs, but a NaN must never
+  // rank or print as "$NaN" regardless).
+  const hasValue = (r) => r.value !== null && !Number.isNaN(r.value);
+  const withValue = all.filter(hasValue);
+  const withoutValue = all.filter((r) => !hasValue(r));
   withValue.sort((a, b) => (meta.ascending ? a.value - b.value : b.value - a.value));
   return [...withValue, ...withoutValue];
 }
 
 // Badge color reflects the entry's dry yield vs. the plot mean (green =
-// 10+ bu/ac over, yellow = 10+ bu/ac under, light gray = within 10 bu/ac
-// either way) rather than its rank position — this holds steady across
+// 8+ bu/ac over, yellow = 8+ bu/ac under, light gray = within 8 bu/ac
+// either way — see SIGNIFICANCE_THRESHOLD_BU_AC) rather than its rank position — this holds steady across
 // both metric tabs (Dry Yield/Gross) since it's describing the entry's
 // yield standing, not the current sort.
 function significanceBadgeClass(significance) {

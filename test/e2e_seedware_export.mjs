@@ -347,9 +347,18 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   await page.waitForSelector(".modal-overlay:not(.hidden) .modal-card-large", { timeout: 3000 });
   const menuItems = await page.$$eval(".modal-overlay .share-menu-item", (els) => els.map((e) => e.textContent));
   check(menuItems.some((t) => t.includes("Export for Seedware")), `share menu includes "Export for Seedware" (got ${JSON.stringify(menuItems)})`);
+  // Trimmed menu per explicit request: 3 actions with the new PDF/XLSX
+  // labels; the separate "Print Ranked Results" and "Email XLSX to ...
+  // Operations" rows are gone.
   check(
-    menuItems.some((t) => t.startsWith("Email XLSX to")),
-    "share menu still includes the Email XLSX to Operations action"
+    menuItems.length === 3 &&
+      menuItems.includes("Share / Print PDF Summary") &&
+      menuItems.includes("Share / Print Excel Plot Form"),
+    `share menu is exactly the 3 renamed actions (got ${JSON.stringify(menuItems)})`
+  );
+  check(
+    !menuItems.some((t) => t.startsWith("Email XLSX to")) && !menuItems.includes("Print Ranked Results"),
+    "the removed Email XLSX / Print Ranked Results rows are gone"
   );
 
   // ---- 2b. "Export for Seedware" now bundles BOTH the Seedware file
@@ -368,23 +377,10 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
     );
   }
 
-  // ---- 3. "Email XLSX to ... Operations" shares BOTH files together ----
-  await page.evaluate(() => {
-    window.__shareCalls.length = 0;
-  });
-  await page.click("text=Share This Plot");
-  await page.waitForSelector(".modal-overlay:not(.hidden) .modal-card-large", { timeout: 3000 });
-  await page.click("text=Email XLSX to Midwest Seed Genetics Operations");
-  await page.waitForTimeout(400);
-  shareCalls = await page.evaluate(() => window.__shareCalls);
-  check(shareCalls.length === 1, `"Email XLSX to Operations" triggered exactly one share call (got ${shareCalls.length})`);
-  if (shareCalls.length === 1) {
-    const names = shareCalls[0].files.map((f) => f.name).sort();
-    check(
-      names.length === 2 && names.includes("26-1777.xlsx") && names.includes("26-1777_Seedware.xlsx"),
-      `the email share includes both the full Trial Outline xlsx and the Seedware file (got ${JSON.stringify(names)})`
-    );
-  }
+  // (The former section 3 — "Email XLSX to ... Operations" sharing both
+  // files — was removed along with that menu row itself, per explicit
+  // request. Its both-files-bundled behavior lives on in "Export for
+  // Seedware", verified in 2b above.)
 
   await page.close();
 }

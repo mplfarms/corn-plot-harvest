@@ -5,7 +5,7 @@
 // dependency-free functions by design specifically so they're testable
 // like this (see the module's own top comment).
 
-import { rowsFromAOA, parseCsvToAOA } from "../public/js/core/hybridCatalogImport.js";
+import { rowsFromAOA, parseCsvToAOA, isHouseBrandAlias, isCompanyGroupBrand } from "../public/js/core/hybridCatalogImport.js";
 
 let failures = 0;
 function check(cond, label) {
@@ -105,6 +105,60 @@ function check(cond, label) {
   const aoa = parseCsvToAOA(csv);
   const { rows, headerError } = rowsFromAOA(aoa);
   check(headerError === null && rows.length === 1 && rows[0].company === "Stine", `a CSV file round-trips through both parsers correctly (got ${JSON.stringify(rows)})`);
+}
+
+// ---- "MW / NC / CR" house-brand alias expands into all 3 Brand Views ----
+// (per explicit request — see HOUSE_BRAND_EXPANSION's comment in
+// hybridCatalogImport.js; SuperCrost, by the same request, is an
+// ordinary competitor and must NOT expand.)
+{
+  const aoa = [
+    ["Brand", "Hybrid Name", "Maturity (RM/CRM day)", "Trait"],
+    ["MW / NC / CR", "83-31 VT2PRIB", 83, "VT2P RIB"],
+    ["SuperCrost", "10T84 VT2PRIB", 84, "VT2P RIB"],
+  ];
+  const { rows, skippedCount, headerError } = rowsFromAOA(aoa);
+  check(headerError === null && skippedCount === 0, `house-alias file parses cleanly (headerError=${headerError}, skipped=${skippedCount})`);
+  check(rows.length === 4, `1 house row + 1 SuperCrost row -> 3 expanded + 1 (got ${rows.length})`);
+  const companies = rows.filter((r) => r.hybrid === "83-31 VT2PRIB").map((r) => r.company).sort();
+  check(
+    JSON.stringify(companies) === JSON.stringify(["Crow's", "Midwest Seed Genetics", "NC+ Hybrids"]),
+    `the house row lands under all 3 Brand Views' exact catalog names (got ${JSON.stringify(companies)})`
+  );
+  check(
+    rows.filter((r) => r.hybrid === "83-31 VT2PRIB").every((r) => r.trait === "VT2P RIB" && r.rm === 83),
+    "every expanded copy keeps the source row's trait and RM"
+  );
+  const superCrost = rows.filter((r) => r.company === "SuperCrost");
+  check(superCrost.length === 1 && superCrost[0].hybrid === "10T84 VT2PRIB", `SuperCrost stays a single ordinary competitor row (got ${superCrost.length})`);
+}
+
+// ---- alias matching is tolerant of separators, and specific ----
+{
+  check(isHouseBrandAlias("MW / NC / CR"), `"MW / NC / CR" matches the alias`);
+  check(isHouseBrandAlias("MW/NC/CR"), `"MW/NC/CR" (no spaces) matches`);
+  check(isHouseBrandAlias("mw - nc - cr"), `"mw - nc - cr" (dashes, lowercase) matches`);
+  check(!isHouseBrandAlias("Mustang"), "an ordinary brand doesn't match");
+  check(!isHouseBrandAlias("SuperCrost"), "SuperCrost doesn't match");
+  check(!isHouseBrandAlias("Midwest Seed Genetics"), "a real house brand name itself doesn't match (only the combined alias expands)");
+}
+
+// ---- upload-group split: Company Hybrids vs Alt. Variety Hybrids ----
+// Per explicit request: MW / NC / CR (the three house brands and their
+// alias) AND SuperCrost belong to the "Company Hybrids" upload; every
+// other brand belongs to "Alt. Variety Hybrids".
+{
+  check(isCompanyGroupBrand("Midwest Seed Genetics"), "Midwest Seed Genetics is a Company-group brand");
+  check(isCompanyGroupBrand("NC+ Hybrids"), "NC+ Hybrids is a Company-group brand");
+  check(isCompanyGroupBrand("Crow's"), "Crow's is a Company-group brand");
+  check(isCompanyGroupBrand("Crows"), "Crows (no apostrophe) still matches the Company group");
+  check(isCompanyGroupBrand("SuperCrost"), "SuperCrost moved to the Company group (per explicit request)");
+  check(isCompanyGroupBrand("supercrost"), "supercrost (lowercase) still matches");
+  check(isCompanyGroupBrand("MW / NC / CR"), "the un-expanded house alias itself counts as Company group");
+  check(!isCompanyGroupBrand("Pioneer"), "Pioneer is an Alt.-Variety brand");
+  check(!isCompanyGroupBrand("AgriGold"), "AgriGold is an Alt.-Variety brand");
+  check(!isCompanyGroupBrand("Some Brand New Seed Co"), "an unknown brand defaults to the Alt. Variety group");
+  check(!isCompanyGroupBrand(""), "a blank brand is not a Company-group brand");
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);

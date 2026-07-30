@@ -34,14 +34,3 @@ export function selectBrand(brandId) {
   pubsub.notify();
 }
 
-/** Clears the selected brand — returns the user to BrandSelect ("Home"). */
-export function clearBrand() {
-  state = { ...state, selectedBrand: null };
-  try {
-    localStorage.removeItem(KEY);
-  } catch (e) {
-    console.error("[brandStore] failed to clear", e);
-  }
-  applyBrandTheme(null);
-  pubsub.notify();
-}

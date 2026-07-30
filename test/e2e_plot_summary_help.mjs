@@ -53,11 +53,15 @@ const rightGroupOrder = await page.evaluate(() => {
   const right = document.querySelector(".top-bar-right");
   return Array.from(right.children).map((el) => el.className);
 });
+// 3 buttons since the share-as-web-page icon was added (see
+// e2e_share_html_snapshot.mjs): share -> help -> settings. The help
+// icon still sits immediately to the left of the Settings gear.
 check(
-  rightGroupOrder.length === 2 &&
-    rightGroupOrder[0].includes("top-bar-btn-help") &&
-    rightGroupOrder[1].includes("top-bar-btn-settings"),
-  `the help icon sits immediately to the left of the Settings gear (got ${JSON.stringify(rightGroupOrder)})`
+  rightGroupOrder.length === 3 &&
+    rightGroupOrder[0].includes("top-bar-btn-share") &&
+    rightGroupOrder[1].includes("top-bar-btn-help") &&
+    rightGroupOrder[2].includes("top-bar-btn-settings"),
+  `the help icon sits immediately to the left of the Settings gear, with the share icon before it (got ${JSON.stringify(rightGroupOrder)})`
 );
 
 // ---- Tapping it opens the new help screen ----
@@ -69,7 +73,29 @@ const hash = await page.evaluate(() => window.location.hash);
 check(hash === "#/plot-summary-help", `navigated to #/plot-summary-help (got "${hash}")`);
 
 const sectionCount = await page.$$eval(".help-section", (els) => els.length);
-check(sectionCount === 6, `the screen shows all 6 sections (got ${sectionCount})`);
+// 7 sections since "The Yield & Moisture by Position Charts" was added
+// (per explicit request — trend line explanation).
+check(sectionCount === 7, `the screen shows all 7 sections (got ${sectionCount})`);
+const positionChartTitles = await page.$$eval(".help-section-title", (els) => els.map((el) => el.textContent));
+check(
+  positionChartTitles.some((t) => /Yield & Moisture by Position/i.test(t)),
+  `a section explains the position bar charts and their trend lines (got ${JSON.stringify(positionChartTitles)})`
+);
+const positionSectionText = await page.evaluate(() =>
+  Array.from(document.querySelectorAll(".help-section"))
+    .find((d) => /Yield & Moisture by Position/i.test(d.querySelector(".help-section-title").textContent))
+    .textContent
+);
+check(/trend line/i.test(positionSectionText) && /R²/.test(positionSectionText), "the section explains the trend line and R²");
+check(
+  /different hybrid/i.test(positionSectionText) && /not a soil measurement/i.test(positionSectionText),
+  "the section carries the honest hybrid-vs-field caveat"
+);
+check(/at least 3 entries/i.test(positionSectionText), "the section mentions the 3-entry minimum for the trend line");
+check(
+  /What to expect from your checks/i.test(positionSectionText) && /calibrate the trend line/i.test(positionSectionText),
+  "the section explains check-hybrid behavior and what to expect from checks (per explicit request)"
+);
 
 const openStates = await page.$$eval(".help-section", (els) => els.map((el) => el.open));
 check(openStates[0] === true, "the first section starts open");
@@ -107,6 +133,11 @@ check(true, "the help screen's Back button returns to Plot Summary");
 // Shifted from position 6 to 7 once "Add it to your Home Screen" was inserted as step 2.
 await page.goto(`${BASE}/index.html?r=2#/quick-start`);
 await page.waitForSelector(".quick-start-screen", { timeout: 5000 });
+const signInStepText = await page.evaluate(() => document.querySelector(".quick-start-screen").textContent);
+check(
+  /all four fields \(counting your email\) are required/.test(signInStepText),
+  "Quick Start's sign-in step says all four Welcome-form fields are required"
+);
 const step6Tip = await page.$eval(".quick-start-step:nth-child(7) .quick-start-step-tip", (el) => el.textContent);
 check(/[“"]i[”"]\s*(info\s+)?icon/i.test(step6Tip), `Quick Start's "Check your results" step points to the "i" info icon (got "${step6Tip}")`);
 

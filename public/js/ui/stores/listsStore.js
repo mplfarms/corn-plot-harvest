@@ -456,47 +456,6 @@ export function isCustomHybrid(brand, hybrid) {
 }
 
 /**
- * @param {string} value
- * @param {string} category
- */
-export function removeCustomItem(value, category) {
-  const c = state.custom;
-  let next;
-  switch (category) {
-    case CATEGORY.BRAND_COMPANY:
-      next = { ...c, companies: c.companies.filter((v) => v !== value) };
-      break;
-    case CATEGORY.TRAIT:
-      next = { ...c, traits: c.traits.filter((v) => v !== value) };
-      break;
-    case CATEGORY.SEED_TREATMENT:
-      next = { ...c, seedTreatments: c.seedTreatments.filter((v) => v !== value) };
-      break;
-    case CATEGORY.COLLECTED_BY:
-      next = { ...c, collectionMethods: c.collectionMethods.filter((v) => v !== value) };
-      break;
-    default:
-      next = c;
-  }
-  setCustom(next);
-}
-
-/**
- * @param {string} value
- * @param {string} brand
- */
-export function removeCustomHybrid(value, brand) {
-  const c = state.custom;
-  const brandTrimmed = (brand || "").trim();
-  const currentForBrand = c.hybridsByBrand[brandTrimmed] || [];
-  const next = {
-    ...c,
-    hybridsByBrand: { ...c.hybridsByBrand, [brandTrimmed]: currentForBrand.filter((v) => v !== value) },
-  };
-  setCustom(next);
-}
-
-/**
  * Fixed (non-customizable) lists, straight from DefaultLists.json.
  * @returns {{tillageOptions:string[], irrigationOptions:string[], soilTypeOptions:string[], previousCropOptions:string[]}}
  */

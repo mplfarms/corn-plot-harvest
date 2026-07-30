@@ -93,6 +93,13 @@ export function createTrialHeader() {
     county: "",
     gpsLatitude: null,
     gpsLongitude: null,
+    // How the coordinates above were set: "device" (the capture button)
+    // or "manual" (typed into the Latitude/Longitude fields). Drives the
+    // capture button's "Device Location Enabled" state and its
+    // override-manual-data confirmation — see trialDetails.js. null on
+    // plots from before this field existed (treated as device-sourced,
+    // matching the old button behavior for existing coordinates).
+    gpsSource: null,
     datePlanted: null,
     tillage: "",
     irrigation: "",
@@ -149,17 +156,6 @@ export function entryDisplayTitle(entry) {
   const brand = entry.brand.trim();
   if (brand !== "") return brand;
   return "New Entry";
-}
-
-/**
- * @param {string} id
- * @param {TrialHeader} header
- * @param {PlotEntry[]} entries
- * @param {string} lastModifiedISO
- * @returns {SavedTrial}
- */
-export function createSavedTrial(id, header, entries, lastModifiedISO) {
-  return { id, header, entries, lastModified: lastModifiedISO };
 }
 
 /**

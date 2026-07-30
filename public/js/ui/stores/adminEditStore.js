@@ -61,11 +61,6 @@ export function getOwnerLabel() {
   return session ? session.ownerName || session.ownerEmail : null;
 }
 
-/** @returns {string|null} */
-export function getOwnerEmail() {
-  return session ? session.ownerEmail : null;
-}
-
 /**
  * The plot OWNER's own account details (not the admin doing the
  * editing) — used by trialDetails.js so a plot's Collected By/Phone/

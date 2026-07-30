@@ -90,7 +90,7 @@
 
 import { formatHeaderDate, filenameYear } from "./models.js";
 import { isEntryBlank } from "./models.js";
-import { dryYield, parseNumber } from "./yieldCalculator.js";
+import { dryYield, parseNumber, rmNumericValue } from "./yieldCalculator.js";
 import { cellInline, cellNum } from "./xmlHelpers.js";
 import { coreProperties, APP_PROPERTIES } from "./xlsxTemplateParts.js";
 import { sanitizeFilenamePart } from "./xlsxBuilder.js";
@@ -181,7 +181,7 @@ const COLUMNS = [
   {
     header: "Request Maturity",
     type: "number",
-    value: (h, e, p, ctx) => (ctx.provider === "Request" ? roundOrNull(parseNumber(e.relativeMaturity), 3) : null),
+    value: (h, e, p, ctx) => (ctx.provider === "Request" ? roundOrNull(rmNumericValue(e.relativeMaturity), 3) : null),
   },
   { header: "Row Length", type: "number", value: (h, e) => roundOrNull(parseNumber(e.stripLengthFeet), 3) },
   { header: "Row Width", type: "number", value: (h, e) => roundOrNull(parseNumber(e.widthInches), 3) },

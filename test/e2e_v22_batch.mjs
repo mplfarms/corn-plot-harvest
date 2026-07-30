@@ -75,6 +75,14 @@ check(placeholderText.trim() === "Select a date", `unset date shows placeholder 
 
 await datePlantedBtn.click();
 await page.waitForSelector(".date-picker-grid .date-picker-day:not(.date-picker-day-empty)", { timeout: 3000 });
+
+// Double-tap-zoom fix: every button carries touch-action: manipulation,
+// so two quick taps on the month arrows (backing up several months)
+// step twice instead of zooming the page — per explicit bug report.
+const navTouchAction = await page.$eval(".date-picker-nav-btn", (el) => getComputedStyle(el).touchAction);
+check(navTouchAction === "manipulation", `the month-nav arrows suppress double-tap zoom (touch-action: ${navTouchAction})`);
+const dayTouchAction = await page.$eval(".date-picker-day:not(.date-picker-day-empty)", (el) => getComputedStyle(el).touchAction);
+check(dayTouchAction === "manipulation", `day cells suppress double-tap zoom too (touch-action: ${dayTouchAction})`);
 const modalTitle = await page.$eval(".modal-title", (el) => el.textContent);
 check(modalTitle === "Select Date", `calendar opens in a modal titled "Select Date" (got "${modalTitle}")`);
 

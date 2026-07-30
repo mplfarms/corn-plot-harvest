@@ -136,12 +136,13 @@ check(!shareMenuVisibleBefore, "no modal open before clicking Share This Plot");
 await page.click("text=Share This Plot");
 await page.waitForSelector(".modal-overlay:not(.hidden) .modal-card-large", { timeout: 3000 });
 const modalItems = await page.$$eval(".modal-overlay .share-menu-item", (els) => els.map((e) => e.textContent));
-// 5 actions as of "Export for Seedware" (see seedwareExportBuilder.js) —
-// was 4 before that action existed.
-check(modalItems.length === 5, `share modal has 5 actions (got ${modalItems.length})`);
+// 3 actions as of the trimmed/renamed menu (was 5: "Print Ranked
+// Results" and "Email XLSX to ... Operations" were removed and the
+// PDF/XLSX rows relabeled, per explicit request).
+check(modalItems.length === 3, `share modal has 3 actions (got ${modalItems.length})`);
 check(
-  modalItems.some((t) => t.includes("Export / Share PDF")),
-  "share modal includes PDF export action"
+  modalItems.some((t) => t.includes("Share / Print PDF Summary")),
+  "share modal includes the renamed PDF share action"
 );
 
 // Confirm it's actually centered via the overlay's flex centering (not a

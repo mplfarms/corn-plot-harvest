@@ -26,7 +26,7 @@ async function seedAndOpenSummary(page, selectedBrand, brandName, entries) {
       if (selectedBrand) localStorage.setItem("cph.selectedBrand", JSON.stringify(selectedBrand));
       localStorage.setItem("cph.authSession", JSON.stringify({ name: "Test User", email: "test@example.com", isAdmin: false }));
       const full = entries.map((e, i) => ({
-        id: `e${i}`, brand: brandName, hybrid: `H${i}`, trait: "", relativeMaturity: "100", seedTreatment: "",
+        id: `e${i}`, brand: brandName, hybrid: e.h || `H${i}`, trait: "", relativeMaturity: "100", seedTreatment: "",
         sampleNetWeightLbs: "", testWeight: "", stripLengthFeet: "", numberOfRows: "",
         widthInches: "", comments: "",
         manualDryYield: e.y === null ? "" : String(e.y),
@@ -196,6 +196,158 @@ for (const [brandId, brandName] of [
   const barSvgCount = await page.$$eval(".entry-bar-svg", (els) => els.length);
   check(barSvgCount === 2, `no-Brand-View state also renders both entry-position bar cards (got ${barSvgCount})`);
 
+  await page.close();
+}
+
+// ---- Trendline: perfect linear data (R²=1), opposite slope directions on yield vs. moisture ----
+{
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
+  // Crafted so both fits are exact (R²=1): yield rises +10 bu/ac per
+  // position (slope=10, intercept=190), moisture falls -2% per position
+  // (slope=-2, intercept=27) — hand-verified by OLS.
+  const trendEntries = [
+    { y: 200, m: 25 },
+    { y: 210, m: 23 },
+    { y: 220, m: 21 },
+    { y: 230, m: 19 },
+    { y: 240, m: 17 },
+  ];
+  await seedAndOpenSummary(page, "midwestSeedGenetics", "Midwest Seed Genetics", trendEntries);
+
+  const trendLineCount = await page.$$eval(".entry-bar-trend-line", (els) => els.length);
+  check(trendLineCount === 2, `trendline overlay renders on both charts with 5 clean data points (got ${trendLineCount})`);
+
+  const yieldTrendCaption = await page.evaluate(
+    () => Array.from(document.querySelectorAll(".card")).find((c) => c.querySelector(".section-header")?.textContent === "Yield by Position").querySelector(".entry-bar-trend-caption").textContent
+  );
+  check(yieldTrendCaption === "Trend: +10.0 bu/ac per entry (R² 1.00)", `yield trendline caption shows the correct positive slope and R² (got "${yieldTrendCaption}")`);
+
+  const moistureTrendCaption = await page.evaluate(
+    () => Array.from(document.querySelectorAll(".card")).find((c) => c.querySelector(".section-header")?.textContent === "Moisture by Position").querySelector(".entry-bar-trend-caption").textContent
+  );
+  check(moistureTrendCaption === "Trend: −2.0% per entry (R² 1.00)", `moisture trendline caption shows the correct negative slope and R² (got "${moistureTrendCaption}")`);
+
+  const disclaimerCount = await page.$$eval(".entry-bar-trend-disclaimer", (els) => els.length);
+  check(disclaimerCount === 2, `the "reflects hybrid + field variation" disclaimer renders under both charts (got ${disclaimerCount})`);
+  const disclaimerText = await page.$eval(".entry-bar-trend-disclaimer", (el) => el.textContent);
+  check(
+    disclaimerText.toLowerCase().includes("hybrid") && disclaimerText.toLowerCase().includes("field"),
+    `disclaimer text is the honest caveat about hybrid vs. field variation (got "${disclaimerText}")`
+  );
+
+  // Direction: SVG y grows downward, so a rising-yield trend's line
+  // should slope UPWARD on screen — its y1 (position 1, the lowest
+  // value) sits lower on the chart (larger y) than y2 (position 5, the
+  // highest value, smaller y).
+  const yieldY1Y2 = await page.evaluate(() => {
+    const line = Array.from(document.querySelectorAll(".card"))
+      .find((c) => c.querySelector(".section-header")?.textContent === "Yield by Position")
+      .querySelector(".entry-bar-trend-line");
+    return { y1: Number(line.getAttribute("y1")), y2: Number(line.getAttribute("y2")) };
+  });
+  check(yieldY1Y2.y1 > yieldY1Y2.y2, `rising yield trend slopes upward on screen (y1=${yieldY1Y2.y1} > y2=${yieldY1Y2.y2})`);
+
+  const moistureY1Y2 = await page.evaluate(() => {
+    const line = Array.from(document.querySelectorAll(".card"))
+      .find((c) => c.querySelector(".section-header")?.textContent === "Moisture by Position")
+      .querySelector(".entry-bar-trend-line");
+    return { y1: Number(line.getAttribute("y1")), y2: Number(line.getAttribute("y2")) };
+  });
+  check(moistureY1Y2.y1 < moistureY1Y2.y2, `falling moisture trend slopes downward on screen (y1=${moistureY1Y2.y1} < y2=${moistureY1Y2.y2})`);
+
+  await page.close();
+}
+
+// ---- Trendline gating: too few data points (< 3) means no trendline at all ----
+{
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
+  await seedAndOpenSummary(page, "midwestSeedGenetics", "Midwest Seed Genetics", [
+    { y: 100, m: 10 },
+    { y: 200, m: 20 },
+  ]);
+
+  const trendLineCount = await page.$$eval(".entry-bar-trend-line", (els) => els.length);
+  check(trendLineCount === 0, `no trendline drawn with only 2 data points, below the 3-point minimum (got ${trendLineCount})`);
+
+  const trendCaptionCount = await page.$$eval(".entry-bar-trend-caption", (els) => els.length);
+  check(trendCaptionCount === 0, "no trend caption or disclaimer text with only 2 data points");
+
+  await page.close();
+}
+
+// ---- No moistures at all: Moisture card hidden entirely, Yield card unaffected ----
+{
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
+  await seedAndOpenSummary(page, "midwestSeedGenetics", "Midwest Seed Genetics", [
+    { y: 200, m: null },
+    { y: 210, m: null },
+    { y: 220, m: null },
+    { y: 230, m: null },
+  ]);
+
+  const cardTitles = await page.$$eval(".screen-body > .card > .section-header", (els) => els.map((e) => e.textContent));
+  check(cardTitles.includes("Yield by Position"), `Yield by Position card still renders with yields but no moistures (got ${JSON.stringify(cardTitles)})`);
+  check(!cardTitles.includes("Moisture by Position"), `Moisture by Position card is absent entirely when the plot has no moisture readings (got ${JSON.stringify(cardTitles)})`);
+
+  const barSvgCount = await page.$$eval(".entry-bar-svg", (els) => els.length);
+  check(barSvgCount === 1, `exactly 1 entry-position chart renders (yield only) (got ${barSvgCount})`);
+
+  await page.close();
+}
+
+// ---- Check-hybrid marks: a repeated hybrid's bars carry the white check, unique hybrids don't ----
+{
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
+  // "CHECK" planted at positions 1, 3, and 5 (ends + middle); unique
+  // hybrids at 2 and 4. Position 4 has no moisture, so the moisture
+  // chart draws 4 bars but the same 3 checks.
+  await seedAndOpenSummary(page, "midwestSeedGenetics", "Midwest Seed Genetics", [
+    { y: 200, m: 25, h: "CHECK" },
+    { y: 210, m: 23 },
+    { y: 220, m: 21, h: "CHECK" },
+    { y: 230, m: null },
+    { y: 240, m: 17, h: "CHECK" },
+  ]);
+
+  // The check replaces the position NUMBER below the bar (same label
+  // element/class, so same size and color automatically) — per explicit
+  // follow-up; it is no longer drawn inside the bar.
+  const labelsPerChart = await page.$$eval(".entry-bar-svg", (svgs) =>
+    svgs.map((s) => Array.from(s.querySelectorAll(".entry-bar-axis-label")).map((t) => t.textContent))
+  );
+  check(
+    JSON.stringify(labelsPerChart) === JSON.stringify([["✓", "2", "✓", "4", "✓"], ["✓", "2", "✓", "4", "✓"]]),
+    `check positions show ✓ in place of their entry numbers on BOTH charts (got ${JSON.stringify(labelsPerChart)})`
+  );
+
+  // Ranked Results: check entries say "Check n", others "Entry n".
+  // Ranked by yield desc: 240(check,5), 230(4), 220(check,3), 210(2), 200(check,1).
+  const entryPosTexts = await page.$$eval(".ranked-row-entry-pos", (els) => els.map((e) => e.textContent));
+  check(
+    JSON.stringify(entryPosTexts) === JSON.stringify(["Check 5", "Entry 4", "Check 3", "Entry 2", "Check 1"]),
+    `Ranked Results says "Check" instead of "Entry" for the repeated hybrid's rows only (got ${JSON.stringify(entryPosTexts)})`
+  );
+
+  await page.close();
+}
+
+// ---- No repeated hybrids: no check marks anywhere ----
+{
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
+  await seedAndOpenSummary(page, "midwestSeedGenetics", "Midwest Seed Genetics", [
+    { y: 200, m: 25 },
+    { y: 210, m: 23 },
+    { y: 220, m: 21 },
+  ]);
+  const labelTexts = await page.$eval(".entry-bar-svg", (s) => Array.from(s.querySelectorAll(".entry-bar-axis-label")).map((t) => t.textContent));
+  check(JSON.stringify(labelTexts) === JSON.stringify(["1", "2", "3"]), `all-unique hybrids keep plain position numbers, no ✓ anywhere (got ${JSON.stringify(labelTexts)})`);
+  const rankedLabels = await page.$$eval(".ranked-row-entry-pos", (els) => els.map((e) => e.textContent));
+  check(rankedLabels.every((l) => l.startsWith("Entry ")), `all-unique hybrids all say "Entry n" in Ranked Results (got ${JSON.stringify(rankedLabels)})`);
   await page.close();
 }
 

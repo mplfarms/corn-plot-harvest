@@ -1,7 +1,7 @@
 // src/core/companyMatch.js
 //
 // Company-name de-duplication for Hybrid Catalog uploads (see
-// adminPlots.js's "Upload Hybrid Catalog" button and
+// the Hybrid Catalog upload section in Settings' Admin card (components/hybridCatalogUpload.js) and
 // netlify/functions/hybridCatalog.js). A catalog spreadsheet compiled
 // from public seed-guide sources will naturally spell a brand slightly
 // differently than this app's existing company list already does

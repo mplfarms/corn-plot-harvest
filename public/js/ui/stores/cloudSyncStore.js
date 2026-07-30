@@ -105,11 +105,6 @@ export function getSyncStatus() {
   return status;
 }
 
-/** @param {Function} fn @returns {Function} unsubscribe */
-export function subscribeStatus(fn) {
-  return statusPubsub.subscribe(fn);
-}
-
 function mergeByLastModified(localTrials, cloudTrials) {
   const byId = new Map();
   for (const t of localTrials) byId.set(t.id, t);

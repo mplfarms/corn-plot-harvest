@@ -110,14 +110,15 @@ export function render(container) {
     helpSection("Starting a New Plot", [
       p("From the Home Screen, tap “Enter a New Plot.” This clears the workspace and takes you to Plot Details. You don't need to fill in everything before moving on — enter what you know now and come back later if needed."),
       p("Nothing here needs a Save button. The moment you type a cooperator name, the plot is saved automatically — you can close the app and come back anytime."),
+      p("You'll also see a Form ID at the top of Cooperator Details — a short, permanent reference number for this exact plot, assigned automatically the first time you tap Save Plot. If you were offline when that should have happened, just tap the Form ID note (or the “Assign Plot ID” button on Plot Summary) to try again."),
       sub("Cooperator Details"),
-      p("The grower's name and location: Name, Address, State, County, City, and Zip. Picking a State first narrows down the County and City lists to match. City works like the Company and Hybrid pickers: tap it to open the state's town list, start typing to filter down, tap to pick — handy when entering a plot for a distant location. A town that's somehow missing from the list can be typed and added right in the picker."),
+      p("The grower's name and location: Name, Cooperator Address, State, County, City, and Zip. Picking a State first narrows down the County and City lists to match — and switching to a different State clears out a County or City that doesn't exist in the new state (along with the Zip), so a leftover from the old state never lingers. City works like the Company and Hybrid pickers: tap it to open the state's town list, start typing to filter down, tap to pick — handy when entering a plot for a distant location. A town that's somehow missing from the list can be typed and added right in the picker."),
       sub("GPS Location"),
       p("Nothing fills in on its own — location and soil type only ever pre-populate when you choose to. When you're standing at the plot, tap “Use Device for Location & Soil Type” at the very top of Plot Details, then tap Allow when your phone or tablet asks. It's faster and far more accurate than typing coordinates in by hand, and it's what triggers the automatic Soil Type lookup described just below."),
       p("Once allowed, your Latitude and Longitude fill in, along with roughly how accurate the reading is (for example, “Location captured (±5m)”). The button then turns solid in your Brand View's color and reads “Device Location Enabled” — tapping it again at any time re-captures from wherever you're standing."),
       p("The capture also fills in State, County, and City for you when those fields are still blank. For City, the app searches for every incorporated town within 10 miles of where you're standing (widening to 25 miles in open country), auto-fills the NEAREST one, and shows the full nearest-first list — with distances — right under the City field so you can tap a different town if the nearest isn't the right mailing address; the Zip follows whichever town is picked. County and City always come from the app's own lists (real towns, never townships). Anything you've already typed or picked is never overwritten (with one exception: a brand-new plot's untouched default State gets corrected to where you're actually standing). No signal, or no town found? Those fields simply wait for manual entry, same as Soil Type below."),
       p("Moved to a different field, or want to re-capture your location later? Tap the button again any time (it keeps working after it reads “Device Location Enabled”). Reopening an existing plot never changes a location you've already set — only tapping the button does."),
-      p("Prefer not to use GPS at all? Just type the Latitude and Longitude directly into those two fields by hand instead — nothing else in the app requires the button to work, though see the Soil Type note below for the one tradeoff of doing it that way."),
+      p("Prefer not to use GPS at all? Just type the Latitude and Longitude directly into those two fields by hand instead — nothing else in the app requires the button to work, though see the Soil Type note below for the one tradeoff of doing it that way. Coordinates typed by hand don't light the button up as “Device Location Enabled” — and if you tap the button after typing them, the app asks “Override Manual Location” (Yes/No) before replacing what you entered, so one stray tap can't wipe out your numbers."),
       p("If you accidentally tapped “Don't Allow” on the location prompt: the fastest fix is to just type the coordinates in by hand. To use the button again, you'll need to re-enable Location for this app/site in your phone or browser's own settings first (this varies by phone — look for Settings → the app or website → Location/Permissions). See Troubleshooting below for more."),
       sub("Soil Type"),
       p("Right after you capture your location with the button, the app looks up the most common soil type at that exact spot (using USDA soil survey data) and fills in the Soil Type field on the Planting Details section for you — one less thing to look up or guess at. You'll see a note like “Soil type set to [name]” appear under the button when this happens."),
@@ -126,15 +127,16 @@ export function render(container) {
       sub("Planting Details"),
       p("Tillage, Irrigation, Soil Type (see above), Previous Crop, Planting Population, and Date Planted."),
       sub("Harvest Details"),
-      p("Who collected the data (Collected By), their Phone and Email, and the Date Harvested."),
+      p("Who collected the data (Collected By), their Phone and Email, and the Date Harvested. Collected By, Phone, and Email start out filled in from your own account details on a new plot — if someone else collected this one's data, just type over them; your edits stick and are never overwritten."),
       sub("Yield Calculation"),
       p("Drying Shrink Rate and Price per Bushel — these are used to calculate the dollar value of each hybrid's yield. Base moisture is fixed at 15.5%, the standard basis for corn, so there's nothing to set there. Plot Notes at the bottom is just free space for anything else worth writing down about this plot."),
     ]),
 
     helpSection("Adding Your Hybrids", [
-      p("From the Plot Workspace menu, tap “Enter Plot Hybrids” to see the list of hybrids in this plot. Tap the + button (bottom right) to add one."),
+      p("From the Plot Workspace menu, tap “Enter Plot Hybrids” to open the Hybrid Entries list for this plot. Tap “Add Another Hybrid” at the bottom to add one — or, from the bottom of Plot Details, “Continue to Hybrid Entries” starts your first one directly."),
       sub("Hybrid Details"),
       p("Brand/Company, Hybrid, Trait, Seed Treatment, and Relative Maturity (RM) — these describe which product this entry is."),
+      p("Pick the Brand / Company first — the Hybrid list is per-brand, so it stays off until a brand is chosen. Picking a hybrid that's on your admin's Hybrid Catalog fills in its RM for you (and its Trait too, when that hybrid only comes in one package — otherwise the Trait list narrows down to just that hybrid's packages). Switching an entry to a different brand clears its Hybrid, Trait, and RM so nothing from the old brand carries over — pick the new brand's hybrid and they fill back in. Everything auto-filled can still be changed, and a hybrid, trait, or brand that isn't on any list can always be typed in and added."),
       sub("Yield Measurements"),
       p("There are two different ways to get a Dry Yield number onto an entry — use whichever one fits how you actually collected your data. You never need to do both."),
       sub("Option 1: Enter it yourself (yield monitor, scale ticket, or another app)"),
@@ -149,7 +151,7 @@ export function render(container) {
       p("The app converts those into bu/ac for you, adjusted to the standard 15.5% base moisture — nothing to calculate by hand. Test Weight is also on this screen and worth recording for your own records, but it isn't part of the Dry Yield formula itself."),
       p("You can switch between the two at any time: type a number into Dry Yield to override whatever the app calculated, or clear that field back to empty to return to the automatic calculation from your raw measurements. The field's placeholder text shows you the calculated value even while it's blank, so you can always see what the app would use."),
       p("Comments at the bottom is a free-text spot for notes on that specific hybrid."),
-      p("Back on the Plot Hybrids list: tap any row to edit it, use the ↑ / ↓ arrows to reorder entries, or the 🗑 trash icon to remove one."),
+      p("Back on the Hybrid Entries list: tap any row to edit it. To reorder entries, press and hold a row for a moment, then drag it up or down to where it belongs (with a mouse, just click and drag) — the list renumbers itself. To remove one, tap the 🗑 trash icon, or swipe the row to the left and tap Delete."),
     ]),
 
     helpSection("Viewing Your Results", [
@@ -157,25 +159,26 @@ export function render(container) {
       p("Near the top, two tabs — Dry Yield and Gross — let you re-rank the list by whichever number matters most right now. Each hybrid's Moisture reading still shows on its row either way."),
       p("Below that: the Trial Mean (the plot's average), CV (a measure of how spread out the results are — lower means more consistent), and how many entries have complete data."),
       p("The small horizontal chart is a box plot — it shows the full spread of yields at a glance: the box is where the middle half of your results fall, the line through it is the median, and the whiskers reach out to your highest and lowest yields."),
-      p("If two or more brands are represented with multiple hybrids each, you'll also see an average for each brand."),
+      p("Below that, two bar charts — Yield by Position and Moisture by Position — show every entry in planting order, one bar per position, with a dashed trend line showing any drift from one end of the plot to the other. A ✓ under a bar (and a “Check” label in the ranked list) marks a hybrid you entered at more than one position — a repeated “check” hybrid."),
+      p("Any brand with two or more hybrids in this plot also gets its own average — a single-hybrid brand doesn't, since averaging one number isn't meaningful."),
       p("In the Ranked Results list, each hybrid gets a colored number badge: green means it came in well above the plot's average, yellow means well below, and gray means close to average — this color reflects how that hybrid actually performed, not just where it landed in the ranking."),
-      p("Tap “Edit This Plot” to jump back to Plot Hybrids and keep editing."),
+      p("Tap the plot's name card at the very top to expand a recap of everything entered on Plot Details, with an “Edit Plot Details” shortcut at the bottom of the panel. Tap “Edit This Plot” to jump back to Hybrid Entries and keep editing."),
       p("Want more detail on any of this? Tap the “i” info icon next to the gear at the top of the Plot Summary screen for a deeper walkthrough of the tabs, the box plot, and the rank badges, right there on the results screen."),
     ]),
 
     helpSection("Sharing & Exporting Your Results", [
-      p("From Plot Summary, tap “Share This Plot” to open four options:"),
+      p("From Plot Summary, open the Share menu — either the share icon at the very top of the screen or the “Share This Plot” button at the bottom; both open the same menu, with three options:"),
       ul([
-        "Export / Share PDF — a clean, printable summary of your ranked results, ready to hand someone or save.",
-        "Export / Share XLSX — the full spreadsheet with everything you entered, for anyone who wants the raw data.",
-        "Print — opens a print-ready version so you can print directly from your phone, tablet, or computer.",
-        "Email — opens your email app with the spreadsheet ready to send to your team. If your device can't attach it automatically, the file downloads instead and you just attach it yourself in the email that opens.",
+        "Share / Print PDF Summary — a clean, printable summary of your ranked results. You'll first be asked whether to add a compact Plot Details header to the page; then your device's share screen opens, where you can print it, save it, or send it by text or email.",
+        "Share / Print Excel Plot Form — the full spreadsheet with everything you entered, for anyone who wants the raw data. It shares, prints, and emails the same way as the PDF.",
+        "Export for Seedware — prepares the Seedware import file AND the full Excel plot form together, so both files travel in one share. If your device can't share files directly, they download instead and you attach them yourself.",
       ]),
+      p("The PDF is the easiest format to pass around: it opens on any phone, tablet, or computer, and travels through a group text as a proper file attachment instead of a blurry picture."),
     ]),
 
     helpSection("Saved Plots", [
       p("Every plot you've entered a cooperator name for is saved automatically — there's no separate “Save” step to remember. Find them all by tapping “Saved Plots” from the Home Screen or Plot Workspace menu."),
-      p("Use the search box at the top to find a plot by cooperator name, state, or year. A gold “Current” badge marks whichever plot is open in your workspace right now. Tap any row to open it; tap the 🗑 icon to permanently delete one from your device."),
+      p("Use the search box at the top to find a plot by cooperator name, state, or year. A gold “Current” badge marks whichever plot is open in your workspace right now. Tap any row to open it. To delete one, tap the 🗑 icon, swipe the row to the left, or right-click it on a computer — whichever way you choose, the app always asks you to confirm first."),
       p("If a saved plot shows a “From {name}” badge, it means it originally belonged to a teammate — either an admin merged their account into yours, or they deleted their own account and their plots came to your farm's admin (see “For Admins” below). It's yours to manage from here just like any other saved plot."),
       p("You'll also see one plot with a gray “Demo” badge — a sample plot pre-loaded on this device so you always have something to look at on Plot Summary. Feel free to edit it for practice; it stays local to this device and never syncs, shows up on All Plots (Admin), or counts in an export. Delete it whenever you like — every time the app updates, the Demo Plot reappears with fresh sample content, even if you'd edited or deleted it before, so you can just delete it again if you'd rather not have it around."),
     ]),
@@ -193,7 +196,7 @@ export function render(container) {
         "See which email you're signed in as, and Sign Out.",
         "Edit My Info — update your First Name, Last Name, and Mobile Number any time (your email itself can't be changed here, since that's how you sign in).",
         "Delete My Account — permanently removes your account. Every plot you've saved transfers to your farm's admin first, so nothing is lost, but this can't be undone and you'll need to sign back in (creating a fresh account) to keep using the app afterward. You'll be asked to confirm twice, including typing the word DELETE, before anything happens.",
-        "Open this Help guide, or (for admins) Manage Users.",
+        "Open this Help guide, or (for admins) Manage Users and the Hybrid Catalog uploads — see “For Admins” below.",
       ]),
     ]),
 
@@ -209,6 +212,8 @@ export function render(container) {
         "Merge Into… — for when the same person ends up with two accounts (usually from signing in with a different email on a different device). This moves all of one account's plots onto the other and removes the duplicate. Nothing is lost.",
         "Delete — permanently removes someone's account and all their saved plots. Because this can't be undone, you'll be asked to confirm twice, including typing the word DELETE.",
       ]),
+      sub("Hybrid Catalog"),
+      p("Also in Settings' Admin section: the Hybrid Catalog is the list that pre-fills RM and Trait when someone picks a hybrid on an entry. It's maintained as two separate uploads (.xlsx or .csv files): “Upload Company Hybrids” covers MW / NC / CR and SuperCrost, and “Upload Alt. Variety Hybrids” covers every other brand. Each upload replaces only its own half of the catalog and leaves the other half untouched, so you can refresh one side without re-uploading the other — and rows that belong in the other upload are skipped with a notice, never mixed in. The status line above the buttons shows how many hybrids are loaded on each side and when the catalog was last updated."),
     ]),
 
     helpSection("Troubleshooting & Common Questions", [

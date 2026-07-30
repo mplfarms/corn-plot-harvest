@@ -98,6 +98,16 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   const backfillBtn = page.locator("button", { hasText: "Assign Form IDs to All Plots" });
   check(await backfillBtn.count() === 1, "the \"Assign Form IDs to All Plots\" button is visible to an admin");
 
+  // Per explicit request the button moved from the top of the page to
+  // the very BOTTOM — it must be .screen-body's last element, below
+  // every user's card.
+  const isLastElement = await page.evaluate(() => {
+    const body = document.querySelector(".admin-plots-screen .screen-body");
+    const last = body && body.lastElementChild;
+    return Boolean(last && last.tagName === "BUTTON" && last.textContent.includes("Assign Form IDs to All Plots"));
+  });
+  check(isLastElement, "the backfill button is the LAST element on the page, below all user cards");
+
   // Before backfilling, Bob's row shows no Form ID.
   let bobRowText = await page.locator(".admin-plot-row", { hasText: "Bob's Farm" }).textContent();
   check(!bobRowText.includes("APP"), `before backfilling, Bob's plot row shows no Form ID yet (got "${bobRowText}")`);

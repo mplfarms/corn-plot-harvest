@@ -175,12 +175,27 @@ export function render(container, params) {
   function applyFirstEntryHybridRmDefault(brandValue) {
     if (!isFirstEntryOfPlot || !brandValue) return;
     const current = currentEntry();
+    // ONE-SHOT: the default is applied at most once per entry, tracked
+    // on the entry itself. Without this, reopening the first entry
+    // after a brand change had cleared Hybrid/Trait/RM (see brandRow's
+    // onChange) found the fields blank again and silently re-applied
+    // the RM-100 default the clear rule had just removed (real audit
+    // finding). The brand-change clear also sets this flag for the
+    // same reason.
+    if (current.firstEntryDefaultApplied) return;
     // Only default while both are still untouched, so this never
     // clobbers a hybrid/RM the user already picked.
     if (current.hybrid.trim() || current.relativeMaturity.trim()) return;
     const defaultHybrid = listsStore.firstHybridWithRm(brandValue, DEFAULT_RM_FOR_NEW_PLOT);
-    const patch = { relativeMaturity: String(DEFAULT_RM_FOR_NEW_PLOT) };
-    if (defaultHybrid) patch.hybrid = defaultHybrid;
+    const patch = { relativeMaturity: String(DEFAULT_RM_FOR_NEW_PLOT), firstEntryDefaultApplied: true };
+    if (defaultHybrid) {
+      patch.hybrid = defaultHybrid;
+      // The default pick gets the same catalog cascade a deliberate
+      // pick of the same hybrid would (audit finding: it used to skip
+      // it, leaving Trait blank for a single-trait catalog hybrid).
+      const traits = catalogStore.traitsForHybrid(brandValue, defaultHybrid);
+      if (traits.length === 1) patch.trait = traits[0];
+    }
     trialStore.updateEntry(entryId, patch);
     rmWheel.setValue(String(DEFAULT_RM_FOR_NEW_PLOT));
   }
@@ -211,7 +226,10 @@ export function render(container, params) {
       // from the catalog as usual). Re-picking the SAME brand changes
       // nothing.
       if (v.trim() !== prevBrand) {
-        trialStore.updateEntry(entryId, { hybrid: "", trait: "", relativeMaturity: "" });
+        // firstEntryDefaultApplied: the cleared state must STAY cleared
+        // — without the flag, reopening this entry re-applied the
+        // first-entry RM-100 default into the blanked fields.
+        trialStore.updateEntry(entryId, { hybrid: "", trait: "", relativeMaturity: "", firstEntryDefaultApplied: true });
         rmWheel.setValue("");
       }
       rebuildHybridWheel();
