@@ -94,6 +94,8 @@ export function render(container) {
       p("This only works in Safari — if you're using Chrome or another browser on an iPhone, open this same page in Safari first."),
       sub("On an Android phone or tablet (Chrome)"),
       p("Tap the ⋮ menu in the top right of Chrome, then tap “Add to Home screen” (some phones show this as “Install app” instead), then confirm."),
+      sub("What the icon looks like"),
+      p("Look for a dark navy square that reads “Plot” in white letters, with two angled plot strips behind the word. Underneath it your phone will label it “Corn Plot.”"),
       p("Either way, you only need to do this once per device. If you ever sign in on a new phone or tablet, just repeat these steps there too."),
     ]),
 

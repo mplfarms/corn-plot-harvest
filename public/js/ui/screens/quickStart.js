@@ -33,7 +33,7 @@ const STEPS = [
   },
   {
     title: "Add it to your Home Screen",
-    text: "On an iPhone or iPad: tap the Share button in Safari (the square with an arrow), then “Add to Home Screen.” On Android: tap the ⋮ menu in Chrome, then “Add to Home screen” (or “Install app”). Either way, an icon appears on your home screen that opens the app directly — no browser bar, no re-typing a web address.",
+    text: "On an iPhone or iPad: tap the Share button in Safari (the square with an arrow), then “Add to Home Screen.” On Android: tap the ⋮ menu in Chrome, then “Add to Home screen” (or “Install app”). Either way, a dark navy “Plot” icon appears on your home screen and opens the app directly — no browser bar, no re-typing a web address.",
     tip: "Tip: see “Adding This App to Your Home Screen” under Settings → Help for the full step-by-step, including what it looks like on Android.",
   },
   {
