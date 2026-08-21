@@ -1688,6 +1688,87 @@ h3.section-header:first-child {
   opacity: 0.7;
 }
 
+/* A plot row in All Plots (Admin) now carries two controls: the row
+   itself (opens the plot for admin editing, exactly as before) and a
+   "Copy to…" button that hands a duplicate to another user. The row
+   button takes the leftover width so the two never collide on a narrow
+   phone. */
+.admin-plot-row-item {
+  align-items: center;
+}
+
+.admin-plot-row-item .admin-plot-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.admin-plot-assign-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 11px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.admin-plot-assign-btn:active {
+  opacity: 0.7;
+}
+
+/* The "Assign a Copy" picker (showCustomModal): one tappable row per
+   other registered user, name over email. */
+.admin-assign-intro {
+  margin: 0 0 12px;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+.admin-assign-user-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-assign-user-btn {
+  width: 100%;
+  text-align: left;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-assign-user-btn:active {
+  opacity: 0.7;
+}
+
+.admin-assign-user-btn.is-busy {
+  opacity: 0.55;
+}
+
+.admin-assign-user-name {
+  font-weight: 600;
+}
+
+.admin-assign-user-email {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
 /* All Plots (Admin) card header: name + email stacked on the left, a "☰"
    details button pinned to the far right — replaces the old plain
    single-line .section-header text for this screen only (still uses the

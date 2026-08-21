@@ -139,6 +139,45 @@ export function createPlotEntry() {
 }
 
 /**
+ * Deep-copies a saved trial so an admin can hand a duplicate of it to
+ * another user (see ui/screens/adminPlots.js's "Copy to…" action). The
+ * copy is a genuinely separate plot on the recipient's account — they
+ * can edit it without touching the original — so it gets a brand new
+ * trial id and brand new entry ids. That matters for more than
+ * tidiness: cloud sync merges by trial id (see cloudSyncStore.js's
+ * mergeByLastModified), so a copy that reused the source id would
+ * collide with the original the moment both ever landed in one library,
+ * and a second copy sent to the same person would silently overwrite
+ * the first.
+ *
+ * The Form ID is deliberately carried over UNCHANGED (per explicit
+ * request): both copies keep pointing at the same real-world plot, which
+ * is the whole point of handing one to a teammate. Note that means two
+ * plots share a Form ID — including in the Seedware export, whose
+ * "Form #" column is documented as unique — so a copy is for working
+ * with, not for uploading a second time.
+ *
+ * `isDemo` is stripped: the sample Demo Plot is local-only practice data
+ * (see demoPlot.js / cloudSyncStore.js's push filter), and a copy that
+ * kept the flag would be filtered right back out of the recipient's own
+ * cloud push and vanish on their next device.
+ *
+ * @param {SavedTrial} trial the source trial, left completely untouched
+ * @param {string} [lastModified] ISO datetime for the copy; defaults to now
+ * @returns {SavedTrial}
+ */
+export function copyTrialForAssignment(trial, lastModified) {
+  const source = JSON.parse(JSON.stringify(trial));
+  delete source.isDemo;
+  return {
+    ...source,
+    id: uuid(),
+    entries: (source.entries || []).map((entry) => ({ ...entry, id: uuid() })),
+    lastModified: lastModified || new Date().toISOString(),
+  };
+}
+
+/**
  * @param {PlotEntry} entry
  * @returns {boolean}
  */

@@ -2,9 +2,14 @@
 //
 // Builds "Export for Seedware" — a flat, one-row-per-entry .xlsx that
 // matches the column layout of Mike's reference file
-// ("harvest_data_import_template_v1", Instructions + Import Data tabs)
-// so it can be dropped straight into SeedWare's Harvest Data Request
-// Widget import. This is a completely separate, much simpler workbook
+// ("harvest upload template v2", Instructions + Import Data + Lists
+// tabs) so it can be dropped straight into SeedWare's Harvest Data
+// Request Widget import. v2 keeps v1's A–AA columns exactly as they
+// were and adds six "Extra Columns" (SeedWare fields/stats) on the
+// right — AB Planting Population, AC Irrigated?, AD Tillage,
+// AE Recorded by, AF Soil Type, AG Brand — every one of which this app
+// already collects, so a shared plot now leaves nothing behind (see the
+// column map below). This is a completely separate, much simpler workbook
 // than xlsxBuilder.js's full formatted "Trial Outline" export: no
 // formulas, no fetched template parts, no second (Lists) sheet — just a
 // header row plus one data row per plot entry, assembled fully offline
@@ -74,6 +79,41 @@
 //                          Yield @ 15%, same value shown everywhere else
 //                          in the app (Plot Summary, the PDF, the full
 //                          XLSX export).
+//
+// The v2 "Extra Columns" (AB-AG), all straight off the plot's own Plot
+// Details screen, so nothing the app collects is dropped on the way to
+// SeedWare:
+//   Planting Population  -> header.plantingPopulation (numeric — the
+//                          template's extra-column rule is "a number up
+//                          to 3 decimals" for a numeric field/stat)
+//   Irrigated?            -> derived from header.irrigation, whose app
+//                          list is "No" / "Pivot" / "Drip" / "Flood"
+//                          (DefaultLists.json's irrigationOptions). The
+//                          column's name and the template's yes/no rule
+//                          ("the value must be exactly one of 'Yes' or
+//                          'No'") make this a yes/no field, so any real
+//                          irrigation METHOD becomes "Yes", the app's
+//                          own "No" stays "No", and an unanswered field
+//                          stays blank rather than guessing. If the
+//                          SeedWare field turns out to be a custom list
+//                          of methods instead, pass the raw value
+//                          through here instead — see irrigatedYesNo().
+//   Tillage               -> header.tillage ("Conventional" / "No-Till"
+//                          / "Minimum Till" / "Strip Till")
+//   Recorded by           -> header.collectedBy (prefilled from the
+//                          signed-in user on Plot Details, editable)
+//   Soil Type             -> header.soilType (the USDA type filled in by
+//                          the location capture, or picked by hand)
+//   Brand                 -> entry.brand, on EVERY row — unlike Request
+//                          Company (which is blank unless the row is a
+//                          Request), this always carries the entry's
+//                          brand so the whole plot's lineup is visible
+//                          in SeedWare without opening the varieties.
+//
+// Tillage, Soil Type and Brand are free text as far as this app is
+// concerned; if any of them is configured as a SeedWare custom list, its
+// values have to match that list exactly — same caveat as the Lookup
+// fields noted below.
 //
 // Left blank on every row, because there is nowhere in this app for the
 // data to come from: District Account Number, Cooperator Account
@@ -148,8 +188,23 @@ function roundOrNull(n, digits) {
 }
 
 /**
+ * Maps the app's Irrigation answer onto the v2 template's "Irrigated?"
+ * yes/no extra column: the app's own "No" stays "No", any actual
+ * irrigation method ("Pivot" / "Drip" / "Flood", or anything hand-typed)
+ * becomes "Yes", and an unanswered field stays blank instead of being
+ * guessed either way.
+ * @param {string|null|undefined} irrigation
+ * @returns {string}
+ */
+export function irrigatedYesNo(irrigation) {
+  const value = String(irrigation || "").trim();
+  if (!value) return "";
+  return value.toLowerCase() === "no" ? "No" : "Yes";
+}
+
+/**
  * One entry per column, in the exact left-to-right order of the
- * reference template's Import Data tab (A=Form # ... AA=Yield) — see
+ * reference template's Import Data tab (A=Form # ... AG=Brand) — see
  * this file's top comment for the full field-by-field rationale. `ctx`
  * is computed once per row (see buildSheet1Xml) rather than each column
  * recomputing Variety Provider independently — `ctx.provider` is
@@ -188,12 +243,19 @@ const COLUMNS = [
   { header: "Num Rows", type: "number", value: (h, e) => roundOrNull(parseNumber(e.numberOfRows), 3) },
   { header: "Moisture", type: "number", value: (h, e) => roundOrNull(parseNumber(e.moisturePercent), 3) },
   { header: "Yield", type: "number", value: (h, e) => roundOrNull(dryYield(e), 3) },
+  // ---- v2 "Extra Columns" (AB-AG) ----
+  { header: "Planting Population", type: "number", value: (h) => roundOrNull(parseNumber(h.plantingPopulation), 3) },
+  { header: "Irrigated?", type: "text", value: (h) => irrigatedYesNo(h.irrigation) },
+  { header: "Tillage", type: "text", value: (h) => h.tillage || "" },
+  { header: "Recorded by", type: "text", value: (h) => h.collectedBy || "" },
+  { header: "Soil Type", type: "text", value: (h) => h.soilType || "" },
+  { header: "Brand", type: "text", value: (h, e) => e.brand || "" },
 ];
 
 /**
  * Converts a 0-based column index into its spreadsheet letter(s) — 0 ->
- * "A", 25 -> "Z", 26 -> "AA", matching COLUMNS' 27 entries (A through AA,
- * same span as the reference template's Import Data tab).
+ * "A", 25 -> "Z", 26 -> "AA", matching COLUMNS' 33 entries (A through AG,
+ * same span as the v2 reference template's Import Data tab).
  * @param {number} index
  * @returns {string}
  */

@@ -177,6 +177,8 @@ export function render(container) {
         "Export for Seedware — prepares the Seedware import file AND the full Excel plot form together, so both files travel in one share. If your device can't share files directly, they download instead and you attach them yourself.",
       ]),
       p("The PDF is the easiest format to pass around: it opens on any phone, tablet, or computer, and travels through a group text as a proper file attachment instead of a blurry picture."),
+      sub("What goes into the Seedware file"),
+      p("The Seedware file carries everything the plot has, not just the yields: dates, previous crop, city, state, zip, and GPS coordinates; each entry's position, brand, variety, treatment, strip dimensions, moisture, and dry yield; and — from Plot Details — planting population, irrigation, tillage, soil type, and who collected it. Anything left blank on Plot Details arrives blank in Seedware, so it's worth filling those in before you export."),
     ]),
 
     helpSection("Saved Plots", [
@@ -207,6 +209,9 @@ export function render(container) {
       p("If your account has admin access, you'll see a couple of extra things other users don't:"),
       sub("All Plots (Admin)"),
       p("Browse every teammate's saved plots in one place — every registered user gets their own card here, even one who hasn't saved a plot yet. Tap any plot to open and edit it directly — a banner at the top reminds you whose plot you're in the whole time you're working on it. When you're done, tap “Save Changes” to write your edits back to their account, or “Discard Admin Edit” to back out without saving anything. Tap the “☰” on any card to see that person's First Name, Last Name, Email, and Phone."),
+      sub("Giving someone a copy of a plot"),
+      p("Every plot row has a “Copy to…” button on its right. Tap it, pick a teammate, and a copy of that plot lands in their Saved Plots the next time their app syncs. It's a copy, not a hand-off: the original stays right where it is, untouched, and the person receiving it can edit their copy freely without it affecting anyone else's."),
+      p("The copy keeps the original's Form ID, so both point back at the same real-world plot — which also means only one of them should ever be uploaded to Seedware, since Seedware expects each Form # to appear once. If you send the same plot to someone who already has it, the app warns you before sending a second copy."),
       sub("Manage Users"),
       p("Reachable from Settings, this lists everyone who's ever signed in (admin(s) first, then everyone else alphabetically by last name), and lets you:"),
       ul([

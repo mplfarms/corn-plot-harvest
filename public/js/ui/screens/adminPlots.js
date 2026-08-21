@@ -46,8 +46,9 @@
 
 import { h, mount, clear } from "../dom.js";
 import { createTopBar } from "../components/topBar.js";
-import { showCustomModal } from "../components/modal.js";
+import { showCustomModal, showConfirm } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
+import { copyTrialForAssignment } from "../../core/models.js";
 import * as authStore from "../authStore.js";
 import * as libraryStore from "../stores/libraryStore.js";
 import * as adminEditStore from "../stores/adminEditStore.js";
@@ -127,6 +128,177 @@ async function runBackfillFormIds(btn, onDone) {
 // (The Hybrid Catalog upload section moved to Settings' Admin card —
 // per explicit request — see components/hybridCatalogUpload.js.)
 
+/**
+ * A short human label for one plot, used in the assign-a-copy dialogs —
+ * the cooperator name plus the Form ID when there is one.
+ * @param {Object} trial
+ * @returns {string}
+ */
+function plotLabel(trial) {
+  const name = (trial.header.cooperatorName || "").trim() || "Untitled Plot";
+  return trial.header.formId ? `${name} (${trial.header.formId})` : name;
+}
+
+/**
+ * True if `recipient` already appears to be holding a copy of this plot,
+ * so a second tap of "Copy to…" can warn instead of quietly stacking up
+ * duplicates. Matched on Form ID when the source has one (a copy keeps
+ * the original's Form ID — see models.copyTrialForAssignment), and
+ * otherwise on the cooperator name + harvest date pair, which is the
+ * closest thing to an identity a plot has before its Form ID is assigned.
+ * @param {{trials?: Object[]}} recipient
+ * @param {Object} sourceTrial
+ * @returns {boolean}
+ */
+function alreadyHasCopy(recipient, sourceTrial) {
+  const trials = recipient.trials || [];
+  const formId = (sourceTrial.header.formId || "").trim();
+  if (formId) return trials.some((t) => (t.header.formId || "").trim() === formId);
+  const name = (sourceTrial.header.cooperatorName || "").trim().toLowerCase();
+  if (!name) return false;
+  return trials.some(
+    (t) =>
+      (t.header.cooperatorName || "").trim().toLowerCase() === name &&
+      (t.header.dateHarvested || "") === (sourceTrial.header.dateHarvested || "")
+  );
+}
+
+/**
+ * Writes a copy of `sourceTrial` onto `recipient`'s cloud record, by
+ * PUTting their existing trials plus the copy — the same whole-array
+ * replace contract every other save in this app uses (see
+ * cloudSyncStore.js and adminEditStore.js's saveAndExit), and the same
+ * `adminEmail` field that tells the server this is an admin acting on
+ * someone else's behalf so it can re-check the caller really is one
+ * (netlify/functions/plots.js's requireAdmin).
+ *
+ * The recipient's `trials` come from the scope=all listing this screen
+ * already loaded, which is a point-in-time snapshot — if they saved
+ * something on their own device in the seconds since, that save is lost
+ * to this replace. Same narrow race adminEditStore.js already documents
+ * and accepts for a handful of internal users; the screen re-renders
+ * (re-fetching the listing) after every successful assignment, so the
+ * window is one dialog wide.
+ *
+ * @param {{sourceTrial: Object, recipient: Object, adminEmail: string}} args
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
+async function assignCopyToUser({ sourceTrial, recipient, adminEmail }) {
+  const copy = copyTrialForAssignment(sourceTrial);
+  let res;
+  try {
+    res = await fetch("/.netlify/functions/plots", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: recipient.email,
+        trials: [...(recipient.trials || []), copy],
+        adminEmail,
+      }),
+    });
+  } catch (e) {
+    return { ok: false, error: "Couldn't reach the server — check your connection and try again." };
+  }
+  let payload = {};
+  try {
+    payload = await res.json();
+  } catch (e) {
+    // Ignore — the status-based message below covers it.
+  }
+  if (!res.ok) return { ok: false, error: payload.error || `Assign failed (${res.status}).` };
+  return { ok: true };
+}
+
+/**
+ * The "Copy to…" picker: one row per OTHER registered user (the plot's
+ * own owner is left out — they already have it). One recipient per
+ * assignment, per explicit request.
+ * @param {{sourceTrial: Object, owner: Object, users: Object[], onAssigned: () => void}} args
+ */
+function openAssignCopyModal({ sourceTrial, owner, users, onAssigned }) {
+  const others = users.filter((u) => u.email !== owner.email);
+  const creds = authStore.getCredentials();
+  const reopen = () => openAssignCopyModal({ sourceTrial, owner, users, onAssigned });
+
+  /**
+   * Sends the copy and reports the outcome. Assumes the caller has
+   * already dealt with the picker's own visual state.
+   * @param {Object} recipient
+   * @returns {Promise<boolean>} true if it landed
+   */
+  const performAssign = async (recipient) => {
+    const result = await assignCopyToUser({ sourceTrial, recipient, adminEmail: creds && creds.email });
+    if (result.ok) {
+      showToast(`Copy of ${plotLabel(sourceTrial)} sent to ${recipient.name || recipient.email}.`, { type: "success" });
+      onAssigned();
+      return true;
+    }
+    showToast(result.error, { type: "error" });
+    return false;
+  };
+
+  const list = h(
+    "ul",
+    { className: "admin-assign-user-list" },
+    others.length === 0
+      ? [h("li", {}, h("p", { className: "empty-state" }, "There's no one else signed up yet."))]
+      : others.map((u) => {
+          const hasName = Boolean(u.name && u.name.trim() && u.name !== u.email);
+          return h("li", {}, [
+            h(
+              "button",
+              {
+                type: "button",
+                className: "admin-assign-user-btn",
+                onclick: async (e) => {
+                  const btn = e.currentTarget;
+                  if (alreadyHasCopy(u, sourceTrial)) {
+                    // showConfirm reuses the one shared modal overlay, so
+                    // it can't sit ON TOP of this picker — close the
+                    // picker first, then put it back if they say no.
+                    modal.close();
+                    const again = await showConfirm({
+                      title: "Already Has a Copy",
+                      message: `${u.name || u.email} already has this plot. Send another copy anyway?`,
+                      confirmLabel: "Send Anyway",
+                      cancelLabel: "Cancel",
+                    });
+                    if (!again || !(await performAssign(u))) reopen();
+                    return;
+                  }
+                  btn.disabled = true;
+                  btn.classList.add("is-busy");
+                  if (await performAssign(u)) {
+                    modal.close();
+                  } else {
+                    btn.disabled = false;
+                    btn.classList.remove("is-busy");
+                  }
+                },
+              },
+              [
+                h("span", { className: "admin-assign-user-name" }, hasName ? u.name : u.email),
+                hasName ? h("span", { className: "admin-assign-user-email" }, u.email) : null,
+              ]
+            ),
+          ]);
+        })
+  );
+
+  const body = h("div", { className: "admin-assign-body" }, [
+    h(
+      "p",
+      { className: "admin-assign-intro" },
+      `Send a copy of ${plotLabel(sourceTrial)} to another user. They get their own editable copy — ${
+        owner.name || owner.email
+      }'s original stays exactly as it is.`
+    ),
+    list,
+  ]);
+
+  const modal = showCustomModal({ title: "Assign a Copy", bodyNode: body });
+}
+
 export async function render(container) {
   const topBar = createTopBar({
     title: "All Plots (Admin)",
@@ -182,7 +354,7 @@ export async function render(container) {
         u.trials.length === 0
           ? [h("p", { className: "empty-state" }, "No saved plots.")]
           : u.trials.map((t) =>
-              h("li", { className: "brand-average-row" }, [
+              h("li", { className: "brand-average-row admin-plot-row-item" }, [
                 h(
                   "button",
                   {
@@ -210,6 +382,28 @@ export async function render(container) {
                       } ›`
                     ),
                   ]
+                ),
+                // Second control on the row: hand a copy of this plot to
+                // another user. Deliberately its own button rather than
+                // something inside the row button — tapping the row
+                // itself still opens the plot for admin editing exactly
+                // as it always has.
+                h(
+                  "button",
+                  {
+                    type: "button",
+                    className: "admin-plot-assign-btn",
+                    "aria-label": `Assign a copy of ${plotLabel(t)} to another user`,
+                    title: "Assign a copy to another user",
+                    onclick: () =>
+                      openAssignCopyModal({
+                        sourceTrial: t,
+                        owner: u,
+                        users,
+                        onAssigned: () => render(container),
+                      }),
+                  },
+                  "Copy to…"
                 ),
               ])
             );

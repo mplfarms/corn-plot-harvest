@@ -44,7 +44,7 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   await page.goto(`${BASE}/index.html`);
 
   const result = await page.evaluate(async () => {
-    const { buildSeedwareExport, varietyProviderFor, seedwareExportFilename } = await import(
+    const { buildSeedwareExport, varietyProviderFor, seedwareExportFilename, irrigatedYesNo } = await import(
       "/js/core/seedwareExportBuilder.js"
     );
 
@@ -107,6 +107,13 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
       gpsLatitude: 42.034534,
       gpsLongitude: -93.62,
       cooperatorName: "Test Cooperator",
+      // The v2 template's six extra columns (AB-AG) all come off Plot
+      // Details, so they're part of the fixture now too.
+      plantingPopulation: "34500",
+      irrigation: "Pivot",
+      tillage: "No-Till",
+      collectedBy: "Dana Rep",
+      soilType: "Silt Loam",
     };
     const entries = [
       {
@@ -228,6 +235,31 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
         requestVariety: cellValue(sheetXml, "S2"),
         requestCompany: cellValue(sheetXml, "T2"),
       },
+      // ---- v2 extra columns (AB-AG) ----
+      extraHeaders: ["AB1", "AC1", "AD1", "AE1", "AF1", "AG1"].map((ref) => cellValue(sheetXml, ref)),
+      lastHeaderPresent: cellValue(sheetXml, "AH1"),
+      extrasRow2: {
+        plantingPopulation: cellValue(sheetXml, "AB2"),
+        irrigated: cellValue(sheetXml, "AC2"),
+        tillage: cellValue(sheetXml, "AD2"),
+        recordedBy: cellValue(sheetXml, "AE2"),
+        soilType: cellValue(sheetXml, "AF2"),
+        brand: cellValue(sheetXml, "AG2"),
+      },
+      // Row 3 = the Competitor (Pioneer) entry — Brand tracks the entry,
+      // while the five plot-level extras repeat unchanged.
+      extrasRow3: {
+        brand: cellValue(sheetXml, "AG3"),
+        soilType: cellValue(sheetXml, "AF3"),
+        plantingPopulation: cellValue(sheetXml, "AB3"),
+      },
+      irrigatedCases: {
+        no: irrigatedYesNo("No"),
+        pivot: irrigatedYesNo("Pivot"),
+        flood: irrigatedYesNo("Flood"),
+        blank: irrigatedYesNo(""),
+        missing: irrigatedYesNo(undefined),
+      },
     };
   });
 
@@ -273,6 +305,42 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
   check(
     result.row6.requestCompany === "Some Brand New Seed Co",
     `that row's Request Company holds the custom brand name (got "${result.row6.requestCompany}")`
+  );
+
+  // ---- v2 template: the six Extra Columns (AB-AG) ----
+  check(
+    JSON.stringify(result.extraHeaders) ===
+      JSON.stringify(["Planting Population", "Irrigated?", "Tillage", "Recorded by", "Soil Type", "Brand"]),
+    `the v2 extra columns are AB-AG in template order (got ${JSON.stringify(result.extraHeaders)})`
+  );
+  check(
+    result.lastHeaderPresent === undefined,
+    `the sheet stops at AG — no stray 34th column (got ${JSON.stringify(result.lastHeaderPresent)})`
+  );
+  check(
+    result.extrasRow2.plantingPopulation === 34500,
+    `Planting Population comes across as a number (got ${JSON.stringify(result.extrasRow2.plantingPopulation)})`
+  );
+  check(result.extrasRow2.irrigated === "Yes", `an irrigation method ("Pivot") exports as Irrigated? "Yes" (got "${result.extrasRow2.irrigated}")`);
+  check(result.extrasRow2.tillage === "No-Till", `Tillage carries the plot's answer (got "${result.extrasRow2.tillage}")`);
+  check(result.extrasRow2.recordedBy === "Dana Rep", `Recorded by carries Collected By (got "${result.extrasRow2.recordedBy}")`);
+  check(result.extrasRow2.soilType === "Silt Loam", `Soil Type carries the plot's soil type (got "${result.extrasRow2.soilType}")`);
+  check(result.extrasRow2.brand === "Midwest Seed Genetics", `Brand carries the entry's brand (got "${result.extrasRow2.brand}")`);
+  check(
+    result.extrasRow3.brand === "Pioneer",
+    `Brand tracks each entry, not the plot — row 3 is the competitor entry (got "${result.extrasRow3.brand}")`
+  );
+  check(
+    result.extrasRow3.soilType === "Silt Loam" && result.extrasRow3.plantingPopulation === 34500,
+    `the plot-level extras repeat on every row (got "${result.extrasRow3.soilType}"/${result.extrasRow3.plantingPopulation})`
+  );
+  check(
+    result.irrigatedCases.no === "No" &&
+      result.irrigatedCases.pivot === "Yes" &&
+      result.irrigatedCases.flood === "Yes" &&
+      result.irrigatedCases.blank === "" &&
+      result.irrigatedCases.missing === "",
+    `Irrigated? maps No->No, any method->Yes, unanswered->blank (got ${JSON.stringify(result.irrigatedCases)})`
   );
 
   await page.close();
