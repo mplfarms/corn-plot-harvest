@@ -1,206 +1,76 @@
-// Corn Plot Harvest service worker.
+// Corn Plot Harvest — SUSPENSION service worker.
 //
-// Cache-first-falling-back-to-network for same-origin GET requests, plus
-// the jsPDF CDN URL specifically (also cache-first, falling back to
-// network, caching a successful network response for next time). The
-// app shell is precached on install; old-versioned caches are purged on
-// activate.
-
-const CACHE_VERSION = "v26.113-beta";
-const CACHE_NAME = `corn-plot-harvest-${CACHE_VERSION}`;
-
-const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-
-// Enumerated app-shell files (no wildcard support in the Cache API).
-// Keep this in sync with the actual contents of public/ — see the
-// `find public -type f` cross-check in the build notes.
-const PRECACHE_URLS = [
-  "/",
-  "/index.html",
-  "/manifest.webmanifest",
-  "/DefaultLists.json",
-  "/css/styles.css",
-
-  "/js/main.js",
-  "/js/version.js",
-  "/js/ui/authStore.js",
-  "/js/ui/brand.js",
-  "/js/ui/dom.js",
-  "/js/ui/fileSave.js",
-  "/js/ui/formIdAssign.js",
-  "/js/ui/geoData.js",
-  "/js/ui/logoCache.js",
-  "/js/ui/router.js",
-  "/js/ui/theme.js",
-  "/js/ui/xlsxLibLoader.js",
-
-  "/js/ui/components/datePicker.js",
-  "/js/ui/components/doubleConfirm.js",
-  "/js/ui/components/editUserDetailsModal.js",
-  "/js/ui/components/modal.js",
-  "/js/ui/components/newUserDetailsModal.js",
-  "/js/ui/components/searchListPicker.js",
-  "/js/ui/components/toast.js",
-  "/js/ui/components/topBar.js",
-  "/js/ui/components/updateBanner.js",
-  "/js/ui/components/wheelSelect.js",
-
-  "/js/ui/screens/accountScreen.js",
-  "/js/ui/screens/adminPlots.js",
-  "/js/ui/screens/brandSelect.js",
-  "/js/ui/screens/entriesList.js",
-  "/js/ui/screens/entryEditor.js",
-  "/js/ui/screens/help.js",
-  "/js/ui/screens/manageUsers.js",
-  "/js/ui/screens/plotChooser.js",
-  "/js/ui/screens/plotSummary.js",
-  "/js/ui/screens/plotSummaryHelp.js",
-  "/js/ui/screens/quickStart.js",
-  "/js/ui/screens/savedPlots.js",
-  "/js/ui/screens/settings.js",
-  "/js/ui/screens/trialDetails.js",
-  "/js/ui/screens/workspaceMenu.js",
-
-  "/js/ui/stores/brandStore.js",
-  "/js/ui/stores/catalogStore.js",
-  "/js/ui/stores/cloudSyncStore.js",
-  "/js/ui/stores/libraryStore.js",
-  "/js/ui/stores/listsStore.js",
-  "/js/ui/stores/pubsub.js",
-  "/js/ui/stores/themeStore.js",
-  "/js/ui/stores/trialStore.js",
-
-  "/js/core/companyMatch.js",
-  "/js/core/demoPlot.js",
-  "/js/core/formId.js",
-  "/js/core/hybridCatalogImport.js",
-  "/js/core/models.js",
-  "/js/core/pdfBuilder.js",
-  "/js/core/seedwareExportBuilder.js",
-  "/js/core/soilLookup.js",
-  "/js/core/xlsxBuilder.js",
-  "/js/core/xlsxTemplateParts.js",
-  "/js/core/xmlHelpers.js",
-  "/js/core/yieldCalculator.js",
-  "/js/core/zipWriter.js",
-
-  "/data/counties.json",
-  "/data/cityZips.json",
-
-  "/logos/midwest.png",
-  "/logos/ncplus.png",
-  "/logos/republic-shield.png",
-  "/logos/brand-train.png",
-
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/icon-512-maskable.png",
-
-  "/template/drawing1.xml",
-  "/template/drawing1.xml.rels",
-  "/template/image1.emf",
-  "/template/sharedStrings.xml",
-  "/template/sheet1_prefix.xml",
-  "/template/sheet1_rows_9_10.xml",
-  "/template/sheet1_suffix.xml",
-  "/template/styles.xml",
-  "/template/theme1.xml",
-];
+// This file replaces the app's real sw.js while access is suspended. Its
+// entire job is to undo the previous service worker, and it is the piece
+// that actually reaches phones with the app already installed.
+//
+// Why it's needed at all: the real sw.js serves the app shell
+// cache-first, so an installed device keeps opening the CACHED
+// index.html — the old app — even with a signal, and would never see a
+// suspension page put on the server. What the browser DOES fetch fresh
+// is sw.js itself (it byte-compares the registered worker against the
+// server's copy on navigations, and the site's _headers already force
+// no-cache on this file). So the suspension has to arrive as a new
+// service worker, not as a new page.
+//
+// The sequence below is deliberate:
+//   install  — skipWaiting() so this takes over immediately instead of
+//              waiting for every tab of the old app to close.
+//   activate — delete EVERY cache (that's the old app shell, and the
+//              jsPDF/Leaflet CDN copies with it), then unregister this
+//              worker entirely.
+//
+// After that the device has no service worker and no cache, so the very
+// next launch of the app is served straight from the network: the
+// suspension index.html. Someone with the old app ALREADY open in front
+// of them keeps seeing it until they close it — this deliberately does
+// not force-reload their page out from under them (a forced navigate
+// mid-activation can take the page down hard, and there is nothing to
+// gain by yanking a screen away from someone who may be mid-entry). One
+// close-and-reopen is all it takes.
+//
+// There is NO fetch handler here on purpose — while this worker is alive
+// every request passes straight through to the network, so nothing can
+// be served out of a cache that is on its way to being deleted.
+//
+// What this does NOT touch: localStorage. Every plot a rep has entered
+// on that device lives there, and suspending access must not destroy
+// their work. Only the app shell is cleared.
+//
+// To lift the suspension, restore the app's real index.html and sw.js
+// and deploy. Devices pick the real sw.js back up the same way — a
+// byte-different sw.js on the next navigation — and reinstall the app
+// shell from scratch.
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-
-      // Deliberately NOT cache.addAll(PRECACHE_URLS) — that convenience
-      // method fetches with the browser's DEFAULT (HTTP-cache-respecting)
-      // caching mode under the hood. Since every URL here keeps the same
-      // path release over release (no content hashing) and _headers only
-      // forces no-cache on index.html/sw.js, a plain fetch() during
-      // install can silently hand back a STALE previously-cached copy of
-      // an unchanged-URL file straight from the browser's own HTTP cache
-      // — even though this brand-new service worker is actively
-      // installing specifically because the server has a newer build.
-      // That produces exactly the bug this comment is here to prevent:
-      // some files (whichever the browser happened to still have fresh
-      // HTTP-cache entries for) silently stay on old code after an
-      // update, while others (freshly fetched) update normally — so the
-      // version footer can show the new build number while some other
-      // module underneath is still running old logic. { cache: "reload" }
-      // forces every one of these fetches to bypass the HTTP cache and
-      // go to the network, guaranteeing the whole app shell updates
-      // atomically together on every new service worker install.
-      await Promise.all(
-        PRECACHE_URLS.map(async (url) => {
-          const response = await fetch(url, { cache: "reload" });
-          if (response.ok) {
-            await cache.put(url, response);
-          }
-        })
-      );
-
-      // Best-effort: cache jsPDF too, so the app works fully offline after
-      // the first successful load. This sandbox has no network access, so
-      // this will fail here — that's fine, it's wrapped so it never fails
-      // the whole install. In the real deployed app (with real internet)
-      // this succeeds and is cached for offline use thereafter.
-      try {
-        await cache.add(JSPDF_URL);
-      } catch (e) {
-        // Ignored on purpose — see comment above.
-      }
-
-      await self.skipWaiting();
-    })()
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      const names = await caches.keys();
-      await Promise.all(
-        names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
-      );
-      await self.clients.claim();
-    })()
-  );
-});
-
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET") return;
-
-  const url = new URL(req.url);
-  const isSameOrigin = url.origin === self.location.origin;
-  const isCacheableCdnAsset = req.url === JSPDF_URL;
-
-  // Cloud sync API calls must never be served from cache — they're the
-  // live, per-user plot data, not app-shell assets. Let these fall
-  // straight through to the network untouched (no caching either way).
-  const isCloudFunction = isSameOrigin && url.pathname.startsWith("/.netlify/functions/");
-  if (isCloudFunction) return;
-
-  if (!isSameOrigin && !isCacheableCdnAsset) return;
-
-  event.respondWith(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(req);
-      if (cached) return cached;
-
+      // 1. Wipe every cache this origin holds — the old app shell.
       try {
-        const response = await fetch(req);
-        if (response && response.ok) {
-          cache.put(req, response.clone());
-        }
-        return response;
+        const names = await caches.keys();
+        await Promise.all(names.map((name) => caches.delete(name)));
       } catch (e) {
-        if (isSameOrigin) {
-          const fallback = await cache.match("/index.html");
-          if (fallback) return fallback;
-        }
-        throw e;
+        // Ignored on purpose — nothing cached is the same outcome.
+      }
+
+      // 2. Take control, so nothing else can answer from a cache while
+      //    this worker is standing itself down.
+      try {
+        await self.clients.claim();
+      } catch (e) {
+        // Ignored on purpose.
+      }
+
+      // 3. Remove this worker too, so the device is left with no service
+      //    worker at all until the real one is deployed again.
+      try {
+        await self.registration.unregister();
+      } catch (e) {
+        // Ignored on purpose.
       }
     })()
   );
