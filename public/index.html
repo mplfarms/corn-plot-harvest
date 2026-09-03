@@ -4,26 +4,119 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#09452C" />
-  <title>Corn Plot Harvest</title>
+  <title>No Longer Exists</title>
 
+  <!-- The manifest and icons are deliberately left in place and
+       untouched: this file is a drop-in REPLACEMENT for the app's own
+       index.html, so the installed home-screen icon and app name stay
+       exactly as they were and everything comes back the moment the real
+       index.html is restored. -->
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/icon-192.png" />
-  <!-- iOS masks this one itself and composites transparency over black,
-       so it points at the full-bleed opaque 180px tile, not icon-192. -->
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Corn Plot" />
+  <meta name="robots" content="noindex" />
 
-  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    :root {
+      --bg: #f4f8f1;
+      --card: #ffffff;
+      --ink: #16241c;
+      --accent: #09452c;
+      --border: rgba(0, 0, 0, 0.08);
+    }
 
-  <!-- jsPDF is only used lazily inside pdfBuilder.js's buildPdf(), never at
-       module-eval time, so loading it with `defer` is safe even though it
-       resolves after our own module scripts run. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1512;
+        --card: #17211b;
+        --ink: #e8efe9;
+        --accent: #7fb894;
+        --border: rgba(255, 255, 255, 0.12);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    .wrap {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+    }
+
+    .card {
+      width: 100%;
+      max-width: 460px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 24px;
+      box-shadow: 0 2px 14px rgba(0, 0, 0, 0.06);
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      line-height: 1.25;
+      color: var(--accent);
+    }
+  </style>
 </head>
 <body>
-  <div id="app"></div>
-  <script type="module" src="/js/main.js"></script>
+  <div class="wrap">
+    <main class="card">
+      <h1>No Longer Exists</h1>
+    </main>
+  </div>
+
+  <script>
+    // Belt and braces alongside sw.js's own self-destruct (which is what
+    // actually reaches devices with the app already installed): if this
+    // page is ever reached with an old service worker still registered —
+    // or with no service worker at all — clear the app shell out of the
+    // browser's cache storage and drop the registration, so the old app
+    // cannot be served again from cache.
+    //
+    // DELIBERATELY does NOT touch localStorage: that is where every plot
+    // a rep has entered on this device lives (see the app's
+    // libraryStore.js). Taking the app down must never destroy their
+    // work — only the app shell is cleared, and their plots come straight
+    // back if the real index.html is ever restored.
+    (async () => {
+      try {
+        if ("caches" in window) {
+          const names = await caches.keys();
+          await Promise.all(names.map((name) => caches.delete(name)));
+        }
+      } catch (e) {
+        // Ignored on purpose — a browser that blocks the Cache API just
+        // has nothing cached to clear.
+      }
+      try {
+        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((reg) => reg.unregister()));
+        }
+      } catch (e) {
+        // Ignored on purpose — see above.
+      }
+    })();
+  </script>
 </body>
 </html>
